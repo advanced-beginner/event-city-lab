@@ -1,0 +1,77 @@
+.world {
+  display: block;
+  width: 100%;
+  min-height: 390px;
+  max-height: 100%;
+  shape-rendering: crispEdges;
+}
+
+.eyebrow,
+.caption,
+.label,
+.stateLabel,
+.crateLabel,
+.ackText {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  fill: #a7bad0;
+}
+
+.eyebrow { font-size: 13px; letter-spacing: 2px; fill: #42e8e0; }
+.caption { font-size: 13px; }
+.label { font-size: 13px; font-weight: 800; letter-spacing: 1px; fill: #edf7ff; }
+.stateLabel { font-size: 12px; fill: #8fa7bf; }
+.crateLabel { font-size: 11px; fill: #ffd77d; }
+.ackText { font-size: 11px; font-weight: 900; fill: #b9ffd5; }
+
+.station {
+  cursor: pointer;
+  outline: none;
+  transition: filter 180ms ease, opacity 180ms ease;
+}
+
+.station:focus-visible,
+.focused {
+  filter: drop-shadow(0 0 9px #a78bfa);
+}
+
+.station:hover { filter: brightness(1.18); }
+.station.active { filter: drop-shadow(0 0 10px #42e8e0); }
+.station.failed { filter: drop-shadow(0 0 13px #ff6577); }
+.station.complete { filter: drop-shadow(0 0 10px #65e69d); }
+.station.blocked { opacity: .55; }
+.signal { animation: signal 1s steps(2, end) infinite; }
+
+.rail { transition: opacity 180ms ease; }
+.pulseRail { animation: rail-move .9s linear infinite; }
+
+.crate {
+  transform: translate(168px, 306px);
+  transition: transform 520ms cubic-bezier(.2, .8, .2, 1), filter 180ms ease;
+  filter: drop-shadow(0 8px 0 #03091288);
+}
+
+.crateproducer { transform: translate(174px, 306px); }
+.crateserializer { transform: translate(401px, 270px); }
+.craterail { transform: translate(535px, 318px); }
+.cratebroker { transform: translate(693px, 338px); }
+.crateack { transform: translate(550px, 180px); }
+
+.ackDrone { animation: drone 1.4s ease-in-out infinite; cursor: pointer; outline: none; }
+
+.reduced .signal,
+.reduced .pulseRail,
+.reduced .ackDrone { animation: none; }
+.reduced .crate,
+.reduced .station { transition: none; }
+
+@keyframes rail-move { to { stroke-dashoffset: -48; } }
+@keyframes signal { 50% { opacity: .35; } }
+@keyframes drone { 50% { transform: translate(544px, 166px); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .signal,
+  .pulseRail,
+  .ackDrone { animation: none; }
+  .crate,
+  .station { transition: none; }
+}
