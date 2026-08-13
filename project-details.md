@@ -183,7 +183,7 @@ flowchart LR
 - `src/state/labStore.ts`: config, runs, cursor, playback, hints, code bridge 상태.
 - `src/storage/workspaceDb.ts`: IndexedDB 자동 저장과 JSON 직렬화·역직렬화.
 - `src/App.tsx`: hydration, autosave, playback, tabs, user action 연결.
-- `src/components/KafkaWorld.tsx`: event state를 도시·차량·차단기·도착 문자로 투영.
+- `src/components/KafkaWorld.tsx`: event state를 pixel 시설·차량, 상태 램프·오류 표지·도착 문자로 투영.
 - `src/components/CitySprite.tsx`: 장식 PNG의 크기·bottom-center anchor·SVG `<image>` 렌더링을 일관되게 관리.
 - `src/assets/city/`: 생성 master, 전체 source split, runtime sprite, palette와 manifest 보관.
 
@@ -226,8 +226,8 @@ Chapter 1 light-city 구현에서 확인한 내용:
 
 - Stable Diffusion Online sprite 페이지는 형태·외곽선·픽셀 밀도 참고, 사용자 제공 Gemini 이미지는 초기 golden-hour 색감과 도시 활기 참고로만 사용했다.
 - 2048×2048 승인 master와 26개 개별 transparent PNG를 생성했다. 원본 참고 이미지는 저장소에 포함하지 않았다.
-- 24색 whole-sheet 강제 축소는 지붕과 그림자 품질을 손상해 폐기했다. runtime은 실제 사용 sprite만 import하며 PNG 합계는 약 0.98MiB다.
-- 기존 `1000×610` SVG viewBox, 세 Kafka 시설 좌표, 차량 checkpoint, ACK 경로, 3열 page layout을 변경하지 않았다.
+- 24색 whole-sheet 강제 축소는 지붕과 그림자 품질을 손상해 폐기했다. runtime은 실제 사용 sprite만 import하며, 시설 3개와 메시지 밴을 포함한 PNG 합계는 약 1.42MiB다.
+- 기존 `1000×610` SVG viewBox, 세 Kafka 시설 좌표, 차량 checkpoint, ACK 경로, 3열 page layout을 변경하지 않았다. 시설 3개와 메시지 밴도 배경과 같은 승인 sprite master 자산으로 통일했다.
 - Visual Ralph 판정은 첫 iteration 84점에서 도로 대비와 가장자리 배치를 수정한 뒤 92점으로 통과했다.
 - 브라우저에서 initial → failure → pending rerun → success → rewind-before-ACK를 실제 조작해 확인했다.
 - `1280×720`, `1440×900`, `1920×1080`의 document/root scroll size가 viewport와 일치해 page overflow가 없음을 측정했다.

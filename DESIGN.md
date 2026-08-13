@@ -55,7 +55,7 @@ PC 전용 초기 모델이며 지원 범위는 100% 브라우저 확대 기준 `
 
 ### Direction
 
-밝은 초기 golden hour의 실제 도시를 축소한 isometric logistics district다. 장식 건물·수목·공원·정차 차량·도로 모듈은 투명 PNG pixel sprite를 사용하고, Kafka 시설과 움직이는 메시지 차량은 같은 팔레트와 deep-violet 외곽선을 가진 동적 SVG로 유지한다. 도로는 화면 밖으로 이어지고 Kafka 경로는 도시 속 주 간선도로로 읽혀야 한다.
+밝은 초기 golden hour의 실제 도시를 축소한 isometric logistics district다. 장식 건물·수목·공원·차량·도로와 Kafka 시설은 하나의 master에서 분리한 투명 PNG pixel sprite를 사용한다. 클릭 영역, 접근 가능한 이름, 상태 램프·오류·ACK 등 의미가 바뀌는 정보만 SVG 오버레이로 유지한다. 도로는 화면 밖으로 이어지고 Kafka 경로는 도시 속 주 간선도로로 읽혀야 한다.
 
 Sprite 규칙:
 
@@ -197,7 +197,7 @@ Standard view에는 Kafka 핵심 시설 3개, 일반 건물 6–8개, 작은 공
 - 제품명과 로고는 위 라이선스에서 제외한다.
 - 외부 참고 자료는 출처와 참고 목적을 생성 기록에 남기며 원본 파일을 재배포하지 않는다.
 - AI 생성 master와 전체 split set은 source record이고, 런타임에는 사용 중인 sprite만 import한다.
-- Kafka 시설·메시지 차량·상태 효과는 참고 이미지를 복제하지 않은 프로젝트 고유 SVG다.
+- Kafka 시설·메시지 차량은 승인된 project sprite master에서 가져오며, 상태 효과와 실제 텍스트는 프로젝트 고유 SVG다.
 
 ## Open questions
 

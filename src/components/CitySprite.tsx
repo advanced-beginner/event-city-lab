@@ -4,6 +4,9 @@ import buildingMidriseApartment from '../assets/city/sprites/building-midrise-ap
 import buildingModernOffice from '../assets/city/sprites/building-modern-office.png'
 import buildingSmallApartment from '../assets/city/sprites/building-small-apartment.png'
 import buildingTownhouse from '../assets/city/sprites/building-townhouse.png'
+import facilityBroker from '../assets/city/sprites/facility-broker.png'
+import facilityProducer from '../assets/city/sprites/facility-producer.png'
+import facilitySerializer from '../assets/city/sprites/facility-serializer.png'
 import parkGarden from '../assets/city/sprites/park-garden.png'
 import propStreetLamp from '../assets/city/sprites/prop-street-lamp.png'
 import roadCorner from '../assets/city/sprites/road-corner.png'
@@ -14,6 +17,7 @@ import treeConical from '../assets/city/sprites/tree-conical.png'
 import treeOval from '../assets/city/sprites/tree-oval.png'
 import treeRound from '../assets/city/sprites/tree-round.png'
 import vehicleCoralCar from '../assets/city/sprites/vehicle-coral-car.png'
+import vehicleKafkaVan from '../assets/city/sprites/vehicle-kafka-van.png'
 import vehicleTealCar from '../assets/city/sprites/vehicle-teal-car.png'
 
 const citySprites = {
@@ -23,6 +27,9 @@ const citySprites = {
   'building-modern-office': { href: buildingModernOffice, width: 218, height: 302 },
   'building-small-apartment': { href: buildingSmallApartment, width: 196, height: 271 },
   'building-townhouse': { href: buildingTownhouse, width: 187, height: 253 },
+  'facility-broker': { href: facilityBroker, width: 399, height: 280 },
+  'facility-producer': { href: facilityProducer, width: 362, height: 261 },
+  'facility-serializer': { href: facilitySerializer, width: 365, height: 253 },
   'park-garden': { href: parkGarden, width: 234, height: 215 },
   'prop-street-lamp': { href: propStreetLamp, width: 67, height: 175 },
   'road-corner': { href: roadCorner, width: 250, height: 178 },
@@ -33,6 +40,7 @@ const citySprites = {
   'tree-oval': { href: treeOval, width: 110, height: 169 },
   'tree-round': { href: treeRound, width: 109, height: 178 },
   'vehicle-coral-car': { href: vehicleCoralCar, width: 165, height: 135 },
+  'vehicle-kafka-van': { href: vehicleKafkaVan, width: 192, height: 171 },
   'vehicle-teal-car': { href: vehicleTealCar, width: 166, height: 136 },
 } as const
 
@@ -43,10 +51,11 @@ interface CitySpriteProps {
   x: number
   y: number
   scale?: number
+  flipX?: boolean
   className?: string | undefined
 }
 
-export function CitySprite({ id, x, y, scale = 1, className }: CitySpriteProps) {
+export function CitySprite({ id, x, y, scale = 1, flipX = false, className }: CitySpriteProps) {
   const sprite = citySprites[id]
   return (
     <image
@@ -56,7 +65,7 @@ export function CitySprite({ id, x, y, scale = 1, className }: CitySpriteProps) 
       y={-sprite.height}
       width={sprite.width}
       height={sprite.height}
-      transform={`translate(${x} ${y}) scale(${scale})`}
+      transform={`translate(${x} ${y}) scale(${flipX ? -scale : scale} ${scale})`}
       preserveAspectRatio="xMidYMax meet"
       aria-hidden="true"
     />
