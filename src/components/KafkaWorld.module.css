@@ -9,7 +9,7 @@
 .vehicle image { image-rendering: pixelated; }
 .backgroundCity { opacity: .88; }
 .foregroundCity { opacity: .92; }
-.roadBed image { opacity: .38; }
+.roadBed image { opacity: 1; }
 .facility { cursor: pointer; outline: none; transition: filter 180ms ease, opacity 180ms ease; }
 .facility:hover { filter: brightness(1.04) saturate(1.08); }
 .facility:focus-visible,

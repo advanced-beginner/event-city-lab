@@ -34,13 +34,13 @@ function statusText(state: ComponentState): string {
 }
 
 function vehiclePosition(activeEvent: SimulationEvent | null): [number, number, number] {
-  if (!activeEvent) return [245, 421, 0]
-  if (activeEvent.kind === 'command.accepted' || activeEvent.kind === 'producer.preparing') return [278, 414, -3]
-  if (activeEvent.kind === 'serializer.inspecting') return [430, 371, -8]
-  if (activeEvent.kind === 'serializer.rejected') return [447, 365, -8]
-  if (activeEvent.kind === 'serializer.completed') return [492, 354, -8]
-  if (activeEvent.kind === 'network.dispatched') return [610, 322, -8]
-  return [777, 276, -8]
+  if (!activeEvent) return [230, 451, 0]
+  if (activeEvent.kind === 'command.accepted' || activeEvent.kind === 'producer.preparing') return [260, 440, -4]
+  if (activeEvent.kind === 'serializer.inspecting') return [462, 365, -8]
+  if (activeEvent.kind === 'serializer.rejected') return [490, 354, -8]
+  if (activeEvent.kind === 'serializer.completed') return [530, 339, -8]
+  if (activeEvent.kind === 'network.dispatched') return [674, 286, -8]
+  return [815, 234, -8]
 }
 
 export function KafkaWorld({
@@ -91,73 +91,67 @@ export function KafkaWorld({
 
       <rect width="1000" height="610" fill="url(#world-sky)" />
       <path d="M0 88 505 0h495v610H0z" fill="#f4eddf" />
-      <path d="M0 510 250 446 506 378 1000 246V610H0z" fill="#f1e8d7" />
+      <path d="M0 510 250 446 506 378 1000 246V610H0z" fill="#f6ead5" />
 
       <g className={styles.roadBed} aria-hidden="true">
-        <path d="M-90 544 322 437 486 382 1080 225" fill="none" stroke="#302840" strokeWidth="108" opacity=".3" />
-        <path d="M-90 533 322 426 486 371 1080 214" fill="none" stroke="url(#road)" strokeWidth="98" />
-        <path d="M-90 533 322 426 486 371 1080 214" fill="none" stroke="#fff2cf" strokeWidth="3" strokeDasharray="26 18" />
-        <path d="M130 610 370 421 577 0" fill="none" stroke="#6a626b" strokeWidth="58" opacity=".16" />
-        <path d="M130 610 370 421 577 0" fill="none" stroke="#979096" strokeWidth="50" />
-        <path d="M130 610 370 421 577 0" fill="none" stroke="#fff2cf" strokeWidth="2" strokeDasharray="20 15" />
-        <path d="M690 610 676 322 870 0" fill="none" stroke="#6a626b" strokeWidth="53" opacity=".16" />
-        <path d="M690 610 676 322 870 0" fill="none" stroke="#979096" strokeWidth="45" />
-        <path d="M690 610 676 322 870 0" fill="none" stroke="#fff2cf" strokeWidth="2" strokeDasharray="20 15" />
-        <CitySprite id="road-straight" x={276} y={465} scale={0.32} />
-        <CitySprite id="road-intersection" x={476} y={406} scale={0.32} />
-        <CitySprite id="road-t-junction" x={659} y={349} scale={0.3} />
-        <CitySprite id="road-corner" x={857} y={299} scale={0.3} />
+        {[-50, 50, 150, 250, 350, 450, 550, 650, 750, 850, 950, 1050].map((x, index) => (
+          <CitySprite key={`main-${x}`} id="road-straight" x={x} y={548 - index * 37} scale={0.46} />
+        ))}
+
+        {[-50, 50, 150, 250, 350, 450, 550, 650].map((x, index) => (
+          <CitySprite key={`cross-a-${x}`} id="road-straight" x={x} y={276 + index * 37} scale={0.46} flipX />
+        ))}
+        {[450, 550, 650, 750, 850, 950, 1050].map((x, index) => (
+          <CitySprite key={`cross-b-${x}`} id="road-straight" x={x} y={132 + index * 37} scale={0.46} flipX />
+        ))}
+
+        <CitySprite id="road-intersection" x={250} y={389} scale={0.37} />
+        <CitySprite id="road-intersection" x={750} y={247} scale={0.37} />
       </g>
 
       <g className={styles.backgroundCity} aria-hidden="true">
-        <CitySprite id="building-townhouse" x={52} y={269} scale={0.56} />
-        <CitySprite id="building-small-apartment" x={184} y={238} scale={0.55} className={styles.standardOnly} />
-        <CitySprite id="building-modern-office" x={325} y={222} scale={0.52} />
-        <CitySprite id="building-coffee-shop" x={586} y={210} scale={0.5} />
-        <CitySprite id="building-midrise-apartment" x={710} y={188} scale={0.48} />
-        <CitySprite id="building-corner-store" x={902} y={207} scale={0.49} />
-        <CitySprite id="building-small-apartment" x={980} y={330} scale={0.52} className={styles.wideOnly} />
-        <CitySprite id="tree-round" x={120} y={288} scale={0.48} />
-        <CitySprite id="tree-conical" x={255} y={243} scale={0.45} />
-        <CitySprite id="tree-oval" x={516} y={230} scale={0.45} />
-        <CitySprite id="tree-round" x={785} y={213} scale={0.45} />
-        <CitySprite id="tree-conical" x={844} y={218} scale={0.42} />
-        <CitySprite id="tree-round" x={228} y={314} scale={0.36} className={styles.wideOnly} />
-        <CitySprite id="tree-oval" x={556} y={282} scale={0.36} className={styles.wideOnly} />
-        <CitySprite id="tree-conical" x={902} y={260} scale={0.36} className={styles.wideOnly} />
-        <CitySprite id="tree-round" x={972} y={375} scale={0.36} className={styles.wideOnly} />
-        <CitySprite id="vehicle-coral-car" x={605} y={174} scale={0.3} className={styles.wideOnly} />
+        <CitySprite id="building-townhouse" x={74} y={274} scale={0.46} />
+        <CitySprite id="building-small-apartment" x={212} y={239} scale={0.45} className={styles.standardOnly} />
+        <CitySprite id="building-modern-office" x={350} y={204} scale={0.45} />
+        <CitySprite id="building-coffee-shop" x={520} y={171} scale={0.44} />
+        <CitySprite id="building-midrise-apartment" x={686} y={139} scale={0.42} />
+        <CitySprite id="building-corner-store" x={884} y={137} scale={0.43} />
+        <CitySprite id="tree-round" x={136} y={291} scale={0.36} />
+        <CitySprite id="tree-conical" x={280} y={249} scale={0.34} />
+        <CitySprite id="tree-oval" x={444} y={207} scale={0.34} />
+        <CitySprite id="tree-round" x={608} y={170} scale={0.34} />
+        <CitySprite id="tree-conical" x={800} y={144} scale={0.32} />
+        <CitySprite id="tree-round" x={968} y={300} scale={0.32} className={styles.wideOnly} />
       </g>
 
       <g className={styles.route} aria-hidden="true">
-        <path d="M248 432 444 375 510 357 784 284" fill="none" stroke="#65736e" strokeWidth="10" opacity=".25" />
-        <path d="M248 432 444 375 510 357 784 284" fill="none" stroke={isFailure ? '#aab2ad' : '#0e9da0'} strokeWidth="5" strokeDasharray="11 10" className={railState === 'active' ? styles.routeActive : ''} />
-        {isFailure && <path d="M500 359 784 284" fill="none" stroke="#c2c6c2" strokeWidth="6" strokeDasharray="7 12" />}
+        <path d="M230 451 490 354 530 339 815 234" fill="none" stroke="#302840" strokeWidth="8" opacity=".18" />
+        <path d="M230 451 490 354 530 339 815 234" fill="none" stroke={isFailure ? '#aab2ad' : '#20a7a1'} strokeWidth="4" strokeDasharray="10 11" className={railState === 'active' ? styles.routeActive : ''} />
+        {isFailure && <path d="M530 339 815 234" fill="none" stroke="#c2c6c2" strokeWidth="5" strokeDasharray="7 12" />}
       </g>
 
       <g className={styles.foregroundCity} aria-hidden="true">
-        <CitySprite id="building-corner-store" x={88} y={548} scale={0.5} className={styles.standardOnly} />
-        <CitySprite id="building-coffee-shop" x={598} y={568} scale={0.5} className={styles.wideOnly} />
-        <CitySprite id="park-garden" x={810} y={538} scale={0.55} />
-        <CitySprite id="tree-oval" x={48} y={406} scale={0.42} className={styles.standardOnly} />
-        <CitySprite id="tree-round" x={165} y={372} scale={0.47} />
-        <CitySprite id="tree-conical" x={325} y={510} scale={0.48} />
-        <CitySprite id="tree-round" x={690} y={520} scale={0.48} />
-        <CitySprite id="tree-oval" x={930} y={432} scale={0.46} className={styles.standardOnly} />
-        <CitySprite id="vehicle-coral-car" x={706} y={392} scale={0.34} />
-        <CitySprite id="vehicle-teal-car" x={934} y={327} scale={0.34} className={styles.standardOnly} />
-        <CitySprite id="prop-street-lamp" x={540} y={450} scale={0.34} />
-        <CitySprite id="prop-street-lamp" x={888} y={380} scale={0.34} className={styles.wideOnly} />
+        <CitySprite id="building-corner-store" x={84} y={574} scale={0.42} className={styles.standardOnly} />
+        <CitySprite id="building-coffee-shop" x={574} y={579} scale={0.42} className={styles.wideOnly} />
+        <CitySprite id="park-garden" x={820} y={555} scale={0.48} />
+        <CitySprite id="tree-oval" x={52} y={424} scale={0.34} className={styles.standardOnly} />
+        <CitySprite id="tree-round" x={158} y={398} scale={0.36} />
+        <CitySprite id="tree-conical" x={376} y={544} scale={0.36} />
+        <CitySprite id="tree-round" x={700} y={537} scale={0.36} />
+        <CitySprite id="tree-oval" x={948} y={438} scale={0.36} className={styles.standardOnly} />
+        <CitySprite id="vehicle-coral-car" x={710} y={416} scale={0.27} />
+        <CitySprite id="vehicle-teal-car" x={932} y={340} scale={0.27} className={styles.standardOnly} />
+        <CitySprite id="prop-street-lamp" x={596} y={477} scale={0.27} />
       </g>
 
-      <g role="button" tabIndex={0} aria-label={`Producer 출발센터, ${statusText(producerState)}`} onClick={inspect('producer')} onKeyDown={inspectWithKeyboard('producer')} className={`${styles.facility} ${styles[producerState]}`} transform="translate(150 302)">
+      <g role="button" tabIndex={0} aria-label={`Producer 출발센터, ${statusText(producerState)}`} onClick={inspect('producer')} onKeyDown={inspectWithKeyboard('producer')} className={`${styles.facility} ${styles[producerState]}`} transform="translate(118 282)">
         <CitySprite id="facility-producer" x={96} y={190} scale={0.62} />
         <text x="84" y="81" textAnchor="middle" className={styles.pixelFacilityName}>PRODUCER</text>
         <circle cx="150" cy="132" r="7" className={styles.stateLamp} data-state={producerState} />
         <g className={styles.facilitySign} transform="translate(15 174)"><rect width="162" height="25" /><text x="81" y="17" textAnchor="middle">출발센터 · {statusText(producerState)}</text></g>
       </g>
 
-      <g role="button" tabIndex={0} aria-label={`Serializer 검사소, ${statusText(serializerState)}`} onClick={inspect('serializer')} onKeyDown={inspectWithKeyboard('serializer')} className={`${styles.facility} ${styles[serializerState]} ${serializerFocused ? styles.focused : ''}`} transform="translate(415 264)">
+      <g role="button" tabIndex={0} aria-label={`Serializer 검사소, ${statusText(serializerState)}`} onClick={inspect('serializer')} onKeyDown={inspectWithKeyboard('serializer')} className={`${styles.facility} ${styles[serializerState]} ${serializerFocused ? styles.focused : ''}`} transform="translate(408 190)">
         <CitySprite id="facility-serializer" x={94} y={190} scale={0.57} />
         <text x="91" y="77" textAnchor="middle" className={styles.pixelFacilityName}>SERIALIZER</text>
         <circle cx="158" cy="144" r="7" className={styles.stateLamp} data-state={serializerState} />
@@ -165,7 +159,7 @@ export function KafkaWorld({
         {!isFailure && <g className={styles.facilitySign} transform="translate(13 190)"><rect width="162" height="25" /><text x="81" y="17" textAnchor="middle">검사소 · {statusText(serializerState)}</text></g>}
       </g>
 
-      <g role="button" tabIndex={0} aria-label={`Broker 기록센터, ${statusText(brokerState)}`} onClick={inspect('broker')} onKeyDown={inspectWithKeyboard('broker')} className={`${styles.facility} ${styles[brokerState]}`} transform="translate(728 164)">
+      <g role="button" tabIndex={0} aria-label={`Broker 기록센터, ${statusText(brokerState)}`} onClick={inspect('broker')} onKeyDown={inspectWithKeyboard('broker')} className={`${styles.facility} ${styles[brokerState]}`} transform="translate(700 4)">
         <CitySprite id="facility-broker" x={111} y={244} scale={0.56} />
         <text x="111" y="92" textAnchor="middle" className={styles.pixelFacilityName}>BROKER</text>
         <circle cx="176" cy="183" r="7" className={styles.stateLamp} data-state={brokerState} />

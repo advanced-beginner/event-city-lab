@@ -65,6 +65,8 @@ Sprite 규칙:
 - 장식 sprite는 `image-rendering: pixelated`와 bottom-center anchor를 사용한다.
 - 시설 표지의 한글·영문은 raster에 굽지 않고 실제 SVG text로 표시한다.
 - Producer·Serializer·Broker·노란 메시지 차량이 1차 시각 중심이고 일반 건물은 대비를 한 단계 낮춘다.
+- Road grid는 `road-straight` 0.46 scale을 약 100×37 isometric step으로 반복하고, 교차점은 `road-intersection` 0.37 scale을 사용한다. 도로 sprite는 배경 지형 다음, 건물과 시설 이전 레이어에 둔다.
+- 일반 건물은 도로 중앙선에 놓지 않고 두 도로 사이 block interior 또는 보도 바깥에 배치한다. 메시지 checkpoint는 Producer → Serializer → Broker 주간선 중앙을 따른다.
 
 ### Color tokens
 

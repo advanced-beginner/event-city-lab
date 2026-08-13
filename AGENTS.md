@@ -67,6 +67,7 @@
 - 생성형 이미지 자산은 `src/assets/city/source/`에 생성 프롬프트·마스터·전체 분리본을 보존하고, 실제 번들은 `src/assets/city/sprites/`에서 명시적으로 import한 PNG만 포함한다. 자산 메타데이터와 앵커는 `src/assets/city/manifest.json`, 공통 색상은 `src/assets/city/palette.json`을 기준으로 한다.
 - 도시 건물·Producer·Serializer·Broker·메시지 차량은 동일 master에서 분리한 PNG를 `CitySprite`와 SVG `<image href>`로 배치한다. 시설 클릭 영역, 접근 가능한 이름, 상태 램프·오류 표지·ACK와 도착 문자는 동적 SVG로 유지한다.
 - Pixel sprite는 `image-rendering: pixelated`를 유지한다. 마스터 전체나 사용하지 않는 sprite를 runtime에서 import하지 않으며 runtime 도시 PNG 합계는 1.5MB 이하로 관리한다.
+- 도시 도로는 `road-straight`와 `road-intersection` sprite를 같은 배율로 반복해 구성한다. SVG path로 도로 면을 다시 그리지 않으며, 건물은 도로 sprite의 보도 바깥 블록에 bottom-center anchor로 배치한다.
 - Google Fonts가 실패해도 시스템 fallback으로 기능과 레이아웃이 유지되어야 한다.
 
 ### 의존성과 라이선스
