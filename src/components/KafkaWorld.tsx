@@ -94,19 +94,7 @@ export function KafkaWorld({
       <path d="M0 510 250 446 506 378 1000 246V610H0z" fill="#f6ead5" />
 
       <g className={styles.roadBed} aria-hidden="true">
-        {[-50, 50, 150, 250, 350, 450, 550, 650, 750, 850, 950, 1050].map((x, index) => (
-          <CitySprite key={`main-${x}`} id="road-straight" x={x} y={548 - index * 37} scale={0.46} />
-        ))}
-
-        {[-50, 50, 150, 250, 350, 450, 550, 650].map((x, index) => (
-          <CitySprite key={`cross-a-${x}`} id="road-straight" x={x} y={276 + index * 37} scale={0.46} flipX />
-        ))}
-        {[450, 550, 650, 750, 850, 950, 1050].map((x, index) => (
-          <CitySprite key={`cross-b-${x}`} id="road-straight" x={x} y={132 + index * 37} scale={0.46} flipX />
-        ))}
-
-        <CitySprite id="road-intersection" x={250} y={389} scale={0.37} />
-        <CitySprite id="road-intersection" x={750} y={247} scale={0.37} />
+        <CitySprite id="road-mainline" x={500} y={545} scale={0.72} />
       </g>
 
       <g className={styles.backgroundCity} aria-hidden="true">

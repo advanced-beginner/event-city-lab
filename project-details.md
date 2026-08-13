@@ -228,7 +228,7 @@ Chapter 1 light-city 구현에서 확인한 내용:
 - 2048×2048 승인 master와 26개 개별 transparent PNG를 생성했다. 원본 참고 이미지는 저장소에 포함하지 않았다.
 - 24색 whole-sheet 강제 축소는 지붕과 그림자 품질을 손상해 폐기했다. runtime은 실제 사용 sprite만 import하며, 시설 3개와 메시지 밴을 포함한 PNG 합계는 약 1.42MiB다.
 - 기존 `1000×610` SVG viewBox, 세 Kafka 시설 좌표, 차량 checkpoint, ACK 경로, 3열 page layout을 변경하지 않았다. 시설 3개와 메시지 밴도 배경과 같은 승인 sprite master 자산으로 통일했다.
-- 도로 면을 만들던 대형 SVG stroke를 제거하고 `road-straight` 반복과 `road-intersection` 2개로 2:1 isometric 격자를 구성했다. 건물은 도로 바깥 block 중심으로 재배치하고 메시지 밴 checkpoint는 같은 주간선 중앙에 맞췄다.
+- 도로 면을 만들던 대형 SVG stroke와 연결이 보장되지 않던 지선·교차점을 제거했다. 짧은 `road-straight` 반복은 이음새마다 끝 캡이 차도를 덮어 조각처럼 보였기 때문에, 같은 스타일을 유지하면서 양 끝에만 캡이 있는 `road-mainline` 단일 sprite로 교체했다.
 - Visual Ralph 판정은 첫 iteration 84점에서 도로 대비와 가장자리 배치를 수정한 뒤 92점으로 통과했다.
 - 브라우저에서 initial → failure → pending rerun → success → rewind-before-ACK를 실제 조작해 확인했다.
 - `1280×720`, `1440×900`, `1920×1080`의 document/root scroll size가 viewport와 일치해 page overflow가 없음을 측정했다.

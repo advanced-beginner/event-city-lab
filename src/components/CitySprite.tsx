@@ -11,6 +11,7 @@ import parkGarden from '../assets/city/sprites/park-garden.png'
 import propStreetLamp from '../assets/city/sprites/prop-street-lamp.png'
 import roadCorner from '../assets/city/sprites/road-corner.png'
 import roadIntersection from '../assets/city/sprites/road-intersection.png'
+import roadMainline from '../assets/city/sprites/road-mainline.png'
 import roadStraight from '../assets/city/sprites/road-straight.png'
 import roadTJunction from '../assets/city/sprites/road-t-junction.png'
 import treeConical from '../assets/city/sprites/tree-conical.png'
@@ -34,6 +35,7 @@ const citySprites = {
   'prop-street-lamp': { href: propStreetLamp, width: 67, height: 175 },
   'road-corner': { href: roadCorner, width: 250, height: 178 },
   'road-intersection': { href: roadIntersection, width: 320, height: 194 },
+  'road-mainline': { href: roadMainline, width: 1619, height: 971 },
   'road-straight': { href: roadStraight, width: 255, height: 158 },
   'road-t-junction': { href: roadTJunction, width: 239, height: 181 },
   'tree-conical': { href: treeConical, width: 95, height: 178 },

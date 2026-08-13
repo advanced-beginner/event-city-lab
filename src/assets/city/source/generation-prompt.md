@@ -36,3 +36,10 @@ Generate on a perfectly flat uniform solid magenta chroma-key backdrop. Do not u
 - Split 26 disconnected components and assigned semantic filenames.
 - Rejected a forced 24-color whole-sheet quantization because it damaged roofs and shadow detail.
 - Runtime code imports only the sprites it uses; the generated master and complete split set are source records, not browser runtime dependencies.
+
+## Continuous road derivative
+
+- Tool: OpenAI built-in image generation edit using `road-straight.png` as the edit reference.
+- Purpose: replace visibly disconnected repeated short-road tiles with one continuous mainline whose end caps appear only at the two extremes.
+- Prompt: "Edit the referenced isometric pixel-art road sprite into one single, genuinely continuous long road segment for a web simulator. Preserve exactly the same pixel-art style, camera angle, asphalt color, beige tiled sidewalk, yellow curb line, white dashed center line, crisp dark outline, and lighting. Extend the road to approximately 4 times the referenced length along the same diagonal direction. There must be no gaps, no repeated vertical end caps, no seams, no junctions, no buildings, no vehicles, and no text. Keep only one end cap at each extreme end of the entire long road. Place the road alone on a perfectly flat solid #ff00ff chroma-key background with no shadows, gradients, texture, reflections, or lighting variation in the background. Do not use #ff00ff in the road. Generous padding, centered, full sprite visible, crisp hard pixel edges."
+- Post-processing: removed the magenta chroma key with soft matte and despill; validated an alpha channel and transparent corners; saved the project-bound result as `sprites/road-mainline.png`.
