@@ -1,34 +1,46 @@
 :root {
-  font-family: Inter, Pretendard, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  color: #edf7ff;
-  background: #050c16;
+  font-family: "Nanum Gothic", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  color: #243142;
+  background: #f5f4ef;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
-  --city-950: #07111f;
-  --city-900: #0b1729;
-  --city-800: #12243b;
-  --ink-100: #edf7ff;
-  --ink-300: #a7bad0;
-  --cyan-400: #42e8e0;
-  --amber-400: #ffc857;
-  --red-400: #ff6577;
-  --green-400: #65e69d;
-  --violet-400: #a78bfa;
+  --canvas: #f5f4ef;
+  --surface: #ffffff;
+  --surface-muted: #f7f8fa;
+  --line: #d9dee5;
+  --line-strong: #bcc5d0;
+  --ink: #243142;
+  --ink-muted: #66758a;
+  --cyan: #0e9da0;
+  --cyan-soft: #dff5f3;
+  --amber: #e9a23b;
+  --amber-soft: #fff2d7;
+  --red: #d84a5b;
+  --red-soft: #fff0f2;
+  --green: #238a5b;
+  --green-soft: #e8f7ef;
+  --violet: #7656c9;
+  --violet-soft: #f1edff;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
 
 * { box-sizing: border-box; }
-html { min-width: 1280px; min-height: 720px; background: #050c16; }
-body { margin: 0; min-width: 1280px; min-height: 100vh; background: #050c16; }
+html,
+body,
+#root { width: 100%; height: 100%; overflow: hidden; }
+html { min-width: 1280px; min-height: 720px; background: var(--canvas); }
+body { margin: 0; min-width: 1280px; min-height: 720px; background: var(--canvas); }
 button, select, input { font: inherit; }
 button, select { color: inherit; }
 button { cursor: pointer; }
 button:disabled { cursor: not-allowed; opacity: .48; }
 button:focus-visible,
 select:focus-visible,
-input:focus-visible { outline: 2px solid var(--cyan-400); outline-offset: 2px; }
-code, kbd { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+input:focus-visible,
+[tabindex]:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+code, kbd { font-family: var(--mono); }
 
-::selection { background: #42e8e044; color: #fff; }
-::-webkit-scrollbar { width: 10px; height: 10px; }
-::-webkit-scrollbar-thumb { background: #294761; border: 2px solid #0b1729; }
-::-webkit-scrollbar-track { background: #081321; }
+::selection { background: #bfecea; color: #163537; }
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-thumb { background: #bdc7d2; border: 2px solid #f7f8fa; border-radius: 99px; }
+::-webkit-scrollbar-track { background: #f7f8fa; }

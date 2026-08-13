@@ -1,77 +1,90 @@
-.world {
-  display: block;
-  width: 100%;
-  min-height: 390px;
-  max-height: 100%;
-  shape-rendering: crispEdges;
+.world { display: block; width: 100%; height: calc(100% - 36px); min-height: 0; }
+.decorBuilding,
+.tree,
+.park { pointer-events: none; }
+.facility { cursor: pointer; outline: none; transition: filter 180ms ease, opacity 180ms ease; }
+.facility:hover { filter: brightness(1.04) saturate(1.08); }
+.facility:focus-visible,
+.focused { filter: url(#focus-glow); }
+.facility.active { filter: drop-shadow(0 0 8px #0e9da099); }
+.facility.failed { filter: drop-shadow(0 0 9px #d84a5ba6); }
+.facility.complete { filter: drop-shadow(0 0 8px #238a5b8c); }
+.facility.blocked { opacity: .7; }
+
+.facilitySign rect { fill: #ffffffed; stroke: #738394; stroke-width: 1.5; }
+.facilitySign text,
+.gateText,
+.errorSign text,
+.vehicleLabel,
+.plateLabel,
+.attemptLabel,
+.smsTitle,
+.smsText,
+.cityLabel text { font-family: "Nanum Gothic", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; }
+.facilitySign text { fill: #33465a; font-size: 11px; font-weight: 800; }
+.gateText { fill: #6549a7; font-size: 13px; font-weight: 800; letter-spacing: 1px; }
+.errorSign rect { fill: #fff0f2; stroke: #d84a5b; stroke-width: 2; }
+.errorSign text { fill: #b33143; font: 800 11px ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+.routeActive { animation: route-flow .8s linear infinite; }
+.barrier { transform-box: fill-box; transform-origin: 0 50%; transition: transform 300ms ease; }
+.barrierOpen { transform: rotate(-68deg); }
+.barrierClosed { transform: rotate(0); animation: barrier-alert .7s ease-in-out infinite alternate; }
+
+.vehicle {
+  transform: translate(var(--vehicle-x), var(--vehicle-y)) rotate(var(--vehicle-angle));
+  transform-origin: 0 20px;
+  transition: transform 480ms cubic-bezier(.2, .8, .2, 1), filter 180ms ease;
+  filter: drop-shadow(0 6px 5px #44534e3d);
+}
+.vehicleFailed { animation: vehicle-shake .28s ease-in-out 2; filter: drop-shadow(0 6px 5px #d84a5b38); }
+.vehicleLabel { fill: #6c5017; font-size: 8px; font-weight: 800; }
+.plateLabel { fill: #ffffff; font-size: 5px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.attemptLabel { fill: #7c5a18; font-size: 7px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+.ackSignal { cursor: pointer; outline: none; }
+.ackSignal > path { animation: signal-flow 1s linear infinite; }
+.smsBubble { filter: drop-shadow(0 8px 13px #3f5b4b3a); animation: sms-arrive .4s cubic-bezier(.2, .9, .3, 1) both; }
+.smsBubble rect,
+.smsBubble > path { fill: #ffffff; stroke: #83c8a4; stroke-width: 2; }
+.smsTitle { fill: #1f6e4b; font-size: 11px; font-weight: 800; }
+.smsText { fill: #526c60; font-size: 9px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+.cityLabel rect { fill: #fffffff0; stroke: #d2dcd5; }
+.cityLabel text:first-of-type { fill: #328287; font-size: 11px; font-weight: 800; letter-spacing: 1.2px; }
+.cityLabel text:last-of-type { fill: #77877e; font-size: 9px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+.reduced .routeActive,
+.reduced .barrierClosed,
+.reduced .vehicleFailed,
+.reduced .ackSignal > path,
+.reduced .smsBubble { animation: none; }
+.reduced .vehicle,
+.reduced .facility,
+.reduced .barrier { transition: none; }
+
+@keyframes route-flow { to { stroke-dashoffset: -42; } }
+@keyframes signal-flow { to { stroke-dashoffset: -38; } }
+@keyframes barrier-alert { to { filter: drop-shadow(0 0 7px #d84a5b); } }
+@keyframes vehicle-shake { 33% { margin-left: -2px; } 66% { margin-left: 2px; } }
+@keyframes sms-arrive { from { opacity: 0; transform: translate(190px, 200px) scale(.94); } to { opacity: 1; transform: translate(190px, 188px) scale(1); } }
+
+@media (max-width: 1439px) {
+  .standardOnly,
+  .wideOnly { display: none; }
 }
 
-.eyebrow,
-.caption,
-.label,
-.stateLabel,
-.crateLabel,
-.ackText {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  fill: #a7bad0;
+@media (min-width: 1440px) and (max-width: 1679px) {
+  .wideOnly { display: none; }
 }
-
-.eyebrow { font-size: 13px; letter-spacing: 2px; fill: #42e8e0; }
-.caption { font-size: 13px; }
-.label { font-size: 13px; font-weight: 800; letter-spacing: 1px; fill: #edf7ff; }
-.stateLabel { font-size: 12px; fill: #8fa7bf; }
-.crateLabel { font-size: 11px; fill: #ffd77d; }
-.ackText { font-size: 11px; font-weight: 900; fill: #b9ffd5; }
-
-.station {
-  cursor: pointer;
-  outline: none;
-  transition: filter 180ms ease, opacity 180ms ease;
-}
-
-.station:focus-visible,
-.focused {
-  filter: drop-shadow(0 0 9px #a78bfa);
-}
-
-.station:hover { filter: brightness(1.18); }
-.station.active { filter: drop-shadow(0 0 10px #42e8e0); }
-.station.failed { filter: drop-shadow(0 0 13px #ff6577); }
-.station.complete { filter: drop-shadow(0 0 10px #65e69d); }
-.station.blocked { opacity: .55; }
-.signal { animation: signal 1s steps(2, end) infinite; }
-
-.rail { transition: opacity 180ms ease; }
-.pulseRail { animation: rail-move .9s linear infinite; }
-
-.crate {
-  transform: translate(168px, 306px);
-  transition: transform 520ms cubic-bezier(.2, .8, .2, 1), filter 180ms ease;
-  filter: drop-shadow(0 8px 0 #03091288);
-}
-
-.crateproducer { transform: translate(174px, 306px); }
-.crateserializer { transform: translate(401px, 270px); }
-.craterail { transform: translate(535px, 318px); }
-.cratebroker { transform: translate(693px, 338px); }
-.crateack { transform: translate(550px, 180px); }
-
-.ackDrone { animation: drone 1.4s ease-in-out infinite; cursor: pointer; outline: none; }
-
-.reduced .signal,
-.reduced .pulseRail,
-.reduced .ackDrone { animation: none; }
-.reduced .crate,
-.reduced .station { transition: none; }
-
-@keyframes rail-move { to { stroke-dashoffset: -48; } }
-@keyframes signal { 50% { opacity: .35; } }
-@keyframes drone { 50% { transform: translate(544px, 166px); } }
 
 @media (prefers-reduced-motion: reduce) {
-  .signal,
-  .pulseRail,
-  .ackDrone { animation: none; }
-  .crate,
-  .station { transition: none; }
+  .routeActive,
+  .barrierClosed,
+  .vehicleFailed,
+  .ackSignal > path,
+  .smsBubble { animation: none; }
+  .vehicle,
+  .facility,
+  .barrier { transition: none; }
 }

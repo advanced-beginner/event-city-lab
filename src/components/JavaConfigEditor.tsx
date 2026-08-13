@@ -31,23 +31,26 @@ export function JavaConfigEditor({ value, onChange }: JavaConfigEditorProps) {
           EditorView.theme({
             '&': {
               height: '100%',
-              backgroundColor: '#07111f',
-              color: '#dcecff',
+              backgroundColor: '#f7f8fa',
+              color: '#344457',
               fontSize: '12px',
             },
             '.cm-content': {
-              caretColor: '#42e8e0',
+              caretColor: '#0e9da0',
               fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
               padding: '12px 0',
             },
             '.cm-gutters': {
-              backgroundColor: '#0b1729',
-              color: '#536b85',
-              border: 'none',
+              backgroundColor: '#eef1f4',
+              color: '#8995a3',
+              borderRight: '1px solid #d9dee5',
             },
-            '&.cm-focused': { outline: '2px solid #42e8e0' },
-            '.cm-activeLine': { backgroundColor: '#12243b99' },
-            '.cm-activeLineGutter': { backgroundColor: '#12243b' },
+            '&.cm-focused': { outline: '2px solid #0e9da0' },
+            '.cm-activeLine': { backgroundColor: '#e9f6f599' },
+            '.cm-activeLineGutter': { backgroundColor: '#deefee' },
+            '.cm-selectionBackground, &.cm-focused .cm-selectionBackground': {
+              backgroundColor: '#bee7e5',
+            },
           }),
           EditorView.updateListener.of((update) => {
             if (update.docChanged) onChangeRef.current(update.state.doc.toString())
