@@ -7,6 +7,7 @@ import type {
   SimulationRun,
 } from '../domain/simulation'
 
+import { CitySprite } from './CitySprite'
 import styles from './KafkaWorld.module.css'
 
 interface KafkaWorldProps {
@@ -20,17 +21,6 @@ interface KafkaWorldProps {
   onInspect: (component: ComponentId) => void
 }
 
-interface BuildingProps {
-  x: number
-  y: number
-  scale?: number
-  roof: string
-  left: string
-  right: string
-  compact?: boolean
-  wide?: boolean
-}
-
 function stateFor(component: ComponentId, run: SimulationRun | null, cursor: number): ComponentState {
   if (!run || cursor < 0) return 'idle'
   const latest = run.events.slice(0, cursor + 1).filter((event) => event.component === component).at(-1)
@@ -41,30 +31,6 @@ function stateFor(component: ComponentId, run: SimulationRun | null, cursor: num
 
 function statusText(state: ComponentState): string {
   return { idle: '대기', active: '처리 중', blocked: '차단', failed: '실패', complete: '완료' }[state]
-}
-
-function SmallBuilding({ x, y, scale = 1, roof, left, right, compact, wide }: BuildingProps) {
-  const densityClass = wide ? styles.wideOnly : compact ? styles.standardOnly : ''
-  return (
-    <g className={`${styles.decorBuilding} ${densityClass}`} transform={`translate(${x} ${y}) scale(${scale})`} aria-hidden="true">
-      <path d="m0 24 42-22 48 24-43 22z" fill={roof} />
-      <path d="M0 24v52l47 24V48z" fill={left} />
-      <path d="M47 48v52l43-22V26z" fill={right} />
-      <path d="M10 43v11l9 5V48zm17 9v11l9 5V57z" fill="#eaf7f7" opacity=".85" />
-      <path d="m58 54 20-10v11L58 65zm0 19 20-10v11L58 84z" fill="#eef7fa" opacity=".76" />
-    </g>
-  )
-}
-
-function Tree({ x, y, wide }: { x: number; y: number; wide?: boolean }) {
-  return (
-    <g className={`${styles.tree} ${wide ? styles.wideOnly : ''}`} transform={`translate(${x} ${y})`} aria-hidden="true">
-      <path d="M0 11v17" stroke="#8c6944" strokeWidth="4" />
-      <circle cy="2" r="12" fill="#68b879" />
-      <circle cx="-7" cy="9" r="9" fill="#54a96b" />
-      <circle cx="7" cy="9" r="9" fill="#76c88a" />
-    </g>
-  )
 }
 
 function vehiclePosition(activeEvent: SimulationEvent | null): [number, number, number] {
@@ -124,14 +90,44 @@ export function KafkaWorld({
       </defs>
 
       <rect width="1000" height="610" fill="url(#world-sky)" />
-      <path d="M0 125 510 0h490v610H0z" fill="#edf4e8" />
-      <path d="M-90 544 322 437 486 382 1080 225" fill="none" stroke="#b9b6ad" strokeWidth="112" opacity=".55" />
-      <path d="M-90 533 322 426 486 371 1080 214" fill="none" stroke="url(#road)" strokeWidth="98" />
-      <path d="M-90 533 322 426 486 371 1080 214" fill="none" stroke="#f8f5e9" strokeWidth="3" strokeDasharray="26 18" />
-      <path d="M130 610 370 421 577 0" fill="none" stroke="#d5d1c6" strokeWidth="62" />
-      <path d="M130 610 370 421 577 0" fill="none" stroke="#f8f5e9" strokeWidth="2" strokeDasharray="20 15" />
-      <path d="M690 610 676 322 870 0" fill="none" stroke="#d5d1c6" strokeWidth="55" />
-      <path d="M690 610 676 322 870 0" fill="none" stroke="#f8f5e9" strokeWidth="2" strokeDasharray="20 15" />
+      <path d="M0 88 505 0h495v610H0z" fill="#f4eddf" />
+      <path d="M0 510 250 446 506 378 1000 246V610H0z" fill="#f1e8d7" />
+
+      <g className={styles.roadBed} aria-hidden="true">
+        <path d="M-90 544 322 437 486 382 1080 225" fill="none" stroke="#302840" strokeWidth="108" opacity=".3" />
+        <path d="M-90 533 322 426 486 371 1080 214" fill="none" stroke="url(#road)" strokeWidth="98" />
+        <path d="M-90 533 322 426 486 371 1080 214" fill="none" stroke="#fff2cf" strokeWidth="3" strokeDasharray="26 18" />
+        <path d="M130 610 370 421 577 0" fill="none" stroke="#6a626b" strokeWidth="58" opacity=".16" />
+        <path d="M130 610 370 421 577 0" fill="none" stroke="#979096" strokeWidth="50" />
+        <path d="M130 610 370 421 577 0" fill="none" stroke="#fff2cf" strokeWidth="2" strokeDasharray="20 15" />
+        <path d="M690 610 676 322 870 0" fill="none" stroke="#6a626b" strokeWidth="53" opacity=".16" />
+        <path d="M690 610 676 322 870 0" fill="none" stroke="#979096" strokeWidth="45" />
+        <path d="M690 610 676 322 870 0" fill="none" stroke="#fff2cf" strokeWidth="2" strokeDasharray="20 15" />
+        <CitySprite id="road-straight" x={276} y={465} scale={0.32} />
+        <CitySprite id="road-intersection" x={476} y={406} scale={0.32} />
+        <CitySprite id="road-t-junction" x={659} y={349} scale={0.3} />
+        <CitySprite id="road-corner" x={857} y={299} scale={0.3} />
+      </g>
+
+      <g className={styles.backgroundCity} aria-hidden="true">
+        <CitySprite id="building-townhouse" x={52} y={269} scale={0.56} />
+        <CitySprite id="building-small-apartment" x={184} y={238} scale={0.55} className={styles.standardOnly} />
+        <CitySprite id="building-modern-office" x={325} y={222} scale={0.52} />
+        <CitySprite id="building-coffee-shop" x={586} y={210} scale={0.5} />
+        <CitySprite id="building-midrise-apartment" x={710} y={188} scale={0.48} />
+        <CitySprite id="building-corner-store" x={902} y={207} scale={0.49} />
+        <CitySprite id="building-small-apartment" x={980} y={330} scale={0.52} className={styles.wideOnly} />
+        <CitySprite id="tree-round" x={120} y={288} scale={0.48} />
+        <CitySprite id="tree-conical" x={255} y={243} scale={0.45} />
+        <CitySprite id="tree-oval" x={516} y={230} scale={0.45} />
+        <CitySprite id="tree-round" x={785} y={213} scale={0.45} />
+        <CitySprite id="tree-conical" x={844} y={218} scale={0.42} />
+        <CitySprite id="tree-round" x={228} y={314} scale={0.36} className={styles.wideOnly} />
+        <CitySprite id="tree-oval" x={556} y={282} scale={0.36} className={styles.wideOnly} />
+        <CitySprite id="tree-conical" x={902} y={260} scale={0.36} className={styles.wideOnly} />
+        <CitySprite id="tree-round" x={972} y={375} scale={0.36} className={styles.wideOnly} />
+        <CitySprite id="vehicle-coral-car" x={605} y={174} scale={0.3} className={styles.wideOnly} />
+      </g>
 
       <g className={styles.route} aria-hidden="true">
         <path d="M248 432 444 375 510 357 784 284" fill="none" stroke="#65736e" strokeWidth="10" opacity=".25" />
@@ -139,70 +135,75 @@ export function KafkaWorld({
         {isFailure && <path d="M500 359 784 284" fill="none" stroke="#c2c6c2" strokeWidth="6" strokeDasharray="7 12" />}
       </g>
 
-      <g className={styles.park} aria-hidden="true">
-        <path d="m675 430 92-48 110 55-95 49z" fill="#a8d69a" stroke="#84bc7c" strokeWidth="3" />
-        <path d="m704 437 60-31 72 36-62 32z" fill="#d8e5b1" />
-        <path d="M752 407v61M712 433l104 16" stroke="#f4eed8" strokeWidth="5" opacity=".8" />
+      <g className={styles.foregroundCity} aria-hidden="true">
+        <CitySprite id="building-corner-store" x={88} y={548} scale={0.5} className={styles.standardOnly} />
+        <CitySprite id="building-coffee-shop" x={598} y={568} scale={0.5} className={styles.wideOnly} />
+        <CitySprite id="park-garden" x={810} y={538} scale={0.55} />
+        <CitySprite id="tree-oval" x={48} y={406} scale={0.42} className={styles.standardOnly} />
+        <CitySprite id="tree-round" x={165} y={372} scale={0.47} />
+        <CitySprite id="tree-conical" x={325} y={510} scale={0.48} />
+        <CitySprite id="tree-round" x={690} y={520} scale={0.48} />
+        <CitySprite id="tree-oval" x={930} y={432} scale={0.46} className={styles.standardOnly} />
+        <CitySprite id="vehicle-coral-car" x={706} y={392} scale={0.34} />
+        <CitySprite id="vehicle-teal-car" x={934} y={327} scale={0.34} className={styles.standardOnly} />
+        <CitySprite id="prop-street-lamp" x={540} y={450} scale={0.34} />
+        <CitySprite id="prop-street-lamp" x={888} y={380} scale={0.34} className={styles.wideOnly} />
       </g>
 
-      <SmallBuilding x={70} y={160} scale={1.05} roof="#92cae5" left="#73adc9" right="#5c94b3" />
-      <SmallBuilding x={190} y={105} scale={0.82} roof="#f3b5a7" left="#d99085" right="#c87872" compact />
-      <SmallBuilding x={337} y={85} scale={0.94} roof="#d1b9ed" left="#ad91d0" right="#9476ba" />
-      <SmallBuilding x={622} y={95} scale={0.9} roof="#f0cc86" left="#dcb56c" right="#c99a51" />
-      <SmallBuilding x={820} y={78} scale={1.05} roof="#95d3bd" left="#6db69d" right="#549b84" />
-      <SmallBuilding x={77} y={370} scale={0.82} roof="#f5c8ae" left="#dfa589" right="#c98d73" compact />
-      <SmallBuilding x={575} y={470} scale={0.86} roof="#a9c7eb" left="#85a8d2" right="#6f90ba" wide />
-      <SmallBuilding x={865} y={402} scale={0.94} roof="#e8b9d2" left="#cc94b3" right="#b67c9d" />
-
-      <Tree x={38} y={295} /><Tree x={156} y={295} /><Tree x={288} y={190} /><Tree x={565} y={190} /><Tree x={721} y={148} />
-      <Tree x={839} y={340} /><Tree x={888} y={320} /><Tree x={715} y={474} /><Tree x={823} y={460} wide /><Tree x={932} y={340} wide />
-
       <g role="button" tabIndex={0} aria-label={`Producer 출발센터, ${statusText(producerState)}`} onClick={inspect('producer')} onKeyDown={inspectWithKeyboard('producer')} className={`${styles.facility} ${styles[producerState]}`} transform="translate(150 302)">
-        <path d="m0 52 86-44 105 52-90 46z" fill="#8fd1df" filter="url(#city-shadow)" />
-        <path d="M0 52v88l101 50v-84z" fill="#63adbd" />
-        <path d="M101 106v84l90-45V60z" fill="#4d92a4" />
-        <path d="m30 38 54-28 74 37-57 29z" fill="#b9e5ec" />
-        <path d="M24 99h54v58H24z" fill="#f5f0df" stroke="#397b8b" strokeWidth="4" />
-        <path d="M34 111h34M34 125h34M34 139h34" stroke="#8aa0a1" strokeWidth="3" />
-        <path d="M128 112h36v32h-36z" fill="#dff5f3" stroke="#397b8b" strokeWidth="3" />
-        <circle cx="146" cy="128" r="7" fill={producerState === 'complete' ? '#238a5b' : '#0e9da0'} />
+        <path d="m0 52 86-44 105 52-90 46z" fill="#74d3df" stroke="#302840" strokeWidth="5" strokeLinejoin="round" filter="url(#city-shadow)" />
+        <path d="M0 52v88l101 50v-84z" fill="#38adbe" stroke="#302840" strokeWidth="5" strokeLinejoin="round" />
+        <path d="M101 106v84l90-45V60z" fill="#21839a" stroke="#302840" strokeWidth="5" strokeLinejoin="round" />
+        <path d="m30 38 54-28 74 37-57 29z" fill="#bdeff0" stroke="#302840" strokeWidth="4" strokeLinejoin="round" />
+        <path d="M24 99h54v58H24z" fill="#fff1cf" stroke="#302840" strokeWidth="4" />
+        <path d="M34 111h34M34 125h34M34 139h34" stroke="#7c7080" strokeWidth="4" />
+        <path d="M128 112h36v32h-36z" fill="#d7f1ee" stroke="#302840" strokeWidth="4" />
+        <path d="m132 116 28 14-28 14z" fill="#7fd8d4" opacity=".72" />
+        <rect x="52" y="27" width="74" height="24" fill="#fff0cf" stroke="#302840" strokeWidth="4" />
+        <path d="M62 36h54" stroke="#efb15c" strokeWidth="5" />
+        <circle cx="146" cy="128" r="8" fill={producerState === 'complete' ? '#61db94' : '#55d7d0'} stroke="#302840" strokeWidth="3" />
         <g className={styles.facilitySign} transform="translate(4 170)"><rect width="177" height="30" rx="6" /><text x="88" y="19" textAnchor="middle">PRODUCER 출발센터 · {statusText(producerState)}</text></g>
       </g>
 
       <g role="button" tabIndex={0} aria-label={`Serializer 검사소, ${statusText(serializerState)}`} onClick={inspect('serializer')} onKeyDown={inspectWithKeyboard('serializer')} className={`${styles.facility} ${styles[serializerState]} ${serializerFocused ? styles.focused : ''}`} transform="translate(415 264)">
-        <path d="m8 78 74-38 91 45-78 40z" fill="#c8b8e8" filter="url(#city-shadow)" />
-        <path d="M28 73v107h24V85zm108 5v102h25V91z" fill="#8e76bd" stroke="#6f57a2" strokeWidth="3" />
-        <path d="M28 72 82 44l79 39-25 13-53-27-31 16z" fill="#dfd5f2" />
-        <path d="M50 104h87v31H50z" fill="#f8f6fc" stroke="#8066b3" strokeWidth="3" />
+        <path d="m8 78 74-38 91 45-78 40z" fill="#c8afe7" stroke="#302840" strokeWidth="5" strokeLinejoin="round" filter="url(#city-shadow)" />
+        <path d="M28 73v107h24V85zm108 5v102h25V91z" fill="#9271c4" stroke="#302840" strokeWidth="5" strokeLinejoin="round" />
+        <path d="M28 72 82 44l79 39-25 13-53-27-31 16z" fill="#eadcf6" stroke="#302840" strokeWidth="4" strokeLinejoin="round" />
+        <path d="M50 104h87v31H50z" fill="#fff1cf" stroke="#302840" strokeWidth="4" />
+        <path d="M36 95h18m76 4h18M38 166h12m90 0h12" stroke="#f1c56f" strokeWidth="5" />
         <text x="94" y="123" textAnchor="middle" className={styles.gateText}>{isFailure ? 'TYPE ERROR' : serializerState === 'complete' ? 'PASS' : 'CHECK'}</text>
         <g className={`${styles.barrier} ${isFailure ? styles.barrierClosed : styles.barrierOpen}`}>
           <rect x="54" y="148" width="78" height="8" rx="3" fill="#ffffff" stroke="#d84a5b" strokeWidth="2" />
           <path d="M62 149 75 155m10-6 13 6m10-6 13 6" stroke="#d84a5b" strokeWidth="4" />
-          <circle cx="54" cy="152" r="8" fill="#7656c9" />
+          <circle cx="54" cy="152" r="8" fill="#7656c9" stroke="#302840" strokeWidth="3" />
         </g>
         {isFailure && <g className={styles.errorSign} transform="translate(5 194)"><rect width="180" height="31" rx="6" /><text x="90" y="20" textAnchor="middle">OrderEvent ≠ StringSerializer</text></g>}
         {!isFailure && <g className={styles.facilitySign} transform="translate(8 194)"><rect width="174" height="30" rx="6" /><text x="87" y="19" textAnchor="middle">SERIALIZER 검사소 · {statusText(serializerState)}</text></g>}
       </g>
 
       <g role="button" tabIndex={0} aria-label={`Broker 기록센터, ${statusText(brokerState)}`} onClick={inspect('broker')} onKeyDown={inspectWithKeyboard('broker')} className={`${styles.facility} ${styles[brokerState]}`} transform="translate(728 164)">
-        <path d="m0 76 100-51 123 61-105 54z" fill="#9dc7e5" filter="url(#city-shadow)" />
-        <path d="M0 76v123l118 59V140z" fill="#6c9fc6" />
-        <path d="M118 140v118l105-52V86z" fill="#557fa8" />
-        <path d="m31 60 69-35 91 45-73 38z" fill="#c6e0f2" />
-        <path d="M28 126h57v76H28z" fill="#f7fbfc" stroke="#456f95" strokeWidth="4" />
+        <path d="m0 76 100-51 123 61-105 54z" fill="#73aee5" stroke="#302840" strokeWidth="5" strokeLinejoin="round" filter="url(#city-shadow)" />
+        <path d="M0 76v123l118 59V140z" fill="#467fbd" stroke="#302840" strokeWidth="5" strokeLinejoin="round" />
+        <path d="M118 140v118l105-52V86z" fill="#315f9a" stroke="#302840" strokeWidth="5" strokeLinejoin="round" />
+        <path d="m31 60 69-35 91 45-73 38z" fill="#bcd9f2" stroke="#302840" strokeWidth="4" strokeLinejoin="round" />
+        <path d="M28 126h57v76H28z" fill="#fff1cf" stroke="#302840" strokeWidth="5" />
         <path d="M41 145h31M41 163h31M41 181h31" stroke={brokerState === 'complete' ? '#238a5b' : '#74a0b9'} strokeWidth="5" />
-        <path d="m146 130 48-24v25l-48 24zm0 40 48-24v25l-48 24z" fill="#8eb7d4" stroke="#456f95" strokeWidth="3" />
+        <path d="m146 130 48-24v25l-48 24zm0 40 48-24v25l-48 24z" fill="#8dbce0" stroke="#302840" strokeWidth="4" />
+        <path d="m157 58 25 12v38l-25-12zm-35-17 21 10v49l-21-10z" fill="#6e91bb" stroke="#302840" strokeWidth="4" />
+        <rect x="52" y="61" width="95" height="25" fill="#fff0cf" stroke="#302840" strokeWidth="4" />
+        <path d="M64 71h71" stroke="#efb15c" strokeWidth="5" />
         <g className={styles.facilitySign} transform="translate(20 241)"><rect width="182" height="30" rx="6" /><text x="91" y="19" textAnchor="middle">BROKER 기록센터 · {statusText(brokerState)}</text></g>
       </g>
 
       <g className={`${styles.vehicle} ${isFailure ? styles.vehicleFailed : ''}`} style={vehicleStyle} aria-hidden="true">
-        <ellipse cx="0" cy="24" rx="45" ry="14" fill="#5a6870" opacity=".2" />
-        <path d="m-42-4 45-22 54 27-46 23z" fill="#ffd161" stroke="#805d1d" strokeWidth="3" />
-        <path d="M-42-4v29L11 52V24z" fill="#e6a829" stroke="#805d1d" strokeWidth="3" />
-        <path d="M11 24v28L57 29V1z" fill="#c98916" stroke="#805d1d" strokeWidth="3" />
-        <path d="m-22-14 25-12L34-11 8 2z" fill="#fff2b9" stroke="#805d1d" strokeWidth="2" />
-        <path d="m34-11 23 12-19 9L17 0z" fill="#dff2f6" stroke="#547889" strokeWidth="2" />
-        <circle cx="-25" cy="34" r="8" fill="#39434a" /><circle cx="34" cy="42" r="8" fill="#39434a" />
+        <ellipse cx="0" cy="27" rx="47" ry="15" fill="#302840" opacity=".18" />
+        <path d="m-44-5 47-23 55 27-47 24z" fill="#ffd45e" stroke="#302840" strokeWidth="4" strokeLinejoin="round" />
+        <path d="M-44-5v30L11 53V23z" fill="#edae29" stroke="#302840" strokeWidth="4" strokeLinejoin="round" />
+        <path d="M11 23v30L58 29V-1z" fill="#d48c18" stroke="#302840" strokeWidth="4" strokeLinejoin="round" />
+        <path d="m-23-15 26-13L35-12 8 2z" fill="#fff0b5" stroke="#302840" strokeWidth="3" />
+        <path d="m35-12 23 11-20 10L17 0z" fill="#a9dce2" stroke="#302840" strokeWidth="3" />
+        <circle cx="-25" cy="35" r="9" fill="#302840" /><circle cx="35" cy="43" r="9" fill="#302840" />
+        <circle cx="-25" cy="35" r="4" fill="#8994a2" /><circle cx="35" cy="43" r="4" fill="#8994a2" />
         <rect x="-13" y="7" width="34" height="14" rx="3" fill="#fff8dd" /><text x="4" y="17" textAnchor="middle" className={styles.vehicleLabel}>OrderEvent</text>
         <rect x="-29" y="-10" width="30" height="11" rx="2" fill="#293d4d" /><text x="-14" y="-2" textAnchor="middle" className={styles.plateLabel}>order-2401</text>
         <g transform="translate(39 -18)"><rect width="43" height="16" rx="8" fill="#ffffff" stroke="#d8ad47" /><text x="21.5" y="11" textAnchor="middle" className={styles.attemptLabel}>attempt {attempt}</text></g>

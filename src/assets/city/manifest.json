@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "generatedAt": "2026-08-13",
+  "sourceMaster": "source/city-sprite-master-v1.png",
+  "projection": "2:1 isometric",
+  "groundTile": [64, 32],
+  "outline": "#302840",
+  "assets": [
+    { "id": "building-coffee-shop", "file": "sprites/building-coffee-shop.png", "category": "building", "nativeSize": [229, 255], "anchor": [0.5, 1], "tileFootprint": [2, 2], "lod": "wide", "interactive": false, "postProcessing": ["alpha-cleanup", "crop"] },
+    { "id": "building-corner-store", "file": "sprites/building-corner-store.png", "category": "building", "nativeSize": [218, 274], "anchor": [0.5, 1], "tileFootprint": [2, 2], "lod": "compact", "interactive": false, "postProcessing": ["alpha-cleanup", "crop"] },
+    { "id": "building-midrise-apartment", "file": "sprites/building-midrise-apartment.png", "category": "building", "nativeSize": [220, 305], "anchor": [0.5, 1], "tileFootprint": [2, 2], "lod": "compact", "interactive": false, "postProcessing": ["alpha-cleanup", "crop"] },
+    { "id": "building-modern-office", "file": "sprites/building-modern-office.png", "category": "building", "nativeSize": [218, 302], "anchor": [0.5, 1], "tileFootprint": [2, 2], "lod": "compact", "interactive": false, "postProcessing": ["alpha-cleanup", "crop"] },
+    { "id": "building-small-apartment", "file": "sprites/building-small-apartment.png", "category": "building", "nativeSize": [196, 271], "anchor": [0.5, 1], "tileFootprint": [2, 2], "lod": "standard", "interactive": false, "postProcessing": ["alpha-cleanup", "crop"] },
+    { "id": "building-townhouse", "file": "sprites/building-townhouse.png", "category": "building", "nativeSize": [187, 253], "anchor": [0.5, 1], "tileFootprint": [2, 2], "lod": "compact", "interactive": false, "postProcessing": ["alpha-cleanup", "crop"] },
+    { "id": "park-garden", "file": "sprites/park-garden.png", "category": "park", "nativeSize": [234, 215], "anchor": [0.5, 1], "tileFootprint": [3, 3], "lod": "compact", "interactive": false, "postProcessing": ["alpha-cleanup", "crop"] },
+    { "id": "tree-round", "file": "sprites/tree-round.png", "category": "tree", "nativeSize": [109, 178], "anchor": [0.5, 1], "tileFootprint": [1, 1], "lod": "compact", "interactive": false, "postProcessing": ["alpha-cleanup", "crop"] },
+    { "id": "tree-conical", "file": "sprites/tree-conical.png", "category": "tree", "nativeSize": [95, 178], "anchor": [0.5, 1], "tileFootprint": [1, 1], "lod": "compact", "interactive": false, "postProcessing": ["alpha-cleanup", "crop"] },
+    { "id": "tree-oval", "file": "sprites/tree-oval.png", "category": "tree", "nativeSize": [110, 169], "anchor": [0.5, 1], "tileFootprint": [1, 1], "lod": "compact", "interactive": false, "postProcessing": ["alpha-cleanup", "crop"] },
+    { "id": "prop-street-lamp", "file": "sprites/prop-street-lamp.png", "category": "prop", "nativeSize": [67, 175], "anchor": [0.5, 1], "tileFootprint": [1, 1], "lod": "compact", "interactive": false, "postProcessing": ["alpha-cleanup", "crop"] },
+    { "id": "vehicle-coral-car", "file": "sprites/vehicle-coral-car.png", "category": "vehicle", "nativeSize": [165, 135], "anchor": [0.5, 1], "tileFootprint": [2, 1], "lod": "compact", "interactive": false, "postProcessing": ["alpha-cleanup", "crop"] },
+    { "id": "vehicle-teal-car", "file": "sprites/vehicle-teal-car.png", "category": "vehicle", "nativeSize": [166, 136], "anchor": [0.5, 1], "tileFootprint": [2, 1], "lod": "standard", "interactive": false, "postProcessing": ["alpha-cleanup", "crop"] },
+    { "id": "road-straight", "file": "sprites/road-straight.png", "category": "road", "nativeSize": [255, 158], "anchor": [0.5, 1], "tileFootprint": [4, 2], "lod": "compact", "interactive": false, "postProcessing": ["alpha-cleanup", "crop"] },
+    { "id": "road-intersection", "file": "sprites/road-intersection.png", "category": "road", "nativeSize": [320, 194], "anchor": [0.5, 1], "tileFootprint": [4, 4], "lod": "compact", "interactive": false, "postProcessing": ["alpha-cleanup", "crop"] },
+    { "id": "road-t-junction", "file": "sprites/road-t-junction.png", "category": "road", "nativeSize": [239, 181], "anchor": [0.5, 1], "tileFootprint": [4, 3], "lod": "compact", "interactive": false, "postProcessing": ["alpha-cleanup", "crop"] },
+    { "id": "road-corner", "file": "sprites/road-corner.png", "category": "road", "nativeSize": [250, 178], "anchor": [0.5, 1], "tileFootprint": [3, 3], "lod": "compact", "interactive": false, "postProcessing": ["alpha-cleanup", "crop"] }
+  ]
+}

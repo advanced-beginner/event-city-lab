@@ -1,7 +1,13 @@
 .world { display: block; width: 100%; height: calc(100% - 36px); min-height: 0; }
-.decorBuilding,
-.tree,
-.park { pointer-events: none; }
+.backgroundCity,
+.foregroundCity,
+.roadBed { pointer-events: none; }
+.backgroundCity image,
+.foregroundCity image,
+.roadBed image { image-rendering: pixelated; }
+.backgroundCity { opacity: .88; }
+.foregroundCity { opacity: .92; }
+.roadBed image { opacity: .38; }
 .facility { cursor: pointer; outline: none; transition: filter 180ms ease, opacity 180ms ease; }
 .facility:hover { filter: brightness(1.04) saturate(1.08); }
 .facility:focus-visible,

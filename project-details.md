@@ -11,7 +11,7 @@
 - Content version: `2026.1`
 - Kafka rule basis: `4.3.1`
 - Storage schema: `1`
-- 현재 판정: Chapter 1 기능 흐름은 완결. 공개 배포 확인과 자동화된 품질 보강 과제는 남아 있음.
+- 현재 판정: Chapter 1 기능 흐름과 sprite 기반 light-city 시각 개편은 완결. 공개 배포 확인과 자동화된 품질 보강 과제는 남아 있음.
 
 ## 2. 제품 목표
 
@@ -184,6 +184,8 @@ flowchart LR
 - `src/storage/workspaceDb.ts`: IndexedDB 자동 저장과 JSON 직렬화·역직렬화.
 - `src/App.tsx`: hydration, autosave, playback, tabs, user action 연결.
 - `src/components/KafkaWorld.tsx`: event state를 도시·차량·차단기·도착 문자로 투영.
+- `src/components/CitySprite.tsx`: 장식 PNG의 크기·bottom-center anchor·SVG `<image>` 렌더링을 일관되게 관리.
+- `src/assets/city/`: 생성 master, 전체 source split, runtime sprite, palette와 manifest 보관.
 
 ### 저장 규칙
 
@@ -219,6 +221,16 @@ Chapter 1 light-city 구현에서 확인한 내용:
 - CodeMirror code tab과 send button이 1280×720에서 함께 표시됨.
 - 브라우저 console error 0건.
 - 시각 판정 기록은 로컬 `.omx`에 생성했으나 `.gitignore` 대상이므로 저장소에는 포함하지 않는다.
+
+2026-08-13 sprite-city 개편에서 추가로 확인한 내용:
+
+- Stable Diffusion Online sprite 페이지는 형태·외곽선·픽셀 밀도 참고, 사용자 제공 Gemini 이미지는 초기 golden-hour 색감과 도시 활기 참고로만 사용했다.
+- 2048×2048 승인 master와 26개 개별 transparent PNG를 생성했다. 원본 참고 이미지는 저장소에 포함하지 않았다.
+- 24색 whole-sheet 강제 축소는 지붕과 그림자 품질을 손상해 폐기했다. runtime은 실제 사용 sprite만 import하며 PNG 합계는 약 0.98MiB다.
+- 기존 `1000×610` SVG viewBox, 세 Kafka 시설 좌표, 차량 checkpoint, ACK 경로, 3열 page layout을 변경하지 않았다.
+- Visual Ralph 판정은 첫 iteration 84점에서 도로 대비와 가장자리 배치를 수정한 뒤 92점으로 통과했다.
+- 브라우저에서 initial → failure → pending rerun → success → rewind-before-ACK를 실제 조작해 확인했다.
+- `1280×720`, `1440×900`, `1920×1080`의 document/root scroll size가 viewport와 일치해 page overflow가 없음을 측정했다.
 
 현재 자동 테스트가 보장하는 범위:
 
@@ -266,12 +278,11 @@ Chapter 1 light-city 구현에서 확인한 내용:
 - 브라우저 200% 확대와 Windows/Linux font fallback은 자동 검증하지 않았다.
 - Google Fonts 장애 시 fallback 설계는 있으나 실제 offline/network-block 테스트가 없다.
 - screen reader에서 SVG 내부의 많은 텍스트가 중복으로 읽히는지 실사용 검증하지 않았다.
-- UI가 `App.tsx`, `App.module.css`, `KafkaWorld.tsx`에 크게 집중되어 있어 챕터 확장 전에 분리가 필요하다.
+- UI가 `App.tsx`, `App.module.css`, `KafkaWorld.tsx`에 크게 집중되어 있어 챕터 확장 전에 추가 분리가 필요하다. 장식 asset mapping은 `CitySprite.tsx`로 분리했다.
 - 차량 이동은 이벤트 checkpoint 간 CSS 보간이며 실제 도로 path의 거리 비례 이동은 아니다.
 
 ### 라이선스와 고지
 
-- `THIRD_PARTY_NOTICES.md`에는 runtime dependency 일반 고지는 있으나 Google Fonts `Nanum Gothic`과 OFL 관련 고지가 명시적으로 추가되지 않았다.
 - font는 Google 서비스에서 원격 로드하므로 개인정보·네트워크 정책이 필요한 배포 환경에서는 self-host 여부를 다시 결정해야 한다.
 
 ## 10. TODO
@@ -281,7 +292,7 @@ Chapter 1 light-city 구현에서 확인한 내용:
 - [ ] GitHub Actions의 최신 `Verify and deploy Event City Lab` run 성공 여부 확인.
 - [ ] 실제 Pages URL에서 initial → failure → pending rerun → success → rewind smoke test.
 - [ ] 배포 URL에서 Web Worker와 lazy CodeMirror chunk가 `/event-city-lab/` base로 정상 로드되는지 확인.
-- [ ] `THIRD_PARTY_NOTICES.md`에 Nanum Gothic과 OFL 고지를 추가하고 필요한 라이선스 제공 방식을 결정.
+- [x] `THIRD_PARTY_NOTICES.md`에 Nanum Gothic과 OFL 고지를 추가.
 - [ ] Kafka 4.3.1 공식 문서에 근거한 Chapter 1 citation/reference manifest 작성.
 
 ### P1 — 회귀 방지와 유지보수성

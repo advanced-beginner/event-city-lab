@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "basis": "approved master sprite sheet and facility SVG harmonization",
+  "colors": {
+    "outline": "#302840",
+    "creamLight": "#fff1cf",
+    "creamGround": "#f4eddf",
+    "peach": "#efb15c",
+    "coral": "#e86b4f",
+    "amber": "#ffd45e",
+    "cyanLight": "#bdeff0",
+    "cyan": "#38adbe",
+    "teal": "#21839a",
+    "lavenderLight": "#eadcf6",
+    "lavender": "#c8afe7",
+    "violet": "#9271c4",
+    "blueLight": "#bcd9f2",
+    "blue": "#467fbd",
+    "blueDark": "#315f9a",
+    "greenLight": "#9fd04e",
+    "green": "#5f9f43",
+    "greenDark": "#2f7049",
+    "road": "#979096",
+    "shadow": "#6a626b"
+  }
+}

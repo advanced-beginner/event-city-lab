@@ -6,8 +6,8 @@
 - Last refreshed: 2026-08-13
 - Product: Event City Lab
 - Scope: Milestone 0 — Producer의 첫 메시지 발송, Serializer 실패, 설정 수정, Broker append와 ACK 비교
-- Primary evidence: 사용자 제공 기존 화면 캡처, 사용자 제공 Vecteezy 페이지의 도시 구성 참고, 본 문서에 기록된 인터뷰 합의
-- Asset restriction: Vecteezy Pro 이미지는 구성·밝기·밀도 참고에만 사용한다. 원본, 워터마크 이미지, 파생 이미지를 제품에 포함하지 않는다.
+- Primary evidence: 사용자 제공 기존 화면 캡처, 승인된 Event City sprite master, 사용자 제공 Stable Diffusion Online 참고 URL과 Gemini 생성 이미지, 본 문서에 기록된 인터뷰 합의
+- Asset restriction: 참고 이미지 원본은 저장소에 포함하지 않는다. 형태·픽셀 밀도·도시 분위기만 참고하고 프로젝트용 신규 AI 생성 자산을 사용한다.
 
 ## Product intent
 
@@ -55,7 +55,16 @@ PC 전용 초기 모델이며 지원 범위는 100% 브라우저 확대 기준 `
 
 ### Direction
 
-밝은 실제 도시를 축소한 isometric logistics district다. 엄격한 저해상도 pixel art 대신 SVG의 단단한 면, 제한된 계단형 디테일, 약한 그라디언트와 부드러운 그림자를 사용한다. 도로는 화면 밖으로 이어지고 Kafka 경로는 도시 속 주 간선도로로 읽혀야 한다.
+밝은 초기 golden hour의 실제 도시를 축소한 isometric logistics district다. 장식 건물·수목·공원·정차 차량·도로 모듈은 투명 PNG pixel sprite를 사용하고, Kafka 시설과 움직이는 메시지 차량은 같은 팔레트와 deep-violet 외곽선을 가진 동적 SVG로 유지한다. 도로는 화면 밖으로 이어지고 Kafka 경로는 도시 속 주 간선도로로 읽혀야 한다.
+
+Sprite 규칙:
+
+- 2:1 isometric, 64×32 ground tile 기준.
+- 명확한 16-bit pixel cluster와 `#302840` 계열 2–3px 외곽선.
+- 좌상단 golden light, 우하단 muted-violet contact shadow.
+- 장식 sprite는 `image-rendering: pixelated`와 bottom-center anchor를 사용한다.
+- 시설 표지의 한글·영문은 raster에 굽지 않고 실제 SVG text로 표시한다.
+- Producer·Serializer·Broker·노란 메시지 차량이 1차 시각 중심이고 일반 건물은 대비를 한 단계 낮춘다.
 
 ### Color tokens
 
@@ -95,9 +104,9 @@ PC 전용 초기 모델이며 지원 범위는 100% 브라우저 확대 기준 `
 
 ### Kafka facilities
 
-- `ProducerHub`: 배송 출발 창고. 표지 `PRODUCER 출발센터`.
-- `SerializerCheckpoint`: 화물 검사소. 표지 `SERIALIZER 검사소`.
-- `BrokerArchive`: 대형 물류·기록 센터. 표지 `BROKER 기록센터`.
+- `ProducerHub`: cyan 배송 출발 창고. 표지 `PRODUCER 출발센터`.
+- `SerializerCheckpoint`: lavender 화물 검사소. 표지 `SERIALIZER 검사소`.
+- `BrokerArchive`: blue 대형 물류·기록 센터. 표지 `BROKER 기록센터`.
 - 세 시설만 pointer와 keyboard로 선택할 수 있다. 일반 건물, 공원, 나무는 장식이며 상호작용하지 않는다.
 
 ### City composition
@@ -186,8 +195,9 @@ Standard view에는 Kafka 핵심 시설 3개, 일반 건물 6–8개, 작은 공
 - 코드: MIT.
 - 직접 작성한 학습 콘텐츠와 SVG: CC BY 4.0.
 - 제품명과 로고는 위 라이선스에서 제외한다.
-- 외부 리소스는 출처, 라이선스, 수정 여부를 manifest에 기록한다.
-- 이번 도시 SVG는 외부 Pro 이미지를 복제하지 않고 직접 제작한다.
+- 외부 참고 자료는 출처와 참고 목적을 생성 기록에 남기며 원본 파일을 재배포하지 않는다.
+- AI 생성 master와 전체 split set은 source record이고, 런타임에는 사용 중인 sprite만 import한다.
+- Kafka 시설·메시지 차량·상태 효과는 참고 이미지를 복제하지 않은 프로젝트 고유 SVG다.
 
 ## Open questions
 
