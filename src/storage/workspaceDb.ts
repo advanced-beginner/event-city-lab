@@ -1,8 +1,17 @@
 import { openDB, type DBSchema } from 'idb'
 import { z } from 'zod'
 
-import { workspaceSnapshotSchema } from '../domain/schemas'
-import { STORAGE_SCHEMA_VERSION, type WorkspaceSnapshot } from '../domain/simulation'
+import {
+  labMessageSchema,
+  producerConfigSchema,
+  simulationRunSchema,
+  workspaceSnapshotSchema,
+} from '../domain/schemas'
+import {
+  DEFAULT_LEARNING_PROGRESS,
+  STORAGE_SCHEMA_VERSION,
+  type WorkspaceSnapshot,
+} from '../domain/simulation'
 
 interface EventCityDatabase extends DBSchema {
   workspace: {
@@ -101,12 +110,48 @@ function readStorageVersion(candidate: unknown):
   return { success: true, version }
 }
 
+const workspaceSnapshotV1Schema = z.strictObject({
+  storageSchemaVersion: z.literal(1),
+  appVersion: z.string().min(1),
+  contentVersion: z.string().min(1),
+  kafkaRuleVersion: z.string().min(1),
+  savedAt: z.iso.datetime(),
+  config: producerConfigSchema,
+  message: labMessageSchema,
+  runs: z.array(simulationRunSchema).max(20),
+  hintLevel: z.number().int().min(0).max(4),
+  chapterCompleted: z.boolean(),
+})
+
+function migrateV1(candidate: unknown): WorkspaceRecoveryResult {
+  const parsed = workspaceSnapshotV1Schema.safeParse(candidate)
+  if (!parsed.success) return rejected('invalid-snapshot', formatIssues(parsed.error), 1)
+
+  const learningProgress = {
+    completedExperiments: parsed.data.chapterCompleted
+      ? { '1': ['serializer-repair'] }
+      : { ...DEFAULT_LEARNING_PROGRESS.completedExperiments },
+    attempts: { ...DEFAULT_LEARNING_PROGRESS.attempts },
+  }
+
+  return {
+    status: 'recovered',
+    sourceVersion: 1,
+    migrated: true,
+    snapshot: {
+      ...parsed.data,
+      storageSchemaVersion: STORAGE_SCHEMA_VERSION,
+      learningProgress,
+    },
+  }
+}
+
 /**
  * Validates and migrates an untrusted persisted value.
  *
- * Version 1 is the current baseline, so its migration is an explicit identity
- * validation. When version 2 is introduced, add a v1 input schema and a v1 ->
- * v2 transform here before changing STORAGE_SCHEMA_VERSION.
+ * Version 1 is migrated to version 2 by adding multi-chapter learning progress.
+ * Future versions must add an explicit validated transform before increasing
+ * STORAGE_SCHEMA_VERSION.
  */
 export function recoverWorkspace(candidate: unknown): WorkspaceRecoveryResult {
   if (candidate === undefined) return { status: 'empty' }
@@ -115,6 +160,7 @@ export function recoverWorkspace(candidate: unknown): WorkspaceRecoveryResult {
   if (!versionResult.success) return versionResult.result
 
   const sourceVersion = versionResult.version
+  if (sourceVersion === 1 && STORAGE_SCHEMA_VERSION === 2) return migrateV1(candidate)
   if (sourceVersion < STORAGE_SCHEMA_VERSION) {
     return rejected(
       'unsupported-older-version',

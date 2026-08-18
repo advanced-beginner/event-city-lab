@@ -1,7 +1,7 @@
 export const CHAPTER_IDS = [1, 2, 3, 4, 5, 6, 7, 8] as const
 
 export type ChapterId = (typeof CHAPTER_IDS)[number]
-export type ChapterImplementationStatus = 'implemented' | 'planned'
+export type ChapterImplementationStatus = 'implemented'
 
 export interface ChapterMetadata {
   id: ChapterId
@@ -30,7 +30,7 @@ export const CHAPTERS: readonly ChapterMetadata[] = [
     shortTitle: '파티션 선택',
     topic: 'key, partition 선택, partition 내부 ordering',
     learningGoal: 'key와 partitioner가 메시지의 배치와 순서 보장 범위를 어떻게 결정하는지 실험합니다.',
-    implementationStatus: 'planned',
+    implementationStatus: 'implemented',
   },
   {
     id: 3,
@@ -39,7 +39,7 @@ export const CHAPTERS: readonly ChapterMetadata[] = [
     shortTitle: 'ACK와 재시도',
     topic: 'acknowledgements, retry, idempotence',
     learningGoal: 'ACK 유실과 재시도의 관계를 추적하고 idempotence가 줄이는 중복 위험을 비교합니다.',
-    implementationStatus: 'planned',
+    implementationStatus: 'implemented',
   },
   {
     id: 4,
@@ -48,7 +48,7 @@ export const CHAPTERS: readonly ChapterMetadata[] = [
     shortTitle: '복제와 ISR',
     topic: 'broker, replica, ISR, leader 장애',
     learningGoal: 'replica와 ISR 상태를 관찰하며 acks=all의 실제 성공 조건을 설명합니다.',
-    implementationStatus: 'planned',
+    implementationStatus: 'implemented',
   },
   {
     id: 5,
@@ -57,7 +57,7 @@ export const CHAPTERS: readonly ChapterMetadata[] = [
     shortTitle: 'Poll과 Offset',
     topic: 'consumer, poll, offset commit',
     learningGoal: 'poll과 offset commit 시점이 재처리와 메시지 유실 위험에 주는 영향을 비교합니다.',
-    implementationStatus: 'planned',
+    implementationStatus: 'implemented',
   },
   {
     id: 6,
@@ -66,7 +66,7 @@ export const CHAPTERS: readonly ChapterMetadata[] = [
     shortTitle: 'Consumer Group',
     topic: 'consumer group, partition ownership, rebalance',
     learningGoal: 'group 구성원이 바뀔 때 partition ownership과 처리 중단 구간을 추적합니다.',
-    implementationStatus: 'planned',
+    implementationStatus: 'implemented',
   },
   {
     id: 7,
@@ -75,7 +75,7 @@ export const CHAPTERS: readonly ChapterMetadata[] = [
     shortTitle: 'Retry와 DLT',
     topic: 'retry topic, backoff, dead-letter topic',
     learningGoal: '재시도 주기와 격리 전략을 조정하며 독성 메시지를 안전하게 다루는 방법을 설계합니다.',
-    implementationStatus: 'planned',
+    implementationStatus: 'implemented',
   },
   {
     id: 8,
@@ -84,7 +84,7 @@ export const CHAPTERS: readonly ChapterMetadata[] = [
     shortTitle: 'Transaction',
     topic: 'transaction, consume-transform-produce, isolation level',
     learningGoal: 'transaction과 isolation level로 consume-transform-produce 흐름의 원자성을 검증합니다.',
-    implementationStatus: 'planned',
+    implementationStatus: 'implemented',
   },
 ]
 

@@ -5,9 +5,9 @@
 - Status: Active
 - Last refreshed: 2026-08-18
 - Product: Event City Lab
-- Scope: Milestone 0 — Producer의 첫 메시지 발송, Serializer 실패, 설정 수정, Broker append와 ACK 비교
-- Primary evidence: 사용자 제공 기존 화면 캡처, 사용자 승인 단일 Gemini 도시 배경, 본 문서에 기록된 인터뷰 합의
-- Asset restriction: 사용자가 최종 배경으로 지정한 첨부 이미지는 최적화된 runtime WebP로만 저장소에 포함한다. 원본 파일은 중복 저장하지 않으며 다른 참고 이미지도 재배포하지 않는다.
+- Scope: Chapter 1–8 — 실패 중심 Kafka 실험, 증거 조사, 수정과 재실행
+- Primary evidence: 사용자 제공 기존 화면 캡처, Chapter 1 승인 도시 배경, Chapter 2–8 승인 고해상도 도시 atlas, 본 문서에 기록된 인터뷰 합의
+- Asset restriction: 사용자가 지정한 이미지는 최적화된 runtime WebP로만 저장소에 포함한다. 원본 파일은 중복 저장하지 않으며 다른 참고 이미지도 재배포하지 않는다.
 
 ## Product intent
 
@@ -21,6 +21,8 @@ Milestone 0의 완료 경험은 다음과 같다.
 4. Serializer를 수정하되 이미 실패한 실행과 증거는 그대로 유지한다.
 5. 동일 message와 seed로 재실행해 Broker 기록과 ACK 도착 문자를 확인한다.
 6. 실패 실행과 성공 실행의 설정·결과·trade-off를 비교한다.
+
+Chapter 2–8은 같은 학습 반복을 공통 guided lab으로 확장한다. 각 챕터는 정확히 세 실험을 제공하며, 사용자가 결과를 먼저 예측하고 실패 선택을 실행해 로그와 컴포넌트 상태를 조사한 뒤 권장 설정을 적용해 성공 결과를 확인한다. 완료 진도는 브라우저 로컬에 저장하고 모든 실험을 마친 뒤에도 sandbox 방식으로 재실행할 수 있다.
 
 ## Experience principles
 
@@ -115,6 +117,8 @@ Visual asset 규칙:
 ### City composition
 
 Standard view에는 승인된 도시 배경 전체와 중앙 Kafka 핵심 건물 3개가 보인다. 장식 건물·공원·나무·도로는 배경 자체에 포함되며 별도 runtime sprite 수량을 관리하지 않는다.
+
+Chapter 2–8은 `event-city-atlas.webp` 한 장을 공유한다. 이미지 위에는 해당 실험의 Producer, Partition, Broker, Replica/ISR, Consumer, Coordinator, Offset, Retry/DLT, Application, Transaction Coordinator만 의미 있는 HTML overlay로 표시한다. 배경 속 텍스트나 건물을 억지로 특정 Kafka 시설로 해석하지 않으며 현재 이벤트 컴포넌트는 번호, 이름, 외곽선과 상태 문구를 함께 사용해 강조한다.
 
 ### Delivery vehicle
 

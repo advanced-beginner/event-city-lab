@@ -5,7 +5,7 @@
 타임라인·SVG 물류 도시를 증거로 원인을 찾은 뒤 같은 메시지를 다시
 실행해 수정 전후를 비교합니다.
 
-## Milestone 0
+## Chapters 1–8
 
 - `StringSerializer`와 `OrderEvent` 불일치로 시작하는 첫 Producer 장애
 - 결정론적 순수 TypeScript 엔진과 Web Worker 실행
@@ -16,6 +16,9 @@
 - IndexedDB 자동 저장과 검증된 JSON export/import
 - reduced motion과 키보드 기반 핵심 조작
 - GitHub Pages 정적 배포
+- Chapter 2–8의 key/partition, retry/idempotence, ISR, offset, rebalance,
+  retry/DLT, transaction 실험
+- 각 챕터의 예측 → 실패 증거 → 권장 수정 → 성공 재실행과 로컬 진도 저장
 
 ## Local development
 
@@ -61,10 +64,10 @@ React UI는 Kafka 결과를 계산하지 않습니다. `src/domain/engine.ts`가
 
 ## Versions
 
-- App: `0.1.0`
-- Content: `2026.1`
+- App: `0.2.0`
+- Content: `2026.2`
 - Kafka rule basis: `4.3.1`
-- Storage schema: `1`
+- Storage schema: `2` (`v1` 자동 migration)
 
 ## License and trademark notice
 

@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { simulateProducerSend } from '../domain/engine'
+import { simulateChapterExperiment } from '../domain/chapterEngine'
+import type { ChapterSimulationInput } from '../domain/chapterSimulation'
 import { DEFAULT_CONFIG, DEFAULT_MESSAGE, type SimulationInput } from '../domain/simulation'
 
 class FakeWorker {
@@ -49,6 +51,14 @@ const validInput: SimulationInput = {
   seed: 2401,
   message: DEFAULT_MESSAGE,
   config: DEFAULT_CONFIG,
+}
+
+const validChapterInput: ChapterSimulationInput = {
+  runId: 'run-chapter-worker-test',
+  seed: 8001,
+  chapterId: 8,
+  experimentId: 'partial-transform',
+  choiceId: 'use-atomic-transform-boundary',
 }
 
 async function loadClient() {
@@ -154,5 +164,43 @@ describe('simulation worker client', () => {
       '시뮬레이션 입력 형식이 올바르지 않습니다.',
     )
     expect(FakeWorker.instances).toHaveLength(0)
+  })
+
+  it('Chapter 완료 응답을 검증하고 listener를 정리한다', async () => {
+    const { runChapterSimulation } = await loadClient()
+    const resultPromise = runChapterSimulation(validChapterInput)
+    const worker = currentWorker()
+    const result = simulateChapterExperiment(validChapterInput)
+
+    expect(worker.postedMessage).toMatchObject({ type: 'RUN_CHAPTER_SIMULATION' })
+    worker.emit('message', new MessageEvent('message', {
+      data: {
+        type: 'CHAPTER_SIMULATION_COMPLETE',
+        requestId: requestIdOf(worker),
+        payload: result,
+      },
+    }))
+
+    await expect(resultPromise).resolves.toEqual(result)
+    expect(worker.listenerCount('message')).toBe(0)
+    expect(worker.listenerCount('error')).toBe(0)
+  })
+
+  it('Chapter 요청에 일반 시뮬레이션 응답이 오면 거절한다', async () => {
+    const { runChapterSimulation } = await loadClient()
+    const resultPromise = runChapterSimulation(validChapterInput)
+    const worker = currentWorker()
+
+    worker.emit('message', new MessageEvent('message', {
+      data: {
+        type: 'SIMULATION_COMPLETE',
+        requestId: requestIdOf(worker),
+        payload: simulateProducerSend(validInput),
+      },
+    }))
+
+    await expect(resultPromise).rejects.toThrow('Worker가 다른 종류의 시뮬레이션 응답을 반환했습니다.')
+    expect(worker.listenerCount('message')).toBe(0)
+    expect(worker.listenerCount('error')).toBe(0)
   })
 })

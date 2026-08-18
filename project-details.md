@@ -4,14 +4,14 @@
 
 이 문서는 Event City Lab의 제품 흐름, 챕터별 구현 상태, 기술적 동작, 검증 결과, 알려진 미비점과 TODO를 관리하는 단일 기록이다.
 
-- 기록 기준일: 2026-08-13
+- 기록 기준일: 2026-08-18
 - 기준 브랜치: `main`
 - Chapter 1 기준 구현 커밋: `db7e918` (`실패를 도시 배송 경험으로 이해할 수 있게 한다`)
-- App version: `0.1.0`
-- Content version: `2026.1`
+- App version: `0.2.0`
+- Content version: `2026.2`
 - Kafka rule basis: `4.3.1`
-- Storage schema: `1`
-- 현재 판정: Chapter 1 기능 흐름과 승인된 단일 도시 배경 기반 시각 개편은 완결. Chapter 1–8 registry, hash navigation, Chapter 2–8 실험 명세, 저장 복구 기반과 핵심 App/Worker 회귀 테스트를 추가했다. Chapter 2–8의 실제 시뮬레이션 엔진과 공개 배포 확인은 남아 있음.
+- Storage schema: `2` (`v1` 자동 migration)
+- 현재 판정: Chapter 1–8의 결정론적 실험 규칙, Web Worker 실행, 공통 guided UI, 로컬 진도 저장과 hash navigation 구현 완료. 자동 검증은 통과했고 공개 배포 확인만 남았다.
 
 ## 2. 제품 목표
 
@@ -39,13 +39,13 @@ Kafka 설정을 설명문으로 외우는 대신 실패를 직접 만들고, 메
 | Chapter | 학습 주제 | 상태 |
 | --- | --- | --- |
 | 1 | 첫 Producer 발송, Serializer 타입 불일치, Broker append, ACK | 기능 구현 완료 |
-| 2 | key, partition 선택, partition 내부 ordering | 메타데이터·3개 실험 명세 완료, 엔진 미구현 |
-| 3 | acknowledgements, retry, idempotence | 메타데이터·3개 실험 명세 완료, 엔진 미구현 |
-| 4 | broker, replica, ISR, leader 장애 | 메타데이터·3개 실험 명세 완료, 엔진 미구현 |
-| 5 | consumer, poll, offset commit | 메타데이터·3개 실험 명세 완료, 엔진 미구현 |
-| 6 | consumer group, partition ownership, rebalance | 메타데이터·3개 실험 명세 완료, 엔진 미구현 |
-| 7 | retry topic, backoff, DLT | 메타데이터·3개 실험 명세 완료, 엔진 미구현 |
-| 8 | transaction, consume-transform-produce, 격리 수준 | 메타데이터·3개 실험 명세 완료, 엔진 미구현 |
+| 2 | key, partition 선택, partition 내부 ordering | 3개 guided 실험 구현 완료 |
+| 3 | acknowledgements, retry, idempotence | 3개 guided 실험 구현 완료 |
+| 4 | broker, replica, ISR, leader 장애 | 3개 guided 실험 구현 완료 |
+| 5 | consumer, poll, offset commit | 3개 guided 실험 구현 완료 |
+| 6 | consumer group, partition ownership, rebalance | 3개 guided 실험 구현 완료 |
+| 7 | retry topic, backoff, DLT | 3개 guided 실험 구현 완료 |
+| 8 | transaction, consume-transform-produce, 격리 수준 | 3개 guided 실험 구현 완료 |
 
 Chapter 2 이후의 각 3개 실험 시나리오와 정확성 주의사항은 `src/content/chapterScenarioSpecs.ts`에 확정했다. Kafka 4.3.1 공식 근거는 `src/content/kafkaReferences.ts`에서 관리한다. 실제 rule module 구현 시 해당 근거와 deprecated 설정 여부를 다시 확인한다.
 
@@ -176,13 +176,14 @@ flowchart LR
 
 ### 책임 경계
 
-- `src/domain/engine.ts`: Serializer 설정에 따른 실패·성공 event log 생성.
+- `src/domain/engine.ts`: Chapter 1 Serializer 설정에 따른 실패·성공 event log 생성.
+- `src/domain/chapterEngine.ts`, `src/domain/chapters/`: Chapter 2–8의 실험 선택과 결정론적 event log 생성.
 - `src/domain/simulation.ts`: version, core types, default message/config.
 - `src/domain/schemas.ts`: runtime validation과 storage/import 경계.
 - `src/worker/`: engine을 UI thread 밖에서 실행하고 request/response를 검증.
 - `src/state/labStore.ts`: config, runs, cursor, playback, hints, code bridge 상태.
 - `src/storage/workspaceDb.ts`: IndexedDB 자동 저장과 JSON 직렬화·역직렬화.
-- `src/App.tsx`: hydration, autosave, playback, tabs, user action 연결.
+- `src/App.tsx`, `src/components/GuidedChapterLab.tsx`: hydration, autosave, 실험 선택, playback, 진단과 수정 연결.
 - `src/components/KafkaWorld.tsx`: event state를 pixel 시설·차량, 상태 램프·오류 표지·도착 문자로 투영.
 - `src/components/CitySprite.tsx`: 메시지 차량 PNG의 크기·bottom-center anchor·SVG `<image>` 렌더링을 일관되게 관리.
 - `src/assets/city/`: 승인된 runtime 도시 배경, 보존 차량 sprite, palette와 manifest 보관.
@@ -194,7 +195,7 @@ flowchart LR
 - 최대 실행 기록: 최근 20개.
 - 저장 debounce: UI 변경 후 약 350ms.
 - `ecl:reduced-motion`은 localStorage에 저장한다.
-- schema 또는 version이 맞지 않는 snapshot은 현재 복원하지 않고 초기 상태로 돌아간다.
+- schema v1 snapshot은 Chapter 1 진도를 보존해 v2로 migration한다. 손상·미래 버전 데이터는 구조화된 오류로 구분하고 덮어쓰지 않는다.
 
 ## 7. 배포 구성
 
@@ -206,7 +207,7 @@ flowchart LR
 - Trigger: `main` push 또는 manual dispatch.
 - Pipeline: checkout → Node 24 → `npm ci` → unit test → build → Pages artifact upload → deploy.
 - `public/.nojekyll`을 포함한다.
-- Chapter URL은 현재 hash `#/chapter/1`을 사용하지만 실제 다중 chapter router는 아직 없다.
+- Chapter URL은 GitHub Pages 새로고침과 정적 hosting에 안전한 `#/chapter/1`부터 `#/chapter/8`까지의 hash route를 사용한다.
 
 ## 8. 완료 및 검증 기록
 
@@ -264,13 +265,14 @@ Chapter 1 light-city 구현에서 확인한 내용:
 2026-08-18 Chapter 1–8 기반 및 회귀 자동화:
 
 - Chapter 1–8 metadata registry와 `#/chapter/:id` hash router를 추가했다. 잘못된 route는 `#/chapter/1`로 복구하며 모든 챕터는 잠금 없이 탐색할 수 있다.
-- Chapter 2–8은 아직 엔진 구현으로 오인되지 않도록 준비 상태를 명시하고, 각 챕터의 3개 예정 실험을 보여준다.
+- Chapter 2–8은 각 3개 guided 실험과 실패·성공 선택, 결정론적 event/log/evidence/diagnosis/trade-off를 제공한다.
 - Chapter 2–8 시나리오는 Kafka 4.3.1 공식 문서의 partition ordering, producer reliability, ISR, offset, rebalance, transaction 규칙을 근거로 한다. 일반 consumer의 retry topic과 DLT는 Kafka broker 자동 기능이 아니라 애플리케이션·프레임워크 패턴으로 구분한다.
 - 저장 복구는 `storageSchemaVersion`을 호환성 기준으로 사용한다. 앱·콘텐츠·Kafka 규칙 버전이 달라도 schema v1 데이터를 보존하며 손상 데이터, 미래 버전, 잘못된 JSON을 구조화된 사유로 구분한다. 복구가 필요하면 자동 저장을 차단해 기존 데이터를 덮어쓰지 않고 상태 문구로 원인을 알린다.
 - App 통합 테스트는 최초 실패 → 분석 → 설정 변경 → 성공 재실행 → 비교 → ACK 이전 되감기를 검증한다.
 - Worker 테스트는 잘못된 입력·응답, 엔진 오류, runtime 오류, listener cleanup과 crash 이후 Worker 재생성을 검증한다.
-- Vitest 자동 검증은 10개 test file, 46개 test, typecheck와 production build가 통과했다.
-- Playwright 1.62.1을 추가하고 bundled Chromium, Firefox, WebKit에서 `1280×720`, `1440×900`, `1920×1080`을 조합한 9개 project를 구성했다. production preview 기준 Chapter 1 asset·Worker·lazy CodeMirror, Chapter 8 직접 route, 잘못된 hash 복구와 page overflow를 검사하는 18개 테스트가 통과했다.
+- Chapter rule/engine, Worker/client, 저장 migration, store 진도, React 흐름을 포함한 Vitest 검증을 유지한다. 최신 통과 수치는 이 변경의 최종 검증 결과를 기준으로 한다.
+- Playwright 1.62.1과 bundled Chromium, Firefox, WebKit에서 `1280×720`, `1440×900`, `1920×1080`을 조합한 9개 project를 구성했다. production preview 기준 Chapter 1 asset·Worker·lazy CodeMirror, Chapter 2–8 직접 route와 page overflow, Chapter 8 실패→권장 수정→성공 진도 저장, 잘못된 hash 복구를 검사하는 27개 테스트가 통과했다.
+- 사용자 제공 `Gemini_Generated_Image_ovrs7covrs7covrs.png`는 `1920×1047` WebP 537KB로 최적화해 Chapter 2–8 공통 atlas 배경으로 사용한다. 1280×720과 1920×1080 캡처에서 억지로 배경 건물을 Kafka 시설로 지정하지 않고 semantic overlay를 분리한 구성을 확인했다. Chapter 1 배경·이동 차량과 합친 runtime 이미지 합계는 약 1.03MB다.
 - GitHub Actions는 `npx playwright install --with-deps chromium firefox webkit` 후 `npm run test:e2e`를 실행하며, 성공한 production artifact만 Pages 배포 단계로 전달한다.
 
 ## 9. 알려진 미비점
@@ -283,15 +285,15 @@ Chapter 1 light-city 구현에서 확인한 내용:
 
 ### 테스트 자동화
 
-- 현재 46개 테스트는 domain/code bridge, App 핵심 흐름, storage 복구, worker 경계를 다룬다. store 단독, IndexedDB 실제 구현, SVG 세부 상태에 대한 자동 테스트는 아직 없다.
-- 실패 → 설정 변경 → 재실행 → 비교의 핵심 사용자 흐름은 jsdom 통합 테스트로 보강했다. 실제 브라우저 E2E는 첫 실패·분석·Worker 응답까지 자동화했으며 설정 수정부터 성공 비교까지의 전체 브라우저 흐름은 아직 수동 검증에 의존한다.
+- 자동 테스트는 domain/code bridge, Chapter 2–8 rule routing, App 핵심 흐름, storage 복구/migration, store 진도, worker 경계를 다룬다. IndexedDB 실제 구현과 SVG 세부 상태에 대한 자동 테스트는 아직 없다.
+- 실패 → 권장 설정 적용 → 성공 재실행 → 진도 저장의 Chapter 2–8 공통 흐름은 jsdom 통합 테스트와 실제 Worker를 사용하는 Playwright smoke로 보강했다.
 - 세 viewport의 page overflow와 핵심 production asset 로딩은 Chromium, Firefox, WebKit 조합으로 자동화했다. 핵심 텍스트의 시각적 clipping 판정은 아직 수동 검토가 필요하다.
 - accessibility 자동 검사와 키보드 전체 경로 회귀 테스트가 없다.
 - coverage report 설정은 있으나 threshold가 없다.
 
 ### 저장과 복구
 
-- storage schema version은 1뿐이지만 명시적 migration/recovery 진입점과 구조화된 거부 사유를 추가했다. 실제 v2 migration은 아직 없다.
+- storage schema version 2는 챕터별 완료 실험과 시도 횟수를 저장한다. v1 snapshot은 완료된 Chapter 1 진도를 보존하며 자동 migration한다.
 - version이 다른 snapshot은 더 이상 조용히 무시되지 않는다. App은 미래 버전·이전 버전·손상 데이터를 상태 문구로 구분하고 복구 전 자동 저장을 차단한다. 별도 복구 화면과 명시적 초기화 동작은 아직 없다.
 - IndexedDB quota, private mode, 저장소 손상, 다중 tab 동시 수정에 대한 정책이 없다.
 - import/export와 IndexedDB round trip 자동 테스트가 없다.
@@ -300,7 +302,7 @@ Chapter 1 light-city 구현에서 확인한 내용:
 
 - Chapter 1은 실제 Kafka client나 cluster에 연결하지 않는다.
 - partition은 0, leader는 broker-1, append offset은 42로 고정된 학습용 모델이다.
-- `acks=all` 성공은 복제본과 ISR 이벤트를 실제로 모델링하지 않고 결과만 설명한다. 이 내용은 Chapter 4에서 보강해야 한다.
+- Chapter 1의 `acks=all` 경로는 단순화돼 있지만 Chapter 4가 replica, 현재 ISR, `min.insync.replicas`, leader failover를 별도 실험으로 보강한다.
 - payload 82 bytes, logical time, network 지연은 교육용 고정값이며 실제 성능 수치가 아니다.
 - Kafka rule basis `4.3.1`을 선언했지만 각 설명 문장에 대한 공식 문서 citation manifest는 아직 없다.
 - 새 Kafka 버전에서 deprecated/removed 설정이 생기는지 주기적으로 확인하는 자동 절차가 없다.
@@ -311,7 +313,7 @@ Chapter 1 light-city 구현에서 확인한 내용:
 - 브라우저 200% 확대와 Windows/Linux font fallback은 자동 검증하지 않았다.
 - Google Fonts 장애 시 fallback 설계는 있으나 실제 offline/network-block 테스트가 없다.
 - screen reader에서 SVG 내부의 많은 텍스트가 중복으로 읽히는지 실사용 검증하지 않았다.
-- Chapter shell, registry, navigation, planned view와 route는 분리했지만 Chapter 1 workspace UI는 여전히 `App.tsx`, `App.module.css`, `KafkaWorld.tsx`에 크게 집중되어 있다. 장식 asset mapping은 `CitySprite.tsx`로 분리했다.
+- Chapter shell, registry, navigation, guided view와 route는 분리했지만 Chapter 1 workspace UI는 여전히 `App.tsx`, `App.module.css`, `KafkaWorld.tsx`에 크게 집중되어 있다. 장식 asset mapping은 `CitySprite.tsx`로 분리했다.
 - 차량 이동은 이벤트 checkpoint 간 CSS 보간이며 실제 도로 path의 거리 비례 이동은 아니다.
 
 ### 라이선스와 고지
@@ -335,22 +337,22 @@ Chapter 1 light-city 구현에서 확인한 내용:
 - [x] ACK 이전 rewind에서 도착 문자 미표시 테스트.
 - [ ] Zustand hydration과 최대 20개 run 보존 테스트.
 - [ ] IndexedDB save/load와 JSON import/export round-trip 테스트.
-- [ ] worker protocol error, malformed response, worker failure 테스트와 cleanup 정책 추가. timeout 정책은 남아 있음.
+- [x] worker protocol error, malformed response, worker failure 테스트와 cleanup 정책 추가. timeout 정책은 남아 있음.
 - [x] CI viewport test: Chromium, Firefox, WebKit의 1280×720, 1440×900, 1920×1080 page overflow와 production asset smoke 검사. 시각적 clipping 판정은 수동 검토 유지.
 - [ ] keyboard-only 및 automated accessibility 검사 추가.
 - [ ] coverage threshold 설정.
 - [ ] `App.tsx`를 shell, left control, evidence, playback으로 분리.
 - [ ] `KafkaWorld.tsx`의 building, facility, vehicle, signal을 속성 기반 컴포넌트로 추가 분리.
-- [ ] storage version migration 기본 구조와 사용자 복구 메시지 설계. 복구 결과 API·상태 메시지·덮어쓰기 차단은 완료, 실제 migration과 별도 복구 화면은 남아 있음.
+- [x] storage v1→v2 migration, 복구 결과 API·상태 메시지·덮어쓰기 차단 구현. 별도 복구 화면은 남아 있음.
 
 ### P2 — 다중 챕터 기반
 
 - [x] chapter metadata registry와 hash router 구현.
-- [ ] chapter별 default config, message, learning goal, event schema, hint, comparison definition 분리.
-- [ ] 공통 city component와 chapter별 facility/state overlay 경계 정의.
-- [ ] 엔진을 chapter별 rule module 또는 scenario definition으로 확장하되 결정론과 schema validation 유지.
-- [ ] Chapter 완료 상태와 chapter 간 진도 저장 schema 설계. 이 변경은 storage migration을 포함해야 한다.
-- [ ] 전체 챕터 navigation과 잠금·복습 정책 설계. 잠금 없는 navigation은 구현, 완료·복습 상태 정책은 남아 있음.
+- [x] chapter별 learning goal, event schema, diagnosis, trade-off와 실험 definition 분리.
+- [x] 공통 city atlas와 chapter별 semantic facility/state overlay 경계 정의.
+- [x] 엔진을 chapter별 rule module로 확장하고 결정론과 schema validation 유지.
+- [x] Chapter 완료 상태와 chapter 간 진도 저장 schema 및 v1→v2 migration 구현.
+- [x] 전체 챕터 navigation과 잠금 없는 복습 정책 구현.
 
 ### P3 — 다음 콘텐츠
 
@@ -361,6 +363,6 @@ Chapter 1 light-city 구현에서 확인한 내용:
 
 ## 11. 다음 작업자가 가장 먼저 할 일
 
-Chapter 1 공개 상태를 마감하려면 남은 P0 배포 확인을 수행한다. 동시에 이미 마련된 registry, scenario, storage recovery와 회귀 테스트 기반 위에서 Chapter 2 rule module을 시작할 수 있다. 새 챕터 UI를 먼저 확장하기보다 순수 엔진·schema·worker 테스트 순서로 구현한다.
+Chapter 1–8 로컬 구현 이후 남은 우선순위는 GitHub Actions와 실제 Pages URL에서 production artifact, Web Worker, hash route, 새 atlas 자산을 확인하는 것이다. 그 다음 접근성 자동 검사와 IndexedDB 실제 round-trip 테스트를 보강한다.
 
 모든 작업 후에는 이 문서의 날짜, 구현 상태, 미비점과 TODO checkbox를 실제 결과에 맞게 갱신한다.

@@ -1,6 +1,7 @@
 /// <reference lib="webworker" />
 
 import { simulateProducerSend } from '../domain/engine'
+import { simulateChapterExperiment } from '../domain/chapterEngine'
 import {
   readWorkerRequestId,
   simulationWorkerRequestSchema,
@@ -23,11 +24,17 @@ workerScope.addEventListener('message', (event: MessageEvent<unknown>) => {
   }
 
   try {
-    const response: SimulationWorkerResponse = {
-      type: 'SIMULATION_COMPLETE',
-      requestId: parsed.data.requestId,
-      payload: simulateProducerSend(parsed.data.payload),
-    }
+    const response: SimulationWorkerResponse = parsed.data.type === 'RUN_SIMULATION'
+      ? {
+          type: 'SIMULATION_COMPLETE',
+          requestId: parsed.data.requestId,
+          payload: simulateProducerSend(parsed.data.payload),
+        }
+      : {
+          type: 'CHAPTER_SIMULATION_COMPLETE',
+          requestId: parsed.data.requestId,
+          payload: simulateChapterExperiment(parsed.data.payload),
+        }
     workerScope.postMessage(response)
   } catch (error) {
     const response: SimulationWorkerResponse = {

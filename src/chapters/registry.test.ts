@@ -9,9 +9,9 @@ describe('chapter registry', () => {
     expect(CHAPTERS.every((chapter) => chapter.title && chapter.topic && chapter.learningGoal)).toBe(true)
   })
 
-  it('distinguishes implemented content from navigable planned chapters', () => {
+  it('marks every unlocked chapter as implemented', () => {
     expect(getChapter(1).implementationStatus).toBe('implemented')
-    expect(CHAPTERS.slice(1).every((chapter) => chapter.implementationStatus === 'planned')).toBe(true)
+    expect(CHAPTERS.every((chapter) => chapter.implementationStatus === 'implemented')).toBe(true)
   })
 
   it('accepts only registered numeric chapter identifiers', () => {

@@ -7,6 +7,7 @@ import {
   APP_VERSION,
   CONTENT_VERSION,
   DEFAULT_CONFIG,
+  DEFAULT_LEARNING_PROGRESS,
   DEFAULT_MESSAGE,
   KAFKA_RULE_VERSION,
   STORAGE_SCHEMA_VERSION,
@@ -35,8 +36,14 @@ function makeSnapshot(overrides: Partial<WorkspaceSnapshot> = {}): WorkspaceSnap
     runs: [],
     hintLevel: 0,
     chapterCompleted: false,
+    learningProgress: DEFAULT_LEARNING_PROGRESS,
     ...overrides,
   }
+}
+
+function makeV1Snapshot(overrides: Record<string, unknown> = {}) {
+  const { learningProgress: _learningProgress, ...snapshot } = makeSnapshot()
+  return { ...snapshot, storageSchemaVersion: 1, ...overrides }
 }
 
 describe('workspace recovery', () => {
@@ -44,28 +51,45 @@ describe('workspace recovery', () => {
     openDatabaseMock.mockReset()
   })
 
-  it('recovers schema v1 data independently of app and content versions', () => {
-    const snapshot = makeSnapshot({
+  it('migrates schema v1 data independently of app and content versions', () => {
+    const source = makeV1Snapshot({
       appVersion: '0.0.1',
       contentVersion: '2025.4',
       kafkaRuleVersion: '3.9.0',
     })
 
-    expect(recoverWorkspace(snapshot)).toEqual({
+    expect(recoverWorkspace(source)).toEqual({
       status: 'recovered',
-      snapshot,
+      snapshot: {
+        ...source,
+        storageSchemaVersion: STORAGE_SCHEMA_VERSION,
+        learningProgress: DEFAULT_LEARNING_PROGRESS,
+      },
       sourceVersion: 1,
-      migrated: false,
+      migrated: true,
+    })
+  })
+
+  it('preserves completed Chapter 1 progress during v1 migration', () => {
+    const result = recoverWorkspace(makeV1Snapshot({ chapterCompleted: true }))
+
+    expect(result).toMatchObject({
+      status: 'recovered',
+      sourceVersion: 1,
+      migrated: true,
+      snapshot: {
+        learningProgress: { completedExperiments: { '1': ['serializer-repair'] } },
+      },
     })
   })
 
   it('distinguishes an unsupported newer schema from corrupt data', () => {
-    const result = recoverWorkspace({ ...makeSnapshot(), storageSchemaVersion: 2 })
+    const result = recoverWorkspace({ ...makeSnapshot(), storageSchemaVersion: 3 })
 
     expect(result).toMatchObject({
       status: 'rejected',
       reason: 'unsupported-newer-version',
-      detectedVersion: 2,
+      detectedVersion: 3,
     })
   })
 
@@ -75,7 +99,7 @@ describe('workspace recovery', () => {
     expect(result).toMatchObject({
       status: 'rejected',
       reason: 'invalid-snapshot',
-      detectedVersion: 1,
+      detectedVersion: 2,
     })
     if (result.status === 'rejected') {
       expect(result.issues.some((issue) => issue.startsWith('runs:'))).toBe(true)
@@ -108,7 +132,7 @@ describe('workspace recovery', () => {
     expect(parseWorkspaceJson(JSON.stringify(makeSnapshot()))).toEqual(makeSnapshot())
 
     try {
-      parseWorkspaceJson(JSON.stringify({ ...makeSnapshot(), storageSchemaVersion: 2 }))
+      parseWorkspaceJson(JSON.stringify({ ...makeSnapshot(), storageSchemaVersion: 3 }))
       throw new Error('Expected parseWorkspaceJson to reject the newer schema')
     } catch (error) {
       expect(error).toBeInstanceOf(WorkspaceRecoveryError)
@@ -124,18 +148,18 @@ describe('workspace recovery', () => {
     await expect(loadWorkspaceRecovery()).resolves.toMatchObject({
       status: 'rejected',
       reason: 'invalid-snapshot',
-      detectedVersion: 1,
+      detectedVersion: 2,
     })
   })
 
   it('keeps the legacy load API and surfaces rejected IndexedDB data as an error', async () => {
     openDatabaseMock.mockResolvedValue({
-      get: vi.fn().mockResolvedValue({ ...makeSnapshot(), storageSchemaVersion: 2 }),
+      get: vi.fn().mockResolvedValue({ ...makeSnapshot(), storageSchemaVersion: 3 }),
     } as never)
 
     await expect(loadWorkspace()).rejects.toMatchObject({
       name: 'WorkspaceRecoveryError',
-      result: { reason: 'unsupported-newer-version', detectedVersion: 2 },
+      result: { reason: 'unsupported-newer-version', detectedVersion: 3 },
     })
   })
 })

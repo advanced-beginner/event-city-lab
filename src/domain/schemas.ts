@@ -74,6 +74,11 @@ export const simulationRunSchema = z.strictObject({
   summary: z.string(),
 })
 
+export const learningProgressSchema = z.strictObject({
+  completedExperiments: z.record(z.string(), z.array(z.string())),
+  attempts: z.record(z.string(), z.number().int().nonnegative()),
+})
+
 export const workspaceSnapshotSchema = z.strictObject({
   storageSchemaVersion: z.literal(STORAGE_SCHEMA_VERSION),
   appVersion: z.string().min(1),
@@ -85,4 +90,5 @@ export const workspaceSnapshotSchema = z.strictObject({
   runs: z.array(simulationRunSchema).max(20),
   hintLevel: z.number().int().min(0).max(4),
   chapterCompleted: z.boolean(),
+  learningProgress: learningProgressSchema,
 })

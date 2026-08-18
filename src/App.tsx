@@ -3,8 +3,8 @@ import { useStore } from 'zustand'
 
 import styles from './App.module.css'
 import { ChapterNavigation } from './chapters/ChapterNavigation'
-import { PlannedChapter } from './chapters/PlannedChapter'
 import { getChapter, type ChapterMetadata } from './chapters/registry'
+import { GuidedChapterLab } from './components/GuidedChapterLab'
 import { KafkaWorld } from './components/KafkaWorld'
 import {
   APP_VERSION,
@@ -34,6 +34,14 @@ const JavaConfigEditor = lazy(async () => {
 type LeftTab = 'settings' | 'code'
 type EvidenceTab = 'logs' | 'analysis' | 'comparison'
 type PlaybackSpeed = 0.5 | 1 | 2
+
+function readReducedMotionPreference(): boolean {
+  try {
+    return window.localStorage.getItem('ecl:reduced-motion') === 'true'
+  } catch {
+    return false
+  }
+}
 
 const HINTS = [
   '관찰: 배송 차량이 Broker에 도착하기 전에 어느 검사소에서 멈췄는지 확인하세요.',
@@ -107,7 +115,7 @@ export default function App() {
 
   return chapter.id === 1
     ? <ChapterOneLab chapter={chapter} />
-    : <PlannedChapter chapter={chapter} />
+    : <GuidedChapterLab key={chapter.id} chapter={chapter} />
 }
 
 function ChapterOneLab({ chapter }: { chapter: ChapterMetadata }) {
@@ -118,7 +126,7 @@ function ChapterOneLab({ chapter }: { chapter: ChapterMetadata }) {
   const [leftTab, setLeftTab] = useState<LeftTab>('settings')
   const [evidenceTab, setEvidenceTab] = useState<EvidenceTab>('logs')
   const [speed, setSpeed] = useState<PlaybackSpeed>(1)
-  const [reducedMotion, setReducedMotion] = useState(() => localStorage.getItem('ecl:reduced-motion') === 'true')
+  const [reducedMotion, setReducedMotion] = useState(readReducedMotionPreference)
   const importRef = useRef<HTMLInputElement>(null)
   const autoSwitchedRunId = useRef<string | null>(null)
 
@@ -145,6 +153,7 @@ function ChapterOneLab({ chapter }: { chapter: ChapterMetadata }) {
     runs: state.runs,
     hintLevel: state.hintLevel,
     chapterCompleted: state.runs.some((run) => run.status === 'succeeded'),
+    learningProgress: state.learningProgress,
   })
 
   useEffect(() => {
@@ -172,7 +181,7 @@ function ChapterOneLab({ chapter }: { chapter: ChapterMetadata }) {
         .catch(() => setSaveStatus('저장 실패'))
     }, 350)
     return () => window.clearTimeout(timeout)
-  }, [state.config, state.hintLevel, state.hydrated, state.message, state.runs, storageBlocked])
+  }, [state.config, state.hintLevel, state.hydrated, state.learningProgress, state.message, state.runs, storageBlocked])
 
   useEffect(() => {
     if (!state.isPlaying || !activeRun) return
@@ -274,7 +283,11 @@ function ChapterOneLab({ chapter }: { chapter: ChapterMetadata }) {
   const toggleReducedMotion = () => {
     const next = !reducedMotion
     setReducedMotion(next)
-    localStorage.setItem('ecl:reduced-motion', String(next))
+    try {
+      window.localStorage.setItem('ecl:reduced-motion', String(next))
+    } catch {
+      // Ignore storage access failures; the preference is best-effort only.
+    }
   }
 
   return (

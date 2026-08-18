@@ -52,10 +52,11 @@ describe('App chapter shell', () => {
     expect(links[0]).toHaveAttribute('href', '#/chapter/1')
     expect(links[7]).toHaveAttribute('href', '#/chapter/8')
     expect(screen.getByRole('link', { name: /Chapter 2:/ })).toHaveAttribute('aria-current', 'page')
-    expect(screen.getByRole('heading', { level: 2, name: '메시지는 어느 파티션으로 갈까\?' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 1, name: '메시지는 어느 파티션으로 갈까\?' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 2, name: '세 가지 실험' })).toBeInTheDocument()
   })
 
-  it('updates planned chapter content after a hash navigation event', () => {
+  it('updates implemented chapter content after a hash navigation event', () => {
     render(<App />)
 
     act(() => {
@@ -63,8 +64,9 @@ describe('App chapter shell', () => {
       window.dispatchEvent(new HashChangeEvent('hashchange'))
     })
 
-    expect(screen.getByRole('heading', { level: 2, name: '읽고 바꿔 쓰는 전체를 하나로 묶을 수 있을까\?' })).toBeInTheDocument()
-    expect(screen.getByText('출력과 offset의 단일 transaction')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 1, name: '읽고 바꿔 쓰는 전체를 하나로 묶을 수 있을까\?' })).toBeInTheDocument()
+    expect(screen.getAllByText('출력은 쓰고 offset은 잃은 처리')).toHaveLength(2)
+    expect(screen.getByRole('radio', { name: /출력과 offset을 따로 commit/ })).toBeChecked()
     expect(screen.getByRole('link', { name: /Chapter 8:/ })).toHaveAttribute('aria-current', 'page')
   })
 

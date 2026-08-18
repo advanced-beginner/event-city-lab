@@ -15,7 +15,7 @@ export function ChapterNavigation({ activeChapterId }: ChapterNavigationProps) {
           href={chapterHash(chapter.id)}
           className={chapter.id === activeChapterId ? styles.chapterNavActive : undefined}
           aria-current={chapter.id === activeChapterId ? 'page' : undefined}
-          aria-label={`Chapter ${chapter.id}: ${chapter.shortTitle}${chapter.implementationStatus === 'planned' ? ', 준비 중' : ''}`}
+          aria-label={`Chapter ${chapter.id}: ${chapter.shortTitle}`}
           title={`${chapter.numberLabel} · ${chapter.title}`}
         >
           {chapter.numberLabel}

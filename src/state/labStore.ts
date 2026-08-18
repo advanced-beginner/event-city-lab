@@ -3,8 +3,10 @@ import { createStore } from 'zustand/vanilla'
 import { configToJava, javaToConfig } from '../domain/codeConfig'
 import {
   DEFAULT_CONFIG,
+  DEFAULT_LEARNING_PROGRESS,
   DEFAULT_MESSAGE,
   type LabMessage,
+  type LearningProgress,
   type ProducerConfig,
   type SimulationRun,
   type WorkspaceSnapshot,
@@ -25,6 +27,7 @@ export interface LabState {
   codeWarnings: string[]
   hydrated: boolean
   engineError: string | null
+  learningProgress: LearningProgress
   setSerializer: (serializer: ProducerConfig['serializer']) => void
   setFocusedSetting: (setting: FocusedSetting) => void
   updateCode: (code: string) => void
@@ -33,6 +36,7 @@ export interface LabState {
   setIsPlaying: (isPlaying: boolean) => void
   revealHint: () => void
   setEngineError: (message: string | null) => void
+  recordExperimentAttempt: (chapterId: number, experimentId: string, succeeded: boolean) => void
   hydrate: (snapshot: WorkspaceSnapshot | null) => void
   replaceWorkspace: (snapshot: WorkspaceSnapshot) => void
 }
@@ -50,6 +54,7 @@ export const labStore = createStore<LabState>((set) => ({
   codeWarnings: [],
   hydrated: false,
   engineError: null,
+  learningProgress: DEFAULT_LEARNING_PROGRESS,
   setSerializer: (serializer) =>
     set((state) => {
       const config = { ...state.config, serializer }
@@ -73,6 +78,28 @@ export const labStore = createStore<LabState>((set) => ({
   setIsPlaying: (isPlaying) => set({ isPlaying }),
   revealHint: () => set((state) => ({ hintLevel: Math.min(4, state.hintLevel + 1) })),
   setEngineError: (engineError) => set({ engineError }),
+  recordExperimentAttempt: (chapterId, experimentId, succeeded) =>
+    set((state) => {
+      const chapterKey = String(chapterId)
+      const attemptKey = `${chapterKey}:${experimentId}`
+      const previousCompleted = state.learningProgress.completedExperiments[chapterKey] ?? []
+      const completedExperiments = succeeded && !previousCompleted.includes(experimentId)
+        ? {
+            ...state.learningProgress.completedExperiments,
+            [chapterKey]: [...previousCompleted, experimentId],
+          }
+        : state.learningProgress.completedExperiments
+
+      return {
+        learningProgress: {
+          completedExperiments,
+          attempts: {
+            ...state.learningProgress.attempts,
+            [attemptKey]: (state.learningProgress.attempts[attemptKey] ?? 0) + 1,
+          },
+        },
+      }
+    }),
   hydrate: (snapshot) =>
     set(() => {
       if (!snapshot) return { hydrated: true }
@@ -85,6 +112,7 @@ export const labStore = createStore<LabState>((set) => ({
         eventCursor: activeRun ? activeRun.events.length - 1 : -1,
         hintLevel: snapshot.hintLevel,
         javaCode: configToJava(snapshot.config),
+        learningProgress: snapshot.learningProgress,
         hydrated: true,
       }
     }),
@@ -100,5 +128,6 @@ export const labStore = createStore<LabState>((set) => ({
       codeWarnings: [],
       hydrated: true,
       engineError: null,
+      learningProgress: snapshot.learningProgress,
     }),
 }))

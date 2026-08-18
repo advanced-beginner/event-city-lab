@@ -1,7 +1,7 @@
-export const APP_VERSION = '0.1.0' as const
-export const CONTENT_VERSION = '2026.1' as const
+export const APP_VERSION = '0.2.0' as const
+export const CONTENT_VERSION = '2026.2' as const
 export const KAFKA_RULE_VERSION = '4.3.1' as const
-export const STORAGE_SCHEMA_VERSION = 1 as const
+export const STORAGE_SCHEMA_VERSION = 2 as const
 
 export type SerializerKind = 'string' | 'json'
 export type RunStatus = 'failed' | 'succeeded'
@@ -88,6 +88,12 @@ export interface WorkspaceSnapshot {
   runs: SimulationRun[]
   hintLevel: number
   chapterCompleted: boolean
+  learningProgress: LearningProgress
+}
+
+export interface LearningProgress {
+  completedExperiments: Record<string, string[]>
+  attempts: Record<string, number>
 }
 
 export const DEFAULT_MESSAGE: LabMessage = {
@@ -104,4 +110,9 @@ export const DEFAULT_CONFIG: ProducerConfig = {
   serializer: 'string',
   acks: 'all',
   topic: 'orders.v1',
+}
+
+export const DEFAULT_LEARNING_PROGRESS: LearningProgress = {
+  completedExperiments: {},
+  attempts: {},
 }
