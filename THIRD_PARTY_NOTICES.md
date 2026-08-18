@@ -1,14 +1,26 @@
 # Third-party notices
 
-## Event City generated sprites
+## Event City generated visual assets
 
 The isometric city sprites are newly generated project assets. Their source
 prompt, generation date, reference roles, and post-processing record are stored
 in `src/assets/city/source/generation-prompt.md`.
 
-The Stable Diffusion Online image linked in that record and the user-provided
-Gemini image were used only as visual direction. Their original files are not
-redistributed, and no asset was extracted from them.
+The Stable Diffusion Online image linked in that record was used only as visual
+direction. It is not redistributed and no runtime asset was extracted from it.
+
+Two Gemini-generated city images supplied and authorized for use by the user
+are distributed as optimized runtime derivatives:
+
+- `src/assets/city/background/event-city-main.webp`: Chapter 1 city background,
+  derived from `Gemini_Generated_Image_ixg878ixg878ixg8.png` by crop, resize,
+  and WebP encoding.
+- `src/assets/city/background/event-city-atlas.webp`: Chapter 2–8 shared city
+  atlas, derived from `Gemini_Generated_Image_ovrs7covrs7covrs.png` by resize
+  and WebP encoding.
+
+The original PNG files are not redistributed. The asset manifest records the
+runtime files, source filenames, dimensions, transformations, and usage.
 
 ## Nanum Gothic
 
