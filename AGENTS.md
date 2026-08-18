@@ -64,10 +64,11 @@
 - 핵심 조작은 키보드로 가능해야 하며 SVG 시설에는 접근 가능한 이름을 제공한다.
 - Producer, Serializer, Broker 시설과 메시지 차량의 identity를 챕터 흐름 전체에서 일관되게 유지한다.
 - 외부 유료·Pro·워터마크 자산을 복제하거나 배포 산출물에 포함하지 않는다. 새 SVG는 독립적으로 제작하고 `xlink`를 사용하지 않는다.
-- 생성형 이미지 자산은 `src/assets/city/source/`에 생성 프롬프트·마스터·전체 분리본을 보존하고, 실제 번들은 `src/assets/city/sprites/`에서 명시적으로 import한 PNG만 포함한다. 자산 메타데이터와 앵커는 `src/assets/city/manifest.json`, 공통 색상은 `src/assets/city/palette.json`을 기준으로 한다.
-- 도시 건물·Producer·Serializer·Broker·메시지 차량은 동일 master에서 분리한 PNG를 `CitySprite`와 SVG `<image href>`로 배치한다. 시설 클릭 영역, 접근 가능한 이름, 상태 램프·오류 표지·ACK와 도착 문자는 동적 SVG로 유지한다.
-- Pixel sprite는 `image-rendering: pixelated`를 유지한다. 마스터 전체나 사용하지 않는 sprite를 runtime에서 import하지 않으며 runtime 도시 PNG 합계는 1.5MB 이하로 관리한다.
-- 도시 주간선은 `road-mainline` 단일 sprite를 사용한다. 짧은 `road-straight`를 반복하면 끝 캡이 차도를 덮어 조각처럼 보이므로 주간선에는 사용하지 않는다. SVG path로 도로 면을 다시 그리지 않으며, 건물은 도로 sprite의 보도 바깥 블록에 bottom-center anchor로 배치한다.
+- Chapter 1 도시는 사용자 승인 단일 배경 `src/assets/city/background/event-city-main.webp`를 SVG `<image>`로 배치한다. 도로·일반 건물·공원·나무를 별도 sprite로 재조립하거나 배경 위에 중복 배치하지 않는다.
+- 배경 중앙의 큰 건물 세 개를 왼쪽부터 Producer 출발센터, Serializer 검사소, Broker 기록센터로 사용한다. 클릭 영역, 접근 가능한 이름, 상태 램프·오류 표지·ACK와 도착 문자는 동적 SVG overlay로 유지한다.
+- 기존 도시 master와 building/facility/road/park/tree sprite는 폐기됐으며 복원하지 않는다. `src/assets/city/sprites/`에는 `vehicle-*` 이미지만 유지하고 실제 runtime은 움직이는 Kafka 밴만 명시적으로 import한다.
+- 차량 sprite는 `image-rendering: pixelated`와 bottom-center anchor를 유지한다. 주행 checkpoint는 배경 속 실제 도로 위에 놓고, 후면이 좌하단·전면이 우상단인 `vehicle-kafka-van-northeast`를 회전 없이 사용한다.
+- 자산 출처·건물 매핑·runtime 사용 여부는 `src/assets/city/manifest.json`, 공통 색상은 `src/assets/city/palette.json`을 기준으로 한다. runtime 도시 이미지 합계는 1.5MB 이하로 관리한다.
 - Google Fonts가 실패해도 시스템 fallback으로 기능과 레이아웃이 유지되어야 한다.
 
 ### 의존성과 라이선스

@@ -1,45 +1,28 @@
-# Event City sprite generation record
+# Event City visual asset record
 
-- Generated: 2026-08-13
-- Tool: OpenAI built-in image generation
-- Intent: original modular sprite sheet for the Event City Lab Kafka simulator
-- Output workflow: flat chroma-key generation, local alpha extraction, connected-component split, manual semantic naming
+## Current approved composition
 
-## Reference roles
+- Updated: 2026-08-18
+- Background source: user-provided `Gemini_Generated_Image_ixg878ixg878ixg8.png`
+- Runtime asset: `../background/event-city-main.webp`
+- Runtime size: 1600×975, center-cropped and encoded as WebP at quality 88
+- Composition rule: the approved city image is the complete visual background. Runtime code must not rebuild its roads, buildings, parks, or props from separate sprites.
 
-- [Stable Diffusion Online — Isometric City Pixel Art Sprite Sheet](https://stablediffusionweb.com/ko/image/65841461-isometric-city-pixel-art-sprite-sheet?source_site=sdw&source_page_type=prompt_page&source_page_path=%2Fko%2Fprompts%2Fcity-pixel&source_action=view_prompt_image&source_image_slug=65841461-isometric-city-pixel-art-sprite-sheet&source_prompt_slug=city-pixel): geometry, silhouette, outline, and pixel-density direction only. The source image is not redistributed.
-- User-provided Gemini image: palette, early golden-hour atmosphere, urban variety, and city liveliness only. The source image is not redistributed.
+The three large buildings in the center are the Kafka learning facilities:
 
-The generated assets are original compositions and do not reproduce either reference image's exact objects, signs, or arrangement.
+1. Center-left dark tower: Producer 출발센터
+2. Center glass building with the `URBAN PLAZA` sign: Serializer 검사소
+3. Center-right blue-and-cream building with the `ZENITH APTS` sign: Broker 기록센터
 
-## Final generation prompt
+Their interaction targets, state lamps, labels, failure state, ACK path, and arrival-message card remain semantic SVG overlays. The moving yellow Kafka van remains a separate transparent PNG so simulation events can move it along the road.
 
-Use case: stylized-concept
+## Retired sprite composition
 
-Asset type: production-ready modular game environment sprite master sheet for the Event City Lab Kafka learning simulator
+The previous generated city sprite master, split building/facility/road/park/tree images, and derived road-network images were removed at the user's direction. They must not be restored or imported. Only vehicle images were preserved from that set. The exact supplied background is retained only as a local visual-audit reference under ignored `.omx/artifacts`; it is not duplicated in the tracked source-asset directory.
 
-Create one clean 2048×2048 square isometric pixel-art master sprite sheet containing reusable assets for a bright Kafka learning city. This is an asset sheet, never a completed city scene. Every asset must be isolated, fully visible, non-overlapping, and easy to crop into a separate PNG.
+## Preserved vehicle rule
 
-Use a consistent 2:1 isometric projection based on a 64×32 ground tile, the same camera angle and pixel density for every object, crisp hard-edged 16-bit pixel art, nearest-neighbor appearance, a consistent 2–3 pixel deep-violet outline near `#302840`, at least 32 pixels of empty background around each object, and a contained lower-right contact shadow.
-
-Organize the sheet into unlabeled zones containing road and sidewalk modules; six distinct general city buildings; two park modules, three tree variants, a street lamp, and a bench; a yellow Kafka delivery van plus coral and teal compact cars; and three Kafka facility references: a cyan Producer warehouse, lavender Serializer checkpoint, and blue Broker archive.
-
-Use bright early golden-hour light from the upper left, warm cream surfaces, restrained peach and coral highlights, cyan and teal accents, fresh greens, and muted lavender-violet shadows. The facilities and yellow van should have the strongest hierarchy.
-
-Generate on a perfectly flat uniform solid magenta chroma-key backdrop. Do not use magenta inside sprites. No text, letters, numbers, symbols, logos, watermark, people, labels, dividers, overlap, cropping, perspective mismatch, gradients, blur, painterly edges, photorealism, night lighting, cyberpunk darkness, or excessive micro-detail.
-
-## Post-processing
-
-- Removed the flat chroma-key background with the installed image-generation helper.
-- Contracted the alpha edge by one pixel to remove the magenta fringe.
-- Upscaled the preserved master to 2048×2048 with nearest-neighbor sampling.
-- Split 26 disconnected components and assigned semantic filenames.
-- Rejected a forced 24-color whole-sheet quantization because it damaged roofs and shadow detail.
-- Runtime code imports only the sprites it uses; the generated master and complete split set are source records, not browser runtime dependencies.
-
-## Continuous road derivative
-
-- Tool: OpenAI built-in image generation edit using `road-straight.png` as the edit reference.
-- Purpose: replace visibly disconnected repeated short-road tiles with one continuous mainline whose end caps appear only at the two extremes.
-- Prompt: "Edit the referenced isometric pixel-art road sprite into one single, genuinely continuous long road segment for a web simulator. Preserve exactly the same pixel-art style, camera angle, asphalt color, beige tiled sidewalk, yellow curb line, white dashed center line, crisp dark outline, and lighting. Extend the road to approximately 4 times the referenced length along the same diagonal direction. There must be no gaps, no repeated vertical end caps, no seams, no junctions, no buildings, no vehicles, and no text. Keep only one end cap at each extreme end of the entire long road. Place the road alone on a perfectly flat solid #ff00ff chroma-key background with no shadows, gradients, texture, reflections, or lighting variation in the background. Do not use #ff00ff in the road. Generous padding, centered, full sprite visible, crisp hard pixel edges."
-- Post-processing: removed the magenta chroma key with soft matte and despill; validated an alpha channel and transparent corners; saved the project-bound result as `sprites/road-mainline.png`.
+- Runtime vehicle: `sprites/vehicle-kafka-van-northeast.png`
+- Direction: rear at lower-left, front at upper-right
+- Runtime rotation: `0deg`; do not rotate the already-isometric van to compensate for direction
+- Other `vehicle-*` files are preserved as source variants but are not imported unless a later chapter explicitly needs them

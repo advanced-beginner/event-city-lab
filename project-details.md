@@ -11,7 +11,7 @@
 - Content version: `2026.1`
 - Kafka rule basis: `4.3.1`
 - Storage schema: `1`
-- 현재 판정: Chapter 1 기능 흐름과 sprite 기반 light-city 시각 개편은 완결. 공개 배포 확인과 자동화된 품질 보강 과제는 남아 있음.
+- 현재 판정: Chapter 1 기능 흐름과 승인된 단일 도시 배경 기반 시각 개편은 완결. 공개 배포 확인과 자동화된 품질 보강 과제는 남아 있음.
 
 ## 2. 제품 목표
 
@@ -184,8 +184,8 @@ flowchart LR
 - `src/storage/workspaceDb.ts`: IndexedDB 자동 저장과 JSON 직렬화·역직렬화.
 - `src/App.tsx`: hydration, autosave, playback, tabs, user action 연결.
 - `src/components/KafkaWorld.tsx`: event state를 pixel 시설·차량, 상태 램프·오류 표지·도착 문자로 투영.
-- `src/components/CitySprite.tsx`: 장식 PNG의 크기·bottom-center anchor·SVG `<image>` 렌더링을 일관되게 관리.
-- `src/assets/city/`: 생성 master, 전체 source split, runtime sprite, palette와 manifest 보관.
+- `src/components/CitySprite.tsx`: 메시지 차량 PNG의 크기·bottom-center anchor·SVG `<image>` 렌더링을 일관되게 관리.
+- `src/assets/city/`: 승인된 runtime 도시 배경, 보존 차량 sprite, palette와 manifest 보관.
 
 ### 저장 규칙
 
@@ -226,10 +226,21 @@ Chapter 1 light-city 구현에서 확인한 내용:
 
 - Stable Diffusion Online sprite 페이지는 형태·외곽선·픽셀 밀도 참고, 사용자 제공 Gemini 이미지는 초기 golden-hour 색감과 도시 활기 참고로만 사용했다.
 - 2048×2048 승인 master와 26개 개별 transparent PNG를 생성했다. 원본 참고 이미지는 저장소에 포함하지 않았다.
-- 24색 whole-sheet 강제 축소는 지붕과 그림자 품질을 손상해 폐기했다. runtime은 실제 사용 sprite만 import하며, 시설 3개와 메시지 밴을 포함한 PNG 합계는 약 1.42MiB다.
-- 기존 `1000×610` SVG viewBox, 세 Kafka 시설 좌표, 차량 checkpoint, ACK 경로, 3열 page layout을 변경하지 않았다. 시설 3개와 메시지 밴도 배경과 같은 승인 sprite master 자산으로 통일했다.
+- 24색 whole-sheet 강제 축소는 지붕과 그림자 품질을 손상해 폐기했다. runtime은 실제 사용 sprite만 import한다.
+- 기존 `1000×610` SVG viewBox와 3열 page layout은 유지했다. 시설과 차량 좌표·checkpoint·ACK 경로는 7시–2시 주행축에 맞춰 다시 정렬했다.
 - 도로 면을 만들던 대형 SVG stroke와 연결이 보장되지 않던 지선·교차점을 제거했다. 짧은 `road-straight` 반복은 이음새마다 끝 캡이 차도를 덮어 조각처럼 보였기 때문에, 같은 스타일을 유지하면서 양 끝에만 캡이 있는 `road-mainline` 단일 sprite로 교체했다.
-- Visual Ralph 판정은 첫 iteration 84점에서 도로 대비와 가장자리 배치를 수정한 뒤 92점으로 통과했다.
+- 단일 주도로만 남긴 시안은 도로변 배경과 교통 구조가 부족하다는 판정으로 폐기했다. `road-network-v3`의 사거리 2개를 복원하고 일반 건물 11개를 배치했으나, 시설과 일부 배경 건물이 차도 위에 겹쳐 보이는 문제가 후속 검토에서 확인되었다. 2026-08-18 수정에서는 Producer·Serializer·Broker를 각각 독립된 도로 인접 필지로 옮기고 일반 건물도 차도·보도·횡단보도 밖으로 재배치했다. Serializer는 진입 램프가 오른쪽 하단을 향하는 `facility-serializer-east`로 교체했다. 공원·나무·장식 차량은 제거한 상태를 유지해 건물과 사거리 정렬을 우선했다.
+- 메시지 밴은 기존 sprite에 `-29deg` CSS 회전을 중복 적용하던 방식을 폐기했다. 후면이 좌하단, 전면이 우상단을 향하는 `vehicle-kafka-van-northeast`를 새로 생성하고 회전값 `0deg`로 주행시킨다.
+- Visual Ralph 판정은 연결된 사거리 2개, 도로 양옆 배경 건물, 주도로변 시설 정렬, 2시 방향 차량을 핵심 기준으로 재설정했다.
+- 2026-08-18 도로 이격 재검증은 1280×720과 1920×1080에서 수행했다. 초기·Serializer 실패·Broker 성공 상태 모두에서 핵심 시설 3개와 일반 건물 11개가 도로 면을 침범하지 않았고, 1280×720 문서 크기는 viewport와 동일해 페이지 스크롤이 생기지 않았다.
+
+2026-08-18 단일 도시 배경 전환:
+
+- 사용자가 기존 sprite 조립식 도시를 폐기하고 `Gemini_Generated_Image_ixg878ixg878ixg8.png` 한 장을 최종 도시 배경으로 지정했다.
+- 기존 master와 building/facility/road/park/tree 이미지 48개를 프로젝트에서 제거했다. 차량 이미지만 보존했으며 runtime에는 `vehicle-kafka-van-northeast.png` 한 개만 import한다.
+- 배경 중앙의 큰 건물 세 개를 왼쪽부터 `1 · 출발센터(Producer)`, `2 · 검사소(Serializer)`, `3 · 기록센터(Broker)`로 매핑한다. 시설 이미지를 추가로 겹치지 않고 투명 상호작용 영역과 상태 표지만 SVG로 올린다.
+- 메시지 차량은 배경 중앙 대로 위의 checkpoint를 따라 CSS transform으로 이동한다. ACK 완료 시 배경을 가리지 않는 상단 여백에 도착 문자와 회신 경로를 표시한다.
+- 이전 `road-network-v3`, 일반 건물 11개, 방향별 시설 sprite 배치에 관한 기록은 역사적 시도이며 현재 구현 규칙이 아니다.
 - 브라우저에서 initial → failure → pending rerun → success → rewind-before-ACK를 실제 조작해 확인했다.
 - `1280×720`, `1440×900`, `1920×1080`의 document/root scroll size가 viewport와 일치해 page overflow가 없음을 측정했다.
 

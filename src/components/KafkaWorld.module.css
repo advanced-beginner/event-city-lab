@@ -1,17 +1,10 @@
 .world { display: block; width: 100%; height: calc(100% - 36px); min-height: 0; }
-.backgroundCity,
-.foregroundCity,
-.roadBed { pointer-events: none; }
-.backgroundCity image,
-.foregroundCity image,
-.roadBed image,
-.facility image,
+.cityBackdrop { pointer-events: none; image-rendering: auto; }
+.backdropWash { fill: #fff; opacity: .04; pointer-events: none; }
 .vehicle image { image-rendering: pixelated; }
-.backgroundCity { opacity: .88; }
-.foregroundCity { opacity: .92; }
-.roadBed image { opacity: 1; }
 .facility { cursor: pointer; outline: none; transition: filter 180ms ease, opacity 180ms ease; }
-.facility:hover { filter: brightness(1.04) saturate(1.08); }
+.facilityHitArea { fill: #fff; fill-opacity: .001; stroke: transparent; stroke-width: 3; transition: fill-opacity 180ms ease, stroke 180ms ease; }
+.facility:hover .facilityHitArea { fill-opacity: .09; stroke: #fff9d6; }
 .facility:focus-visible,
 .focused { filter: url(#focus-glow); }
 .facility.active { filter: drop-shadow(0 0 8px #0e9da099); }
@@ -28,6 +21,7 @@
 .smsTitle,
 .smsText,
 .cityLabel text { font-family: "Nanum Gothic", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; }
+.facilitySign { filter: drop-shadow(0 3px 4px #1b29384f); }
 .facilitySign text { fill: #302840; font-size: 10px; font-weight: 800; }
 .pixelFacilityName { fill: #302840; font: 900 9px ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .9px; }
 .stateLamp { fill: #9e9aa1; stroke: #302840; stroke-width: 2; }
@@ -42,7 +36,7 @@
   transform: translate(var(--vehicle-x), var(--vehicle-y)) rotate(var(--vehicle-angle));
   transform-origin: 0 20px;
   transition: transform 480ms cubic-bezier(.2, .8, .2, 1), filter 180ms ease;
-  filter: drop-shadow(0 6px 5px #44534e3d);
+  filter: drop-shadow(0 6px 5px #253a45a8);
 }
 .vehicleFailed { animation: vehicle-shake .28s ease-in-out 2; filter: drop-shadow(0 6px 5px #d84a5b38); }
 .cargoTag text { fill: #302840; font: 800 7px ui-monospace, SFMono-Regular, Menlo, monospace; }
@@ -69,7 +63,7 @@
 @keyframes route-flow { to { stroke-dashoffset: -42; } }
 @keyframes signal-flow { to { stroke-dashoffset: -38; } }
 @keyframes vehicle-shake { 33% { margin-left: -2px; } 66% { margin-left: 2px; } }
-@keyframes sms-arrive { from { opacity: 0; transform: translate(190px, 200px) scale(.94); } to { opacity: 1; transform: translate(190px, 188px) scale(1); } }
+@keyframes sms-arrive { from { opacity: 0; } to { opacity: 1; } }
 
 @media (max-width: 1439px) {
   .standardOnly,

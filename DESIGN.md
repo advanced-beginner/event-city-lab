@@ -3,11 +3,11 @@
 ## Source of truth
 
 - Status: Active
-- Last refreshed: 2026-08-13
+- Last refreshed: 2026-08-18
 - Product: Event City Lab
 - Scope: Milestone 0 — Producer의 첫 메시지 발송, Serializer 실패, 설정 수정, Broker append와 ACK 비교
-- Primary evidence: 사용자 제공 기존 화면 캡처, 승인된 Event City sprite master, 사용자 제공 Stable Diffusion Online 참고 URL과 Gemini 생성 이미지, 본 문서에 기록된 인터뷰 합의
-- Asset restriction: 참고 이미지 원본은 저장소에 포함하지 않는다. 형태·픽셀 밀도·도시 분위기만 참고하고 프로젝트용 신규 AI 생성 자산을 사용한다.
+- Primary evidence: 사용자 제공 기존 화면 캡처, 사용자 승인 단일 Gemini 도시 배경, 본 문서에 기록된 인터뷰 합의
+- Asset restriction: 사용자가 최종 배경으로 지정한 첨부 이미지는 최적화된 runtime WebP로만 저장소에 포함한다. 원본 파일은 중복 저장하지 않으며 다른 참고 이미지도 재배포하지 않는다.
 
 ## Product intent
 
@@ -55,18 +55,19 @@ PC 전용 초기 모델이며 지원 범위는 100% 브라우저 확대 기준 `
 
 ### Direction
 
-밝은 초기 golden hour의 실제 도시를 축소한 isometric logistics district다. 장식 건물·수목·공원·차량·도로와 Kafka 시설은 하나의 master에서 분리한 투명 PNG pixel sprite를 사용한다. 클릭 영역, 접근 가능한 이름, 상태 램프·오류·ACK 등 의미가 바뀌는 정보만 SVG 오버레이로 유지한다. 도로는 화면 밖으로 이어지고 Kafka 경로는 도시 속 주 간선도로로 읽혀야 한다.
+밝은 golden hour의 실제 도시를 축소한 isometric logistics district다. 도시·도로·장식 건물·공원은 사용자 승인 단일 배경 이미지가 완성된 장면으로 제공한다. 중앙의 큰 건물 세 개를 왼쪽부터 Producer, Serializer, Broker로 매핑하고 클릭 영역, 접근 가능한 이름, 상태 램프·오류·ACK처럼 의미가 바뀌는 정보만 SVG 오버레이로 유지한다.
 
-Sprite 규칙:
+Visual asset 규칙:
 
 - 2:1 isometric, 64×32 ground tile 기준.
 - 명확한 16-bit pixel cluster와 `#302840` 계열 2–3px 외곽선.
 - 좌상단 golden light, 우하단 muted-violet contact shadow.
-- 장식 sprite는 `image-rendering: pixelated`와 bottom-center anchor를 사용한다.
+- 도시 배경은 화면 비율에 맞춰 잘라 쓰되 건물 세 개가 모두 보이도록 중앙 정렬한다.
 - 시설 표지의 한글·영문은 raster에 굽지 않고 실제 SVG text로 표시한다.
 - Producer·Serializer·Broker·노란 메시지 차량이 1차 시각 중심이고 일반 건물은 대비를 한 단계 낮춘다.
-- Road mainline은 끝 캡이 양 끝에만 있는 `road-mainline` 단일 sprite를 사용한다. 짧은 `road-straight` 반복은 이음새마다 보도·차도 끝 캡이 노출되므로 금지한다. 도로 sprite는 배경 지형 다음, 건물과 시설 이전 레이어에 둔다. 연결이 검증되지 않은 지선은 추가하지 않는다.
-- 일반 건물은 도로 중앙선에 놓지 않고 두 도로 사이 block interior 또는 보도 바깥에 배치한다. 메시지 checkpoint는 Producer → Serializer → Broker 주간선 중앙을 따른다.
+- 별도 도로·건물 sprite를 배경 위에 중복 배치하지 않는다. 메시지 checkpoint와 진행 path만 배경 속 중앙 대로의 실제 차선에 맞춘 SVG overlay다.
+- 세 Kafka 시설의 상호작용 영역은 배경의 건물 실루엣과 일치해야 하며 인접 도로나 다른 건물을 포함하지 않는다.
+- 이동 차량만 투명 PNG sprite를 사용한다. 후면이 좌하단, 전면이 우상단인 방향별 파일을 사용하고 runtime 회전으로 등각 투영 방향을 보정하지 않는다.
 
 ### Color tokens
 
@@ -113,7 +114,7 @@ Sprite 규칙:
 
 ### City composition
 
-Standard view에는 Kafka 핵심 시설 3개, 일반 건물 6–8개, 작은 공원, 나무 8–12개, 교차로와 곁길을 배치한다. 핵심 도로는 Producer에서 Serializer를 반드시 통과해 Broker로 이어진다. 곁길은 도시의 연속감을 만들지만 메시지 경로처럼 강조하지 않는다.
+Standard view에는 승인된 도시 배경 전체와 중앙 Kafka 핵심 건물 3개가 보인다. 장식 건물·공원·나무·도로는 배경 자체에 포함되며 별도 runtime sprite 수량을 관리하지 않는다.
 
 ### Delivery vehicle
 
@@ -198,8 +199,8 @@ Standard view에는 Kafka 핵심 시설 3개, 일반 건물 6–8개, 작은 공
 - 직접 작성한 학습 콘텐츠와 SVG: CC BY 4.0.
 - 제품명과 로고는 위 라이선스에서 제외한다.
 - 외부 참고 자료는 출처와 참고 목적을 생성 기록에 남기며 원본 파일을 재배포하지 않는다.
-- AI 생성 master와 전체 split set은 source record이고, 런타임에는 사용 중인 sprite만 import한다.
-- Kafka 시설·메시지 차량은 승인된 project sprite master에서 가져오며, 상태 효과와 실제 텍스트는 프로젝트 고유 SVG다.
+- 승인된 도시 WebP와 움직이는 Kafka 차량 PNG만 runtime에서 import한다.
+- Kafka 시설은 배경 중앙 건물 세 개를 의미적으로 매핑하며, 상태 효과와 실제 텍스트는 프로젝트 고유 SVG다.
 
 ## Open questions
 
