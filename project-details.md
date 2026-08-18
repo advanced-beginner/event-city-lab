@@ -243,6 +243,15 @@ Chapter 1 light-city 구현에서 확인한 내용:
 - 이전 `road-network-v3`, 일반 건물 11개, 방향별 시설 sprite 배치에 관한 기록은 역사적 시도이며 현재 구현 규칙이 아니다.
 - 브라우저에서 initial → failure → pending rerun → success → rewind-before-ACK를 실제 조작해 확인했다.
 - `1280×720`, `1440×900`, `1920×1080`의 document/root scroll size가 viewport와 일치해 page overflow가 없음을 측정했다.
+- 차량이 시설 표지와 겹치지 않도록 출발센터, 검사소, 기록센터와 Serializer 실패 표지를 각각 위로 이동했다. `1280×720`에서 시설 표지와 차량 bounding box의 수직 간격은 출발센터 약 `7.6px`, 검사소 약 `12.5px`, 기록센터 약 `2.8px`로 측정되어 모든 checkpoint에서 겹침이 제거됐다.
+- 최종 Visual Ralph 판정은 `96/100`이며, 브라우저 console error 0건, Vite production build와 Vitest 6개 테스트 통과를 다시 확인했다.
+
+2026-08-18 GitHub Pages 배포 자산 누락 장애:
+
+- commit `472221b`를 checkout한 GitHub Actions의 `npm run build`가 `KafkaWorld.tsx`의 `../assets/city/background/event-city-main.webp`를 찾지 못해 실패했다.
+- 원인은 import 경로나 Vite base가 아니라 배경 WebP와 새 차량 방향 이미지가 로컬 작업 트리에만 존재하고 Git에 추적되지 않은 상태였기 때문이다. 로컬 빌드는 미추적 파일을 읽을 수 있어 통과했지만 GitHub Actions checkout에는 해당 파일이 없었다.
+- 후속 commit `8132fd6`에서 `event-city-main.webp`, `vehicle-kafka-van-east.png`, `vehicle-kafka-van-northeast.png` 세 runtime 자산을 추가했다. 현재 세 파일 모두 `git ls-files`로 추적 상태임을 확인했다.
+- 자산 추적 누락은 수정됐지만 `8132fd6` 이후 GitHub Actions 재실행 성공과 실제 Pages URL 동작은 아직 이 기록에서 확인하지 않았다.
 
 현재 자동 테스트가 보장하는 범위:
 
@@ -256,7 +265,7 @@ Chapter 1 light-city 구현에서 확인한 내용:
 
 ### 배포와 운영
 
-- `deploy.yml`은 존재하지만 이번 기록 시점에 GitHub Actions 실행 결과와 실제 Pages URL의 최신 화면을 확인한 기록은 없다.
+- 첫 단일 배경 배포는 runtime 이미지 미추적으로 build에 실패했다. 누락 파일은 commit `8132fd6`에 추가됐지만 이후 GitHub Actions 성공 결과와 실제 Pages URL의 최신 화면을 확인한 기록은 없다.
 - Pages repository setting이 GitHub Actions source로 활성화되었는지 코드만으로 확인할 수 없다.
 - 실제 배포 환경에서 Web Worker asset path, hash URL 복원, Google Fonts CSP/network 동작을 별도로 확인해야 한다.
 
@@ -301,6 +310,7 @@ Chapter 1 light-city 구현에서 확인한 내용:
 
 ### P0 — Chapter 1 공개 완료 확인
 
+- [x] 단일 도시 배경과 새 차량 방향 이미지가 Git 추적 상태인지 확인.
 - [ ] GitHub Actions의 최신 `Verify and deploy Event City Lab` run 성공 여부 확인.
 - [ ] 실제 Pages URL에서 initial → failure → pending rerun → success → rewind smoke test.
 - [ ] 배포 URL에서 Web Worker와 lazy CodeMirror chunk가 `/event-city-lab/` base로 정상 로드되는지 확인.

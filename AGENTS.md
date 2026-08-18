@@ -94,7 +94,8 @@ npm run build
 
 6. 레이아웃 변경은 최소 `1280×720`, `1440×900`, `1920×1080`에서 page overflow와 핵심 텍스트 clipping을 확인한다.
 7. GitHub Pages 관련 변경은 `/event-city-lab/` base와 hash URL에서 asset 및 worker 경로를 검증한다.
-8. 완료 범위, 새 미비점, 후속 TODO가 생기면 같은 변경에서 `project-details.md`를 갱신한다.
+8. 새 runtime 이미지·font·worker·기타 정적 파일을 import하면 로컬 빌드 성공만 확인하지 않는다. 커밋 전에 `git status --short`와 `git ls-files --error-unmatch <asset-path>`로 모든 import 대상이 Git 추적 상태인지 확인한다. GitHub Actions checkout에는 미추적 파일이 포함되지 않는다.
+9. 완료 범위, 새 미비점, 후속 TODO가 생기면 같은 변경에서 `project-details.md`를 갱신한다.
 
 ## 문서 유지 규칙
 
