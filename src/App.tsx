@@ -2,6 +2,9 @@ import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useStore } from 'zustand'
 
 import styles from './App.module.css'
+import { ChapterNavigation } from './chapters/ChapterNavigation'
+import { PlannedChapter } from './chapters/PlannedChapter'
+import { getChapter, type ChapterMetadata } from './chapters/registry'
 import { KafkaWorld } from './components/KafkaWorld'
 import {
   APP_VERSION,
@@ -13,11 +16,13 @@ import {
   type WorkspaceSnapshot,
 } from './domain/simulation'
 import { labStore } from './state/labStore'
+import { useChapterRoute } from './routing/chapterRoute'
 import {
   loadWorkspace,
   parseWorkspaceJson,
   saveWorkspace,
   serializeWorkspace,
+  type WorkspaceRecoveryFailureReason,
 } from './storage/workspaceDb'
 import { runSimulation } from './worker/client'
 
@@ -71,10 +76,45 @@ function statusLabel(status: 'failed' | 'succeeded') {
   return status === 'failed' ? '실패' : '성공'
 }
 
+function workspaceRecoveryStatus(error: unknown): string {
+  const reason = (
+    typeof error === 'object'
+    && error !== null
+    && 'result' in error
+    && typeof error.result === 'object'
+    && error.result !== null
+    && 'reason' in error.result
+  ) ? error.result.reason as WorkspaceRecoveryFailureReason : null
+
+  switch (reason) {
+    case 'unsupported-newer-version':
+      return '더 새로운 저장 데이터 · 가져오기로 복구 필요'
+    case 'unsupported-older-version':
+      return '이전 저장 데이터 · migration 필요'
+    case 'invalid-json':
+    case 'invalid-snapshot':
+    case 'missing-storage-schema-version':
+    case 'invalid-storage-schema-version':
+      return '손상된 저장 데이터 · 가져오기로 복구 필요'
+    default:
+      return '로컬 저장소를 열 수 없음'
+  }
+}
+
 export default function App() {
+  const { chapterId } = useChapterRoute()
+  const chapter = getChapter(chapterId)
+
+  return chapter.id === 1
+    ? <ChapterOneLab chapter={chapter} />
+    : <PlannedChapter chapter={chapter} />
+}
+
+function ChapterOneLab({ chapter }: { chapter: ChapterMetadata }) {
   const state = useStore(labStore)
   const [isRunning, setIsRunning] = useState(false)
   const [saveStatus, setSaveStatus] = useState('저장 대기')
+  const [storageBlocked, setStorageBlocked] = useState(false)
   const [leftTab, setLeftTab] = useState<LeftTab>('settings')
   const [evidenceTab, setEvidenceTab] = useState<EvidenceTab>('logs')
   const [speed, setSpeed] = useState<PlaybackSpeed>(1)
@@ -108,26 +148,23 @@ export default function App() {
   })
 
   useEffect(() => {
-    if (!window.location.hash) window.location.hash = '#/chapter/1'
-  }, [])
-
-  useEffect(() => {
     let cancelled = false
     void loadWorkspace()
       .then((snapshot) => {
         if (!cancelled) labStore.getState().hydrate(snapshot)
       })
-      .catch(() => {
+      .catch((error: unknown) => {
         if (!cancelled) {
           labStore.getState().hydrate(null)
-          setSaveStatus('로컬 저장소를 열 수 없음')
+          setStorageBlocked(true)
+          setSaveStatus(workspaceRecoveryStatus(error))
         }
       })
     return () => { cancelled = true }
   }, [])
 
   useEffect(() => {
-    if (!state.hydrated) return
+    if (!state.hydrated || storageBlocked) return
     setSaveStatus('저장 중…')
     const timeout = window.setTimeout(() => {
       void saveWorkspace(makeSnapshot())
@@ -135,7 +172,7 @@ export default function App() {
         .catch(() => setSaveStatus('저장 실패'))
     }, 350)
     return () => window.clearTimeout(timeout)
-  }, [state.config, state.hintLevel, state.hydrated, state.message, state.runs])
+  }, [state.config, state.hintLevel, state.hydrated, state.message, state.runs, storageBlocked])
 
   useEffect(() => {
     if (!state.isPlaying || !activeRun) return
@@ -227,9 +264,10 @@ export default function App() {
     try {
       const snapshot = parseWorkspaceJson(await file.text())
       state.replaceWorkspace(snapshot)
+      setStorageBlocked(false)
       setSaveStatus('가져오기 완료')
-    } catch {
-      setSaveStatus('가져오기 실패: 파일 형식을 확인하세요')
+    } catch (error: unknown) {
+      setSaveStatus(`가져오기 실패 · ${workspaceRecoveryStatus(error)}`)
     }
   }
 
@@ -247,11 +285,12 @@ export default function App() {
             <svg viewBox="0 0 48 48"><path d="m5 17 19-10 19 10-19 10z" /><path d="M5 17v15l19 10V27z" /><path d="M24 27v15l19-10V17z" /></svg>
           </div>
           <div>
-            <p className={styles.kicker}>EVENT CITY · CHAPTER 01</p>
-            <h1>첫 메시지는 왜 출발하지 못했을까?</h1>
+            <p className={styles.kicker}>EVENT CITY · CHAPTER {chapter.numberLabel}</p>
+            <h1>{chapter.title}</h1>
           </div>
         </div>
         <div className={styles.headerMeta}>
+          <ChapterNavigation activeChapterId={chapter.id} />
           <span className={styles.missionBadge}>PRODUCER BOOTCAMP</span>
           <span className={styles.saveState}><span aria-hidden="true">●</span> {saveStatus}</span>
           <button className={styles.textButton} type="button" onClick={toggleReducedMotion} aria-pressed={reducedMotion}>모션 {reducedMotion ? '줄임' : '표준'}</button>

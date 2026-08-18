@@ -69,6 +69,33 @@
 .textButton:hover { color: #087a7e; background: var(--cyan-soft); }
 .hiddenInput { display: none; }
 
+.chapterNav {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-muted);
+}
+.chapterNav a {
+  width: 25px;
+  height: 25px;
+  display: grid;
+  place-items: center;
+  border-radius: 6px;
+  color: #748194;
+  font: 800 8px/1 var(--mono);
+  text-decoration: none;
+}
+.chapterNav a:hover { color: #087a7e; background: var(--cyan-soft); }
+.chapterNav a:focus-visible { outline: 2px solid var(--cyan); outline-offset: 1px; }
+.chapterNav .chapterNavActive {
+  color: white;
+  background: #178f91;
+  box-shadow: 0 1px 3px #08757933;
+}
+
 .briefing {
   display: grid;
   grid-template-columns: minmax(420px, 1.1fr) 1fr auto;
@@ -267,6 +294,106 @@
 
 .footer { gap: 14px; padding: 0 16px; color: #8994a1; border-top: 1px solid #e9ecef; background: #f7f8fa; font: 8px var(--mono); }
 .footer span:last-child { margin-left: auto; }
+
+.plannedChapterShell { grid-template-rows: 56px minmax(0, 1fr) 22px; }
+.plannedChapter {
+  min-height: 0;
+  display: grid;
+  place-items: center;
+  padding: 36px;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 20% 20%, #dff7f4 0 80px, transparent 81px),
+    radial-gradient(circle at 80% 78%, #eee7fc 0 110px, transparent 111px),
+    linear-gradient(145deg, #f8f7f1, #edf5f4);
+}
+.plannedChapterCard {
+  width: min(680px, 100%);
+  position: relative;
+  padding: 36px 40px;
+  overflow: hidden;
+  border: 1px solid #cddbdc;
+  border-radius: 18px;
+  background: #fffffff2;
+  box-shadow: 0 24px 70px #34445c1c;
+}
+.plannedChapterIndex {
+  position: absolute;
+  top: -24px;
+  right: 20px;
+  color: #d9efed;
+  font: 800 112px/1 var(--mono);
+  pointer-events: none;
+}
+.plannedChapterCard h2 {
+  max-width: 520px;
+  position: relative;
+  margin: 14px 0 10px;
+  font-size: 28px;
+  line-height: 1.25;
+  letter-spacing: -.04em;
+}
+.plannedChapterCard > p { max-width: 560px; color: #657589; font-size: 13px; line-height: 1.7; }
+.plannedChapterCard > .plannedTopic { position: relative; color: #087a7e; font: 800 11px/1.5 var(--mono); }
+.plannedExperiments {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 18px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.plannedExperiments li {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  gap: 7px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--surface-muted);
+}
+.plannedExperiments li > span {
+  width: 21px;
+  height: 21px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--cyan-soft);
+  color: #087a7e;
+  font: 800 9px/1 var(--mono);
+}
+.plannedExperiments strong,
+.plannedExperiments small { display: block; }
+.plannedExperiments strong { color: #405166; font-size: 10px; line-height: 1.35; }
+.plannedExperiments small { margin-top: 4px; color: #788598; font-size: 9px; line-height: 1.45; }
+.plannedNotice {
+  display: grid;
+  gap: 5px;
+  margin-top: 22px;
+  padding: 14px 16px;
+  border-left: 4px solid var(--violet);
+  border-radius: 0 10px 10px 0;
+  background: var(--violet-soft);
+}
+.plannedNotice strong { color: #594191; font-size: 12px; }
+.plannedNotice span { color: #746991; font-size: 11px; line-height: 1.55; }
+.returnToLab {
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  margin-top: 22px;
+  padding: 0 15px;
+  border: 1px solid #087f83;
+  border-radius: 8px;
+  background: #159c9d;
+  color: white;
+  font-size: 11px;
+  font-weight: 800;
+  text-decoration: none;
+}
+.returnToLab:hover { background: #087f83; }
+.returnToLab:focus-visible { outline: 2px solid var(--violet); outline-offset: 3px; }
 
 @media (max-width: 1439px) {
   .workspace { grid-template-columns: 268px minmax(0, 1fr) 324px; }

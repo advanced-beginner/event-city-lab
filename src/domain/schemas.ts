@@ -1,9 +1,6 @@
 import { z } from 'zod'
 
 import {
-  APP_VERSION,
-  CONTENT_VERSION,
-  KAFKA_RULE_VERSION,
   STORAGE_SCHEMA_VERSION,
 } from './simulation'
 
@@ -79,9 +76,9 @@ export const simulationRunSchema = z.strictObject({
 
 export const workspaceSnapshotSchema = z.strictObject({
   storageSchemaVersion: z.literal(STORAGE_SCHEMA_VERSION),
-  appVersion: z.literal(APP_VERSION),
-  contentVersion: z.literal(CONTENT_VERSION),
-  kafkaRuleVersion: z.literal(KAFKA_RULE_VERSION),
+  appVersion: z.string().min(1),
+  contentVersion: z.string().min(1),
+  kafkaRuleVersion: z.string().min(1),
   savedAt: z.iso.datetime(),
   config: producerConfigSchema,
   message: labMessageSchema,

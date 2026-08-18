@@ -2,6 +2,7 @@
 
 import { simulateProducerSend } from '../domain/engine'
 import {
+  readWorkerRequestId,
   simulationWorkerRequestSchema,
   type SimulationWorkerResponse,
 } from './protocol'
@@ -14,7 +15,7 @@ workerScope.addEventListener('message', (event: MessageEvent<unknown>) => {
   if (!parsed.success) {
     const response: SimulationWorkerResponse = {
       type: 'SIMULATION_ERROR',
-      requestId: 'invalid-request',
+      requestId: readWorkerRequestId(event.data) ?? 'invalid-request',
       error: '시뮬레이션 요청 형식이 올바르지 않습니다.',
     }
     workerScope.postMessage(response)

@@ -39,3 +39,12 @@ export const simulationWorkerResponseSchema = z.discriminatedUnion('type', [
     error: z.string(),
   }),
 ])
+
+export function readWorkerRequestId(candidate: unknown): string | null {
+  if (typeof candidate !== 'object' || candidate === null || !('requestId' in candidate)) {
+    return null
+  }
+
+  const { requestId } = candidate as { requestId?: unknown }
+  return typeof requestId === 'string' && requestId.length > 0 ? requestId : null
+}

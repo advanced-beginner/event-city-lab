@@ -33,7 +33,13 @@ npm run dev
 npm run typecheck
 npm run test:run
 npm run build
+npm run test:e2e
 ```
+
+브라우저 E2E는 Playwright 1.62.1과 bundled Chromium, Firefox, WebKit을
+사용합니다. 최초 설치 시 `npx playwright install chromium firefox webkit`을
+실행합니다. `npm run test:e2e`는 production build와 preview 서버를 사용해
+세 브라우저와 `1280×720`, `1440×900`, `1920×1080` 조합을 검사합니다.
 
 Vite의 GitHub Pages base는 `/event-city-lab/`로 설정되어 있습니다. 배포
 주소는 `https://advanced-beginner.github.io/event-city-lab/`입니다. 저장소의
