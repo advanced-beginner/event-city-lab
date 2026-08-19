@@ -1,0 +1,89 @@
+.world { display: block; width: 100%; height: 100%; min-height: 0; overflow: visible; }
+.backdrop { image-rendering: auto; }
+.wash { fill: #0e2b36; opacity: .12; pointer-events: none; }
+
+.transactionBoundary { color: #7656c9; opacity: .28; pointer-events: none; }
+.transactionBoundary > path { fill: #7656c9; fill-opacity: .035; stroke: currentColor; stroke-width: 7; stroke-dasharray: 22 15; }
+.transactionBoundary rect { fill: #f8f3ffed; stroke: currentColor; stroke-width: 3; }
+.transactionBoundary text { fill: currentColor; font: 800 17px ui-monospace, SFMono-Regular, Menlo, monospace; }
+.transactionBoundary.active, .transactionBoundary.complete, .previewBoundary { opacity: .88; }
+.transactionBoundary.failed, .transactionBoundary.blocked { color: #d84a5b; opacity: .94; }
+
+.route { color: #2e8f91; opacity: .5; transition: opacity 180ms ease, color 180ms ease; }
+.routeHalo { fill: none; stroke: #fff; stroke-width: 13; stroke-linecap: round; stroke-linejoin: round; opacity: .72; }
+.routeLine { fill: none; stroke: currentColor; stroke-width: 7; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 17 14; }
+.route_replication { color: #2e8f91; }
+.route_control, .route_transaction { color: #7656c9; }
+.route_retry { color: #d88925; }
+.route_return { color: #238a5b; }
+.route_idle, .route_muted { opacity: .22; }
+.route_active { opacity: .96; }
+.route_complete { opacity: .85; }
+.route_failed, .route_blocked { color: #d84a5b; opacity: .95; }
+.routeDisabled { color: #aab2ad; opacity: .38; }
+.route_active .routeLine { animation: advanced-route-flow .9s linear infinite; }
+.previewRoute { color: #7656c9; opacity: .82; }
+.previewRoute .routeLine { stroke-dasharray: 11 10; }
+
+.facility { cursor: pointer; outline: none; transition: filter 180ms ease, opacity 180ms ease; }
+.hitArea { fill: #fff; fill-opacity: .001; stroke: transparent; stroke-width: 6; transition: fill-opacity 180ms ease, stroke 180ms ease; }
+.facility:hover .hitArea { fill-opacity: .08; stroke: #fff4b8; }
+.facility:focus-visible .hitArea { fill-opacity: .11; stroke: #fff; }
+.facility:focus-visible, .focused { filter: url(#advanced-city-glow); }
+.facility.failed .hitArea { fill: #d84a5b; fill-opacity: .13; stroke: #d84a5b; }
+.facility.blocked .hitArea { fill: #e9a23b; fill-opacity: .12; stroke: #e9a23b; stroke-dasharray: 12 10; }
+.facility.complete .hitArea { fill: #238a5b; fill-opacity: .09; stroke: #57c789; }
+.facility.muted { opacity: .52; }
+.previewFacility { filter: drop-shadow(0 0 10px #7656c9aa); }
+.previewFacility .hitArea { fill: #7656c9; fill-opacity: .1; stroke: #7656c9; stroke-dasharray: 10 8; }
+
+.facilitySign { filter: url(#advanced-city-shadow); pointer-events: none; }
+.facilitySign rect { fill: #fefcf4ed; stroke: #302840; stroke-width: 3; }
+.facilitySign circle { fill: #9e9aa1; stroke: #302840; stroke-width: 3; }
+.facilitySign circle[data-state='active'] { fill: #55d7d0; }
+.facilitySign circle[data-state='blocked'] { fill: #e9a23b; }
+.facilitySign circle[data-state='failed'] { fill: #ef6170; }
+.facilitySign circle[data-state='complete'] { fill: #61db94; }
+.facilitySign text { fill: #302840; font-family: "Nanum Gothic", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; font-size: 17px; font-weight: 800; }
+.facilitySign text:last-child { fill: #66758a; font-size: 14px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+.carrier { filter: url(#advanced-city-shadow); transition: transform 480ms cubic-bezier(.2, .8, .2, 1), opacity 180ms ease; }
+.carrier image { image-rendering: pixelated; }
+.carrier_ghost-record { opacity: .45; }
+.carrier_failed { animation: advanced-shake .3s ease-in-out 2; }
+.ticket rect { fill: #f4edff; stroke: #7656c9; stroke-width: 4; }
+.ticket path { fill: none; stroke: #7656c9; stroke-width: 3; }
+.ticket text { fill: #5c439a; font: 800 13px ui-monospace, SFMono-Regular, Menlo, monospace; }
+.cargoLabel rect { fill: #fff5d9f2; stroke: #302840; stroke-width: 3; }
+.cargoLabel text { fill: #302840; font: 800 15px ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+.signal { pointer-events: none; }
+.signal > path { fill: none; stroke: currentColor; stroke-width: 7; stroke-linecap: round; stroke-dasharray: 16 15; animation: advanced-route-flow 1s linear infinite; }
+.signal rect { fill: #fff; stroke: currentColor; stroke-width: 3; }
+.signal text { fill: currentColor; font: 800 15px ui-monospace, SFMono-Regular, Menlo, monospace; }
+.successSignal { color: #238a5b; }
+.controlSignal { color: #7656c9; }
+.signal.failed, .signal.blocked { color: #d84a5b; }
+
+.barrier { color: #238a5b; pointer-events: none; }
+.barrier > path { fill: none; stroke: currentColor; stroke-width: 10; stroke-linecap: round; }
+.barrier rect { fill: #fff; stroke: currentColor; stroke-width: 3; }
+.barrier text { fill: currentColor; font: 800 15px ui-monospace, SFMono-Regular, Menlo, monospace; }
+.barrierClosed { color: #d84a5b; filter: drop-shadow(0 0 10px #d84a5b88); }
+
+.pending { filter: saturate(.82); }
+.pendingLabel rect { fill: #fff8e9; stroke: #7656c9; stroke-width: 3; }
+.pendingLabel text { fill: #664ca6; font: 800 21px "Nanum Gothic", sans-serif; }
+
+:global(.city-world-reduced-motion) .route_active .routeLine,
+:global(.city-world-reduced-motion) .signal > path { animation: none; }
+:global(.city-world-reduced-motion) .carrier,
+:global(.city-world-reduced-motion) .facility { transition: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .route_active .routeLine, .signal > path, .carrier_failed { animation: none; }
+  .carrier, .facility { transition: none; }
+}
+
+@keyframes advanced-route-flow { to { stroke-dashoffset: -62; } }
+@keyframes advanced-shake { 33% { translate: -5px 0; } 66% { translate: 5px 0; } }

@@ -1,5 +1,7 @@
 import { z } from 'zod'
 
+import { chapterCityCueSchema } from '../city/validation'
+
 export const advancedChapterIdSchema = z.union([
   z.literal(2),
   z.literal(3),
@@ -55,6 +57,7 @@ const chapterEventSchema = z.strictObject({
   title: z.string(),
   detail: z.string(),
   log: z.string(),
+  cityCue: chapterCityCueSchema,
 })
 
 export const chapterSimulationRunSchema = z.strictObject({

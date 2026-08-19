@@ -265,14 +265,17 @@ Chapter 1 light-city 구현에서 확인한 내용:
 2026-08-18 Chapter 1–8 기반 및 회귀 자동화:
 
 - Chapter 1–8 metadata registry와 `#/chapter/:id` hash router를 추가했다. 잘못된 route는 `#/chapter/1`로 복구하며 모든 챕터는 잠금 없이 탐색할 수 있다.
-- Chapter 2–8은 각 3개 guided 실험과 실패·성공 선택, 결정론적 event/log/evidence/diagnosis/trade-off를 제공한다.
+- Chapter 2–8은 각 3개 guided 실험과 실패·성공 선택, 결정론적 event/log/evidence/diagnosis/trade-off를 제공한다. 모든 이벤트는 로그 문자열 파싱 없이 scene의 node·route·checkpoint를 참조하는 구조화된 `cityCue`를 함께 생성한다.
 - Chapter 2–8 시나리오는 Kafka 4.3.1 공식 문서의 partition ordering, producer reliability, ISR, offset, rebalance, transaction 규칙을 근거로 한다. 일반 consumer의 retry topic과 DLT는 Kafka broker 자동 기능이 아니라 애플리케이션·프레임워크 패턴으로 구분한다.
 - 저장 복구는 `storageSchemaVersion`을 호환성 기준으로 사용한다. 앱·콘텐츠·Kafka 규칙 버전이 달라도 schema v1 데이터를 보존하며 손상 데이터, 미래 버전, 잘못된 JSON을 구조화된 사유로 구분한다. 복구가 필요하면 자동 저장을 차단해 기존 데이터를 덮어쓰지 않고 상태 문구로 원인을 알린다.
 - App 통합 테스트는 최초 실패 → 분석 → 설정 변경 → 성공 재실행 → 비교 → ACK 이전 되감기를 검증한다.
 - Worker 테스트는 잘못된 입력·응답, 엔진 오류, runtime 오류, listener cleanup과 crash 이후 Worker 재생성을 검증한다.
 - Chapter rule/engine, Worker/client, 저장 migration, store 진도, React 흐름을 포함한 Vitest 검증을 유지한다. 최신 통과 수치는 이 변경의 최종 검증 결과를 기준으로 한다.
-- Playwright 1.62.1과 bundled Chromium, Firefox, WebKit에서 `1280×720`, `1440×900`, `1920×1080`을 조합한 9개 project를 구성했다. production preview 기준 Chapter 1 asset·Worker·lazy CodeMirror, Chapter 2–8 직접 route와 page overflow, Chapter 8 실패→권장 수정→성공 진도 저장, 잘못된 hash 복구를 검사하는 27개 테스트가 통과했다.
-- 사용자 제공 `Gemini_Generated_Image_ovrs7covrs7covrs.png`는 `1920×1047` WebP 537KB로 최적화해 Chapter 2–8 공통 atlas 배경으로 사용한다. 1280×720과 1920×1080 캡처에서 억지로 배경 건물을 Kafka 시설로 지정하지 않고 semantic overlay를 분리한 구성을 확인했다. Chapter 1 배경·이동 차량과 합친 runtime 이미지 합계는 약 1.03MB다.
+- Playwright 1.62.1과 bundled Chromium, Firefox, WebKit에서 `1280×720`, `1440×900`, `1920×1080`을 조합한 9개 project를 구성했다. production preview 기준 Chapter 1 asset·Worker·lazy CodeMirror, Chapter 2–8의 대표 실패→권장 수정→성공, 직접 hash route, page/world overflow, 시설·차량·상태 문구 경계와 중첩, 잘못된 hash 복구를 검사하는 27개 smoke 실행이 통과했다.
+- 사용자 제공 `Gemini_Generated_Image_ovrs7covrs7covrs.png`는 `1920×1047` WebP 537KB로 최적화해 Chapter 2–8 공통 atlas 배경으로 사용한다. atlas 전체를 crop 없이 표시하고 실제 건물 silhouette와 도로에 맞춘 scene 좌표를 별도 관리한다. Chapter 1 배경·이동 차량과 합친 runtime 이미지 합계는 약 1.03MB다.
+- Chapter 1의 `CityWorld`/`CityFacility` 계약을 Chapter 2–8과 공유한다. Chapter 2–8의 기존 중앙 사각형 component map은 제거했으며 노란 record 밴, retry/ghost record, offset ticket, ACK·commit·assignment·metadata·transaction 신호, min ISR·LSO·abort 차단기를 inline SVG overlay로 렌더링한다.
+- 21개 실험의 모든 선택에서 발생하는 모든 이벤트 cue는 존재하는 node·route·checkpoint만 참조하도록 단위 테스트한다. 타임라인 cursor, 되감기, 재생 속도, reduced-motion과 도시 projection은 같은 이벤트 기록을 사용한다.
+- Chromium `1440×900`의 Chapter 2–8 초기·실패·성공과 복잡한 Chapter 2·4·6·8의 `1280×720`/`1920×1080` 실패·성공을 합친 37개 Darwin 시각 baseline을 저장했다. 2026-08-19 최종 검증은 Vitest 27파일 135개, Playwright 42개 실행 통과와 의도된 시각 범위 밖 48개 skip, typecheck와 production build 통과다. Linux CI에서는 pixel baseline을 skip하고 동일한 semantic/bounds smoke를 유지한다.
 - GitHub Actions는 `npx playwright install --with-deps chromium firefox webkit` 후 `npm run test:e2e`를 실행하며, 성공한 production artifact만 Pages 배포 단계로 전달한다.
 
 ## 9. 알려진 미비점
@@ -285,10 +288,10 @@ Chapter 1 light-city 구현에서 확인한 내용:
 
 ### 테스트 자동화
 
-- 자동 테스트는 domain/code bridge, Chapter 2–8 rule routing, App 핵심 흐름, storage 복구/migration, store 진도, worker 경계를 다룬다. IndexedDB 실제 구현과 SVG 세부 상태에 대한 자동 테스트는 아직 없다.
-- 실패 → 권장 설정 적용 → 성공 재실행 → 진도 저장의 Chapter 2–8 공통 흐름은 jsdom 통합 테스트와 실제 Worker를 사용하는 Playwright smoke로 보강했다.
+- 자동 테스트는 domain/code bridge, Chapter 2–8 rule routing과 city cue 참조 무결성, projection reducer, App 핵심 흐름, storage 복구/migration, store 진도, worker 경계를 다룬다. IndexedDB 실제 구현 자동 테스트는 아직 없다.
+- 실패 → 권장 설정 적용 → 성공 재실행 → 진도 저장의 Chapter 2–8 공통 흐름은 jsdom 통합 테스트와 실제 Worker를 사용하는 Playwright smoke로 보강했다. Chromium의 승인 viewport에는 37개 도시 시각 baseline을 추가했다.
 - 세 viewport의 page overflow와 핵심 production asset 로딩은 Chromium, Firefox, WebKit 조합으로 자동화했다. 핵심 텍스트의 시각적 clipping 판정은 아직 수동 검토가 필요하다.
-- accessibility 자동 검사와 키보드 전체 경로 회귀 테스트가 없다.
+- SVG 시설의 role/name과 Enter/Space 조작 회귀 테스트를 유지한다. 전용 WCAG scanner를 사용하는 자동 감사는 아직 없다.
 - coverage report 설정은 있으나 threshold가 없다.
 
 ### 저장과 복구
@@ -339,7 +342,8 @@ Chapter 1 light-city 구현에서 확인한 내용:
 - [ ] IndexedDB save/load와 JSON import/export round-trip 테스트.
 - [x] worker protocol error, malformed response, worker failure 테스트와 cleanup 정책 추가. timeout 정책은 남아 있음.
 - [x] CI viewport test: Chromium, Firefox, WebKit의 1280×720, 1440×900, 1920×1080 page overflow와 production asset smoke 검사. 시각적 clipping 판정은 수동 검토 유지.
-- [ ] keyboard-only 및 automated accessibility 검사 추가.
+- [x] SVG 시설 role/name과 Enter/Space keyboard 회귀 검사 추가.
+- [ ] 전용 WCAG scanner 기반 automated accessibility 검사 추가.
 - [ ] coverage threshold 설정.
 - [ ] `App.tsx`를 shell, left control, evidence, playback으로 분리.
 - [ ] `KafkaWorld.tsx`의 building, facility, vehicle, signal을 속성 기반 컴포넌트로 추가 분리.
@@ -349,7 +353,8 @@ Chapter 1 light-city 구현에서 확인한 내용:
 
 - [x] chapter metadata registry와 hash router 구현.
 - [x] chapter별 learning goal, event schema, diagnosis, trade-off와 실험 definition 분리.
-- [x] 공통 city atlas와 chapter별 semantic facility/state overlay 경계 정의.
+- [x] 공통 city atlas와 chapter별 scene-defined facility/route/carrier/signal/barrier 경계 정의.
+- [x] Chapter 1의 시설 선택·이동·실패·반환 신호 문법을 Chapter 2–8 공통 `CityWorld` 계약으로 통합.
 - [x] 엔진을 chapter별 rule module로 확장하고 결정론과 schema validation 유지.
 - [x] Chapter 완료 상태와 chapter 간 진도 저장 schema 및 v1→v2 migration 구현.
 - [x] 전체 챕터 navigation과 잠금 없는 복습 정책 구현.

@@ -21,10 +21,10 @@
     "source": "user-provided Gemini-generated image",
     "sourceFile": "Gemini_Generated_Image_ovrs7covrs7covrs.png",
     "nativeSize": [1920, 1047],
-    "fit": "cover",
+    "fit": "contain",
     "postProcessing": ["resize-width-1920", "webp-quality-78"],
     "runtime": true,
-    "usage": "Chapter 2–8 shared city atlas with semantic HTML overlays"
+    "usage": "Chapter 2–8 shared city atlas with scene-defined SVG facility polygons, road routes, carriers, signals, and barriers"
   },
   "assets": [
     { "id": "vehicle-coral-car", "file": "sprites/vehicle-coral-car.png", "category": "vehicle", "nativeSize": [165, 135], "anchor": [0.5, 1], "runtime": false },

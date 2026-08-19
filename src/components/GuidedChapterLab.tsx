@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useState, type CSSProperties } from 'react'
+import { useEffect, useState } from 'react'
 import { useStore } from 'zustand'
 
-import atlasUrl from '../assets/city/background/event-city-atlas.webp'
 import { ChapterNavigation } from '../chapters/ChapterNavigation'
 import type { ChapterMetadata } from '../chapters/registry'
+import { getAdvancedChapterScene, getExperimentCityPreview } from '../city/chapterScenes'
 import { kafkaReferences } from '../content/kafkaReferences'
 import { getChapterRule } from '../domain/chapterEngine'
 import type {
@@ -20,22 +20,11 @@ import {
 import { labStore } from '../state/labStore'
 import { loadWorkspace, saveWorkspace } from '../storage/workspaceDb'
 import { runChapterSimulation } from '../worker/client'
+import { AdvancedCityWorld } from './AdvancedCityWorld'
 import styles from './GuidedChapterLab.module.css'
 
-const COMPONENT_LABELS = {
-  producer: 'Producer',
-  partition: 'Partition',
-  broker: 'Broker',
-  replica: 'Replica / ISR',
-  consumer: 'Consumer',
-  coordinator: 'Group Coordinator',
-  offset: 'Offset Store',
-  retry: 'Retry / DLT',
-  application: 'Application',
-  transaction: 'Transaction Coordinator',
-} as const
-
 type Prediction = 'failed' | 'succeeded'
+type PlaybackSpeed = 0.5 | 1 | 2
 
 function makeSnapshot(): WorkspaceSnapshot {
   const state = labStore.getState()
@@ -63,9 +52,17 @@ function firstFailureChoiceId(
     ?? ''
 }
 
-function readReducedMotionPreference(): boolean {
+function readReducedMotionSetting(): boolean {
   try {
     return window.localStorage.getItem('ecl:reduced-motion') === 'true'
+  } catch {
+    return false
+  }
+}
+
+function readOsReducedMotionPreference(): boolean {
+  try {
+    return window.matchMedia('(prefers-reduced-motion: reduce)').matches
   } catch {
     return false
   }
@@ -90,7 +87,13 @@ export function GuidedChapterLab({ chapter }: { chapter: ChapterMetadata }) {
   const [isPlaying, setIsPlaying] = useState(false)
   const [isRunning, setIsRunning] = useState(false)
   const [engineError, setEngineError] = useState<string | null>(null)
+  const [inspectedNodeId, setInspectedNodeId] = useState<string | null>(null)
+  const [showInspectedRole, setShowInspectedRole] = useState(false)
   const [saveStatus, setSaveStatus] = useState('진도 불러오는 중')
+  const [speed, setSpeed] = useState<PlaybackSpeed>(1)
+  const [appReducedMotion, setAppReducedMotion] = useState(readReducedMotionSetting)
+  const [osReducedMotion, setOsReducedMotion] = useState(readOsReducedMotionPreference)
+  const reducedMotion = appReducedMotion || osReducedMotion
 
   const completedIds = workspaceState.learningProgress.completedExperiments[String(chapterId)] ?? []
   const completedCount = rule.experiments.filter((candidate) => completedIds.includes(candidate.id)).length
@@ -101,10 +104,10 @@ export function GuidedChapterLab({ chapter }: { chapter: ChapterMetadata }) {
   const visibleEvents = run ? run.events.slice(0, eventCursor + 1) : []
   const activeEvent = run?.events[eventCursor] ?? null
   const references = kafkaReferences.filter((reference) => experiment.referenceIds.includes(reference.id))
-  const components = useMemo(() => {
-    const source = run?.events ?? experiment.choices.flatMap((choice) => choice.outcome.events)
-    return [...new Set(source.map((event) => event.component))]
-  }, [experiment, run])
+  const scene = getAdvancedChapterScene(chapterId)
+  const scenePreview = getExperimentCityPreview(experiment.id, choiceId)
+  const inspectedNode = scene.nodes.find((node) => node.id === inspectedNodeId) ?? null
+  const pendingRerun = Boolean(run && choiceId !== run.choiceId)
 
   useEffect(() => {
     const firstExperiment = rule.experiments[0]
@@ -117,6 +120,8 @@ export function GuidedChapterLab({ chapter }: { chapter: ChapterMetadata }) {
     setIsPlaying(false)
     setIsRunning(false)
     setEngineError(null)
+    setInspectedNodeId(null)
+    setShowInspectedRole(false)
   }, [chapterId, rule])
 
   useEffect(() => {
@@ -146,14 +151,28 @@ export function GuidedChapterLab({ chapter }: { chapter: ChapterMetadata }) {
       setIsPlaying(false)
       return
     }
-    const reducedMotion = readReducedMotionPreference()
-      || window.matchMedia('(prefers-reduced-motion: reduce)').matches
     const timeout = window.setTimeout(
       () => setEventCursor((cursor) => cursor + 1),
-      reducedMotion ? 80 : 420,
+      reducedMotion ? 80 : 500 / speed,
     )
     return () => window.clearTimeout(timeout)
-  }, [eventCursor, isPlaying, run])
+  }, [eventCursor, isPlaying, reducedMotion, run, speed])
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem('ecl:reduced-motion', String(appReducedMotion))
+    } catch {
+      // The OS preference still applies when local storage is unavailable.
+    }
+  }, [appReducedMotion])
+
+  useEffect(() => {
+    if (typeof window.matchMedia !== 'function') return
+    const media = window.matchMedia('(prefers-reduced-motion: reduce)')
+    const handleChange = (event: MediaQueryListEvent) => setOsReducedMotion(event.matches)
+    media.addEventListener?.('change', handleChange)
+    return () => media.removeEventListener?.('change', handleChange)
+  }, [])
 
   const selectExperiment = (nextIndex: number) => {
     const next = rule.experiments[nextIndex]
@@ -165,6 +184,8 @@ export function GuidedChapterLab({ chapter }: { chapter: ChapterMetadata }) {
     setEventCursor(-1)
     setIsPlaying(false)
     setEngineError(null)
+    setInspectedNodeId(null)
+    setShowInspectedRole(false)
   }
 
   const execute = async () => {
@@ -180,6 +201,8 @@ export function GuidedChapterLab({ chapter }: { chapter: ChapterMetadata }) {
         choiceId,
       })
       setRun(nextRun)
+      setInspectedNodeId(null)
+      setShowInspectedRole(false)
       setEventCursor(0)
       setIsPlaying(nextRun.events.length > 1)
       labStore.getState().recordExperimentAttempt(chapterId, experiment.id, nextRun.status === 'succeeded')
@@ -193,6 +216,27 @@ export function GuidedChapterLab({ chapter }: { chapter: ChapterMetadata }) {
     }
   }
 
+  const inspectFacility = (nodeId: string) => {
+    setInspectedNodeId(nodeId)
+    setIsPlaying(false)
+    if (!run || eventCursor < 0) {
+      setShowInspectedRole(true)
+      return
+    }
+    const latestObservedIndex = run.events
+      .slice(0, eventCursor + 1)
+      .findLastIndex((event) => (
+        event.cityCue.focusNodeIds.includes(nodeId)
+        || Object.hasOwn(event.cityCue.nodeChanges ?? {}, nodeId)
+      ))
+    if (latestObservedIndex < 0) {
+      setShowInspectedRole(true)
+      return
+    }
+    setShowInspectedRole(false)
+    setEventCursor(latestObservedIndex)
+  }
+
   return (
     <main className={styles.shell}>
       <header className={styles.header}>
@@ -204,6 +248,15 @@ export function GuidedChapterLab({ chapter }: { chapter: ChapterMetadata }) {
           <ChapterNavigation activeChapterId={chapter.id} />
           <span className={styles.progressBadge}>{completedCount} / {rule.experiments.length} 완료</span>
           <span className={styles.saveState}>{saveStatus}</span>
+          <button
+            type="button"
+            className={styles.motionButton}
+            aria-pressed={appReducedMotion}
+            onClick={() => setAppReducedMotion((value) => !value)}
+            title={osReducedMotion ? '운영체제의 모션 줄임 설정이 적용 중입니다.' : undefined}
+          >
+            {osReducedMotion ? '모션 줄임 · OS' : appReducedMotion ? '모션 줄임 켬' : '모션 줄임'}
+          </button>
         </div>
       </header>
 
@@ -264,24 +317,22 @@ export function GuidedChapterLab({ chapter }: { chapter: ChapterMetadata }) {
         </aside>
 
         <section className={styles.worldPanel} aria-label="Kafka 도시 시뮬레이션">
-          <img src={atlasUrl} alt="항구, 철도, 도로와 여러 구역이 연결된 Event City 전경" />
-          <div className={styles.worldShade} />
-          <div className={styles.componentMap}>
-            {components.map((component, index) => (
-              <div
-                key={component}
-                className={`${styles.componentNode} ${activeEvent?.component === component ? styles.activeNode : ''}`}
-                style={{ '--node-index': index } as CSSProperties}
-              >
-                <span>{index + 1}</span><strong>{COMPONENT_LABELS[component]}</strong>
-              </div>
-            ))}
+          <div className={styles.cityViewport}>
+            <AdvancedCityWorld
+              scene={scene}
+              events={run?.events ?? []}
+              cursor={eventCursor}
+              reducedMotion={reducedMotion}
+              pendingRerun={pendingRerun}
+              preview={scenePreview}
+              onInspect={inspectFacility}
+            />
           </div>
           <div className={`${styles.worldStatus} ${activeEvent?.state === 'failed' ? styles.failedStatus : ''}`}>
             <span>{activeEvent ? eventCursor + 1 : '·'}</span>
             <div>
-              <strong>{activeEvent?.title ?? '설정과 결과를 예측한 뒤 도시를 실행하세요.'}</strong>
-              <small>{activeEvent?.detail ?? experiment.successCriteria}</small>
+              <strong>{pendingRerun ? '설정은 바뀌었지만 이 실행은 그대로입니다.' : showInspectedRole ? inspectedNode?.ariaLabel ?? inspectedNode?.label : activeEvent?.title ?? inspectedNode?.ariaLabel ?? inspectedNode?.label ?? '설정과 결과를 예측한 뒤 도시를 실행하세요.'}</strong>
+              <small>{pendingRerun ? '권장 설정을 적용하려면 같은 조건으로 도시를 다시 실행하세요.' : showInspectedRole ? inspectedNode?.description : activeEvent?.detail ?? inspectedNode?.description ?? experiment.successCriteria}</small>
             </div>
           </div>
         </section>
@@ -331,6 +382,14 @@ export function GuidedChapterLab({ chapter }: { chapter: ChapterMetadata }) {
       <section className={styles.timeline} aria-label="이벤트 타임라인">
         <button type="button" disabled={!run} onClick={() => { setEventCursor(0); setIsPlaying(false) }}>처음</button>
         <button type="button" disabled={!run} onClick={() => setIsPlaying((value) => !value)}>{isPlaying ? '일시정지' : '재생'}</button>
+        <label className={styles.speedControl}>
+          <span>속도</span>
+          <select value={speed} onChange={(event) => setSpeed(Number(event.target.value) as PlaybackSpeed)}>
+            <option value={0.5}>0.5×</option>
+            <option value={1}>1×</option>
+            <option value={2}>2×</option>
+          </select>
+        </label>
         <div>
           {run?.events.map((event, index) => (
             <button

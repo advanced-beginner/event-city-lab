@@ -239,10 +239,12 @@ function ChapterOneLab({ chapter }: { chapter: ChapterMetadata }) {
     if (component === 'serializer') state.setFocusedSetting('serializer')
     else if (component === 'ack') state.setFocusedSetting('acks')
     else state.setFocusedSetting(null)
-    if (!activeRun) return
-    const latestIndex = activeRun.events.findLastIndex((event) => event.component === component)
+    state.setIsPlaying(false)
+    if (!activeRun || state.eventCursor < 0) return
+    const latestIndex = activeRun.events
+      .slice(0, state.eventCursor + 1)
+      .findLastIndex((event) => event.component === component)
     if (latestIndex >= 0) {
-      state.setIsPlaying(false)
       state.setEventCursor(latestIndex)
     }
   }

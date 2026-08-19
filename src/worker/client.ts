@@ -116,7 +116,11 @@ export function runChapterSimulation(
 
       cleanup()
       if (parsed.data.type === 'CHAPTER_SIMULATION_COMPLETE') {
-        resolve(parsed.data.payload)
+        // The response has already passed the strict Zod boundary above. Zod's
+        // inferred optional keys include `undefined`, while the domain type uses
+        // exact optional properties; normalize that representational difference
+        // only at this validated worker boundary.
+        resolve(parsed.data.payload as ChapterSimulationRun)
       } else if (parsed.data.type === 'SIMULATION_ERROR') {
         reject(new Error(parsed.data.error))
       } else {

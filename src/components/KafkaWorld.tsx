@@ -1,4 +1,4 @@
-import type { CSSProperties, KeyboardEvent } from 'react'
+import type { CSSProperties } from 'react'
 
 import type {
   ComponentId,
@@ -9,6 +9,8 @@ import type {
 import cityBackground from '../assets/city/background/event-city-main.webp'
 
 import { CitySprite } from './CitySprite'
+import { CityFacility } from './CityFacility'
+import { CityWorld } from './CityWorld'
 import styles from './KafkaWorld.module.css'
 
 interface KafkaWorldProps {
@@ -70,25 +72,25 @@ export function KafkaWorld({
     '--vehicle-angle': `${vehicleAngle}deg`,
   } as CSSProperties
 
-  const inspect = (component: ComponentId) => () => onInspect(component)
-  const inspectWithKeyboard = (component: ComponentId) => (event: KeyboardEvent<SVGGElement>) => {
-    if (event.key === 'Enter' || event.key === ' ') {
-      event.preventDefault()
-      onInspect(component)
-    }
-  }
+  const inspect = (nodeId: string) => onInspect(nodeId as ComponentId)
 
   return (
-    <svg className={`${styles.world} ${reducedMotion ? styles.reduced : ''}`} viewBox="0 0 1000 610" role="img" aria-labelledby="world-title world-description" preserveAspectRatio="xMidYMid meet">
-      <title id="world-title">Kafka 메시지 배송 도시</title>
-      <desc id="world-description">노란 배송 차량이 Producer 출발센터에서 Serializer 검사소를 거쳐 Broker 기록센터까지 이동하고, 기록 완료 후 Producer에 도착 문자가 전송됩니다.</desc>
+    <CityWorld
+      backgroundUrl={cityBackground}
+      className={`${styles.world} ${reducedMotion ? styles.reduced : ''}`}
+      imageClassName={styles.cityBackdrop}
+      viewBox="0 0 1000 610"
+      preserveAspectRatio="xMidYMid slice"
+      reducedMotion={reducedMotion}
+      title="Kafka 메시지 배송 도시"
+      description="노란 배송 차량이 Producer 출발센터에서 Serializer 검사소를 거쳐 Broker 기록센터까지 이동하고, 기록 완료 후 Producer에 도착 문자가 전송됩니다."
+    >
       <defs>
         <filter id="city-shadow" x="-40%" y="-40%" width="200%" height="220%"><feDropShadow dx="0" dy="8" stdDeviation="7" floodColor="#53616a" floodOpacity=".2" /></filter>
         <filter id="focus-glow" x="-40%" y="-40%" width="190%" height="190%"><feDropShadow dx="0" dy="0" stdDeviation="5" floodColor="#7656c9" floodOpacity=".7" /></filter>
         <marker id="signal-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0 10 5 0 10z" fill="#238a5b" /></marker>
       </defs>
 
-      <image className={styles.cityBackdrop} href={cityBackground} width="1000" height="610" preserveAspectRatio="xMidYMid slice" aria-hidden="true" />
       <rect className={styles.backdropWash} width="1000" height="610" aria-hidden="true" />
 
       <g className={styles.route} aria-hidden="true">
@@ -97,21 +99,18 @@ export function KafkaWorld({
         {isFailure && <path d="M552 386C614 354 672 326 730 304" fill="none" stroke="#d5d9d7" strokeWidth="5" strokeDasharray="7 12" />}
       </g>
 
-      <g role="button" tabIndex={0} aria-label={`Producer 출발센터, ${statusText(producerState)}`} onClick={inspect('producer')} onKeyDown={inspectWithKeyboard('producer')} className={`${styles.facility} ${styles[producerState]}`}>
-        <path className={styles.facilityHitArea} d="M207 109 358 118 405 413 331 474 239 443 207 318Z" />
+      <CityFacility nodeId="producer" accessibleName={`Producer 출발센터, ${statusText(producerState)}`} onInspect={inspect} hitAreaClassName={styles.facilityHitArea} hitAreaPath="M207 109 358 118 405 413 331 474 239 443 207 318Z" className={`${styles.facility} ${styles[producerState]}`}>
         <g className={styles.facilitySign} transform="translate(230 390)"><rect width="174" height="28" rx="6" /><circle cx="16" cy="14" r="6" className={styles.stateLamp} data-state={producerState} /><text x="96" y="18" textAnchor="middle">1 · 출발센터 · {statusText(producerState)}</text></g>
-      </g>
+      </CityFacility>
 
-      <g role="button" tabIndex={0} aria-label={`Serializer 검사소, ${statusText(serializerState)}`} onClick={inspect('serializer')} onKeyDown={inspectWithKeyboard('serializer')} className={`${styles.facility} ${styles[serializerState]} ${serializerFocused ? styles.focused : ''}`}>
-        <path className={styles.facilityHitArea} d="M414 68 563 68 607 324 566 388 447 370 414 251Z" />
+      <CityFacility nodeId="serializer" accessibleName={`Serializer 검사소, ${statusText(serializerState)}`} onInspect={inspect} hitAreaClassName={styles.facilityHitArea} hitAreaPath="M414 68 563 68 607 324 566 388 447 370 414 251Z" className={`${styles.facility} ${styles[serializerState]} ${serializerFocused ? styles.focused : ''}`}>
         {isFailure && <g className={styles.errorSign} transform="translate(424 318)"><rect width="186" height="28" rx="6" /><text x="93" y="18" textAnchor="middle">2 · OrderEvent ≠ StringSerializer</text></g>}
         {!isFailure && <g className={styles.facilitySign} transform="translate(430 331)"><rect width="174" height="28" rx="6" /><circle cx="16" cy="14" r="6" className={styles.stateLamp} data-state={serializerState} /><text x="96" y="18" textAnchor="middle">2 · 검사소 · {statusText(serializerState)}</text></g>}
-      </g>
+      </CityFacility>
 
-      <g role="button" tabIndex={0} aria-label={`Broker 기록센터, ${statusText(brokerState)}`} onClick={inspect('broker')} onKeyDown={inspectWithKeyboard('broker')} className={`${styles.facility} ${styles[brokerState]}`}>
-        <path className={styles.facilityHitArea} d="M568 21 785 16 842 239 760 315 642 300 578 220Z" />
+      <CityFacility nodeId="broker" accessibleName={`Broker 기록센터, ${statusText(brokerState)}`} onInspect={inspect} hitAreaClassName={styles.facilityHitArea} hitAreaPath="M568 21 785 16 842 239 760 315 642 300 578 220Z" className={`${styles.facility} ${styles[brokerState]}`}>
         <g className={styles.facilitySign} transform="translate(641 247)"><rect width="174" height="28" rx="6" /><circle cx="16" cy="14" r="6" className={styles.stateLamp} data-state={brokerState} /><text x="96" y="18" textAnchor="middle">3 · 기록센터 · {statusText(brokerState)}</text></g>
-      </g>
+      </CityFacility>
 
       <g className={`${styles.vehicle} ${isFailure ? styles.vehicleFailed : ''}`} style={vehicleStyle} aria-hidden="true">
         <CitySprite id="vehicle-kafka-van-northeast" x={4} y={40} scale={0.38} />
@@ -119,7 +118,7 @@ export function KafkaWorld({
       </g>
 
       {ackVisible && (
-        <g role="button" tabIndex={0} aria-label={`Producer 도착 문자, ${statusText(ackState)}`} onClick={inspect('ack')} onKeyDown={inspectWithKeyboard('ack')} className={`${styles.ackSignal} ${ackFocused ? styles.focused : ''}`}>
+        <CityFacility nodeId="ack" accessibleName={`Producer 도착 문자, ${statusText(ackState)}`} onInspect={inspect} hitAreaClassName={styles.facilityHitArea} hitAreaPath="M16 78H310V194H16Z" className={`${styles.ackSignal} ${ackFocused ? styles.focused : ''}`}>
           <path d="M720 274C640 78 400 42 318 255" fill="none" stroke="#238a5b" strokeWidth="4" strokeDasharray="9 10" markerEnd="url(#signal-arrow)" />
           <circle cx="621" cy="128" r="8" fill="#e8f7ef" stroke="#238a5b" strokeWidth="3" />
           <circle cx="482" cy="86" r="8" fill="#e8f7ef" stroke="#238a5b" strokeWidth="3" />
@@ -132,7 +131,7 @@ export function KafkaWorld({
             <text x="18" y="49" className={styles.smsText}>orders.v1 / partition 0 / offset 42 저장 완료</text>
             <text x="18" y="66" className={styles.smsText}>acks=all · broker-1</text>
           </g>
-        </g>
+        </CityFacility>
       )}
 
       <g className={styles.cityLabel} transform="translate(24 28)" aria-hidden="true">
@@ -140,6 +139,6 @@ export function KafkaWorld({
         <text x="14" y="20">EVENT CITY · BUILDING MAP</text>
         <text x="14" y="35">orders.v1 · partition 0</text>
       </g>
-    </svg>
+    </CityWorld>
   )
 }

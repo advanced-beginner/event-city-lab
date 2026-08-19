@@ -22,7 +22,7 @@ Milestone 0의 완료 경험은 다음과 같다.
 5. 동일 message와 seed로 재실행해 Broker 기록과 ACK 도착 문자를 확인한다.
 6. 실패 실행과 성공 실행의 설정·결과·trade-off를 비교한다.
 
-Chapter 2–8은 같은 학습 반복을 공통 guided lab으로 확장한다. 각 챕터는 정확히 세 실험을 제공하며, 사용자가 결과를 먼저 예측하고 실패 선택을 실행해 로그와 컴포넌트 상태를 조사한 뒤 권장 설정을 적용해 성공 결과를 확인한다. 완료 진도는 브라우저 로컬에 저장하고 모든 실험을 마친 뒤에도 sandbox 방식으로 재실행할 수 있다.
+Chapter 2–8은 같은 학습 반복과 도시 문법을 공통 guided lab으로 확장한다. 각 챕터는 정확히 세 실험을 제공하며, 사용자는 실제 atlas 건물과 도로 위에서 시설 선택 → record·ticket 이동 → 실패 지점 → ACK·commit·assignment·transaction 제어 신호를 관찰한다. 권장 설정을 적용해도 과거 실행은 보존되며 재실행 후 성공 결과를 비교한다. 완료 진도는 브라우저 로컬에 저장하고 모든 실험을 마친 뒤에도 sandbox 방식으로 재실행할 수 있다.
 
 ## Experience principles
 
@@ -64,7 +64,7 @@ Visual asset 규칙:
 - 2:1 isometric, 64×32 ground tile 기준.
 - 명확한 16-bit pixel cluster와 `#302840` 계열 2–3px 외곽선.
 - 좌상단 golden light, 우하단 muted-violet contact shadow.
-- 도시 배경은 화면 비율에 맞춰 잘라 쓰되 건물 세 개가 모두 보이도록 중앙 정렬한다.
+- Chapter 1 배경은 기존 승인 구도를 유지한다. Chapter 2–8 atlas는 `preserveAspectRatio="xMidYMid meet"`로 전체를 표시하며 자르거나 늘이지 않는다.
 - 시설 표지의 한글·영문은 raster에 굽지 않고 실제 SVG text로 표시한다.
 - Producer·Serializer·Broker·노란 메시지 차량이 1차 시각 중심이고 일반 건물은 대비를 한 단계 낮춘다.
 - 별도 도로·건물 sprite를 배경 위에 중복 배치하지 않는다. 메시지 checkpoint와 진행 path만 배경 속 중앙 대로의 실제 차선에 맞춘 SVG overlay다.
@@ -112,13 +112,23 @@ Visual asset 규칙:
 - `ProducerHub`: cyan 배송 출발 창고. 표지 `PRODUCER 출발센터`.
 - `SerializerCheckpoint`: lavender 화물 검사소. 표지 `SERIALIZER 검사소`.
 - `BrokerArchive`: blue 대형 물류·기록 센터. 표지 `BROKER 기록센터`.
-- 세 시설만 pointer와 keyboard로 선택할 수 있다. 일반 건물, 공원, 나무는 장식이며 상호작용하지 않는다.
+- 활성 Kafka 시설만 pointer와 keyboard로 선택할 수 있다. 일반 건물, 공원, 나무는 장식이며 상호작용하지 않는다.
 
 ### City composition
 
 Standard view에는 승인된 도시 배경 전체와 중앙 Kafka 핵심 건물 3개가 보인다. 장식 건물·공원·나무·도로는 배경 자체에 포함되며 별도 runtime sprite 수량을 관리하지 않는다.
 
-Chapter 2–8은 `event-city-atlas.webp` 한 장을 공유한다. 이미지 위에는 해당 실험의 Producer, Partition, Broker, Replica/ISR, Consumer, Coordinator, Offset, Retry/DLT, Application, Transaction Coordinator만 의미 있는 HTML overlay로 표시한다. 배경 속 텍스트나 건물을 억지로 특정 Kafka 시설로 해석하지 않으며 현재 이벤트 컴포넌트는 번호, 이름, 외곽선과 상태 문구를 함께 사용해 강조한다.
+Chapter 1과 Chapter 2–8은 공통 inline SVG renderer `CityWorld`와 키보드 조작 가능한 `CityFacility`를 공유한다. Chapter 2–8은 `event-city-atlas.webp` 한 장과 `CitySceneDefinition`을 사용한다. scene은 배경과 분리된 viewBox, 실제 건물 silhouette polygon, 시설 표지 위치, 실제 도로 path와 checkpoint만 소유한다. 같은 Kafka 역할은 모든 실험에서 같은 건물을 사용하며 챕터에 필요한 시설만 활성화한다.
+
+중앙 사각형 component map은 사용하지 않는다. Worker가 생성한 각 이벤트의 구조화된 `cityCue`가 focus node, node/route 상태, carrier checkpoint, 반환 신호와 barrier를 지정하고, 순수 projection reducer가 현재 cursor의 도시 상태를 계산한다. 로그 문자열과 상세 문구를 파싱해 애니메이션을 추론하지 않는다. 배경 교체 시 scene 좌표만 다시 측정하며 Kafka 이벤트 의미는 유지한다.
+
+공통 운송 문법은 다음과 같다.
+
+- record는 노란 Kafka 밴, retry record는 동일 밴과 재시도 표지, duplicate는 반투명 ghost 밴으로 표시한다.
+- offset은 차량과 구분되는 ticket으로 표시한다.
+- ACK·commit은 녹색 반환 신호, metadata·assignment·revocation·transaction 제어는 보라색 신호다.
+- 실패·abort·min ISR·LSO·설정 충돌은 빨간 차단기와 끊긴 경로로 표시한다.
+- transaction은 출력 record와 offset ticket을 같은 원자적 결과로 보여 주며 terminal event에서 commit 또는 abort를 명시한다.
 
 ### Delivery vehicle
 
@@ -173,12 +183,14 @@ Chapter 2–8은 `event-city-atlas.webp` 한 장을 공유한다. 이미지 위�
 - SVG에는 title, desc, 시설별 aria-label을 제공한다.
 - `prefers-reduced-motion`과 앱 설정을 모두 지원한다.
 - 상태는 색상, 아이콘, 문구, 선 스타일로 중복 표현한다.
+- 시설을 클릭하거나 Enter/Space로 선택하면 재생을 멈추고 현재 cursor까지 관찰된 해당 시설의 최신 이벤트로 이동한다. 아직 관찰된 이벤트가 없으면 미래로 건너뛰지 않는다.
 - 200% 확대는 PC 레이아웃 재배치보다 내부 스크롤 허용을 우선하며 기능 손실이 없어야 한다.
 
 ## Technical contract
 
 - React 19, TypeScript strict, Vite 8, CSS Modules, inline SVG.
 - 순수 TypeScript 엔진과 Web Worker가 Kafka 결과와 이벤트 기록을 계산한다. React UI는 결과를 재계산하지 않는다.
+- `ChapterEventTemplate.cityCue`의 모든 node·route·checkpoint 참조는 scene validator와 Zod Worker schema를 통과해야 한다. 좌표는 scene에만 있고 엔진 이벤트에는 이동 의미와 식별자만 있다.
 - Zustand vanilla store는 workspace와 UI 상태를 관리한다.
 - IndexedDB `event-city-lab-v1`에 진행을 저장하고 작은 환경 설정은 `ecl:*` localStorage 키를 사용한다.
 - 외부 JSON과 저장 데이터는 Zod 4의 비권장되지 않은 API로 검증한다.
