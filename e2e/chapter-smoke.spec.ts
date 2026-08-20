@@ -152,6 +152,31 @@ test('direct and invalid chapter hashes resolve without page overflow', async ({
   expect(await pageOverflow(page)).toEqual({ horizontal: false, vertical: false })
 })
 
+test('Chapter 2 carrier stays on the declared main-road path during playback', async ({ page }) => {
+  await page.goto('#/chapter/2')
+  await page.getByRole('button', { name: '실패한다' }).click()
+  await page.getByRole('button', { name: '예측한 조건 실행' }).click()
+
+  await page.waitForFunction(() => document.querySelector('[data-city-carrier][data-motion-mode="road-path"] animateMotion'))
+
+  const motion = await page.evaluate(() => {
+    const carrier = document.querySelector<SVGGElement>('[data-city-carrier][data-motion-mode="road-path"]')
+    const routeId = carrier?.getAttribute('data-carrier-route')
+    const routePath = routeId
+      ? document.querySelector<SVGPathElement>(`[data-city-route="${routeId}"] path:last-of-type`)
+      : null
+    const animateMotion = carrier?.querySelector<SVGAnimateMotionElement>('animateMotion')
+    return {
+      animatePath: animateMotion?.getAttribute('path') ?? null,
+      routeId,
+      routePath: routePath?.getAttribute('d') ?? null,
+    }
+  })
+
+  expect(motion.routeId).toBeTruthy()
+  expect(motion.animatePath).toBe(motion.routePath)
+})
+
 test('Chapter 2–8 each expose a spatial failure, recommended repair, and successful return signal', async ({ page }) => {
   const browserErrors: string[] = []
   const failedRequests: string[] = []

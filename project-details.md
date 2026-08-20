@@ -4,7 +4,7 @@
 
 이 문서는 Event City Lab의 제품 흐름, 챕터별 구현 상태, 기술적 동작, 검증 결과, 알려진 미비점과 TODO를 관리하는 단일 기록이다.
 
-- 기록 기준일: 2026-08-18
+- 기록 기준일: 2026-08-20
 - 기준 브랜치: `main`
 - Chapter 1 기준 구현 커밋: `db7e918` (`실패를 도시 배송 경험으로 이해할 수 있게 한다`)
 - App version: `0.2.0`
@@ -278,6 +278,15 @@ Chapter 1 light-city 구현에서 확인한 내용:
 - Chromium `1440×900`의 Chapter 2–8 초기·실패·성공과 복잡한 Chapter 2·4·6·8의 `1280×720`/`1920×1080` 실패·성공을 합친 37개 Darwin 시각 baseline을 저장했다. 2026-08-19 최종 검증은 Vitest 27파일 135개, Playwright 42개 실행 통과와 의도된 시각 범위 밖 48개 skip, typecheck와 production build 통과다. Linux CI에서는 pixel baseline을 skip하고 동일한 semantic/bounds smoke를 유지한다.
 - GitHub Actions는 `npx playwright install --with-deps chromium firefox webkit` 후 `npm run test:e2e`를 실행하며, 성공한 production artifact만 Pages 배포 단계로 전달한다.
 
+2026-08-20 Chapter 2–8 도시 이동 개선:
+
+- Chapter 2–8의 선택 가능한 시설은 atlas 중앙의 남서–북동 간선도로에 인접한 11개 building slot으로 제한했다. 한 scene 안에서는 slot을 중복하지 않으며, 모든 route는 공통 `downtown-main-arterial`의 연속 부분 구간이다.
+- Chapter 2–8 차량 위치는 route의 시작·끝 건물 좌표를 직선 보간하지 않고, scene route가 소유한 ordered road points의 누적 거리 기준 progress로 계산한다. 재생 중에는 같은 SVG path를 사용하는 `animateMotion`으로 굴곡을 따라가며, 타임라인 직접 선택과 시설 조사는 즉시 이동한다.
+- Route checkpoint의 start/mid/end는 건물 실루엣이 아니라 공통 간선도로 위 progress `0/0.5/1`에서 파생한다. scene validator가 시설 access index, route slice, path string, checkpoint progress를 함께 검증한다.
+- `src/city/routeGeometry.ts`가 polyline 길이, progress 보간, nearest-point 검증을 담당하며 bend, clamp, 반복 좌표, 역방향 route를 단위 테스트한다.
+- 0.5×/1×/2× 차량 motion duration을 이벤트 재생 간격의 84%로 맞춰 다음 이벤트와 겹치지 않게 했다. 차량 화물 라벨은 주도로 아래쪽 공통 anchor를 사용해 시설 표지와 겹치지 않는다.
+- 2026-08-20 최종 검증은 typecheck와 production build, Vitest 28파일 141개, Playwright 51개 실행 통과와 의도된 시각 범위 밖 48개 skip이다. Chromium `1280×720`·`1440×900`·`1920×1080`에서 Chapter 2–8 전체 실패→권장 수정→성공, page/world bounds, 표지 중첩과 재생 중 SVG motion path를 확인했고 Firefox·WebKit도 동일 semantic smoke를 통과했다. 변경된 Darwin 시각 baseline 37장을 재검토해 갱신했다.
+
 ## 9. 알려진 미비점
 
 ### 배포와 운영
@@ -317,7 +326,7 @@ Chapter 1 light-city 구현에서 확인한 내용:
 - Google Fonts 장애 시 fallback 설계는 있으나 실제 offline/network-block 테스트가 없다.
 - screen reader에서 SVG 내부의 많은 텍스트가 중복으로 읽히는지 실사용 검증하지 않았다.
 - Chapter shell, registry, navigation, guided view와 route는 분리했지만 Chapter 1 workspace UI는 여전히 `App.tsx`, `App.module.css`, `KafkaWorld.tsx`에 크게 집중되어 있다. 장식 asset mapping은 `CitySprite.tsx`로 분리했다.
-- 차량 이동은 이벤트 checkpoint 간 CSS 보간이며 실제 도로 path의 거리 비례 이동은 아니다.
+- 역방향 route도 프로젝트 자산 불변 조건에 따라 northeast Kafka van 한 장을 회전 없이 사용한다. 위치는 도로를 정확히 따르지만 진행 방향별 sprite 전환은 아직 제공하지 않는다.
 
 ### 라이선스와 고지
 
@@ -355,6 +364,7 @@ Chapter 1 light-city 구현에서 확인한 내용:
 - [x] chapter별 learning goal, event schema, diagnosis, trade-off와 실험 definition 분리.
 - [x] 공통 city atlas와 chapter별 scene-defined facility/route/carrier/signal/barrier 경계 정의.
 - [x] Chapter 1의 시설 선택·이동·실패·반환 신호 문법을 Chapter 2–8 공통 `CityWorld` 계약으로 통합.
+- [x] Chapter 2–8 시설을 중앙 간선도로의 11개 building slot으로 제한하고, 누적 거리 기반 route geometry와 SVG motion path를 적용.
 - [x] 엔진을 chapter별 rule module로 확장하고 결정론과 schema validation 유지.
 - [x] Chapter 완료 상태와 chapter 간 진도 저장 schema 및 v1→v2 migration 구현.
 - [x] 전체 챕터 navigation과 잠금 없는 복습 정책 구현.

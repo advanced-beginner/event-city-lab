@@ -1,7 +1,8 @@
-import { useMemo } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 
 import atlasUrl from '../assets/city/background/event-city-atlas.webp'
 import { projectCityWorld } from '../city/projection'
+import { interpolatePolyline } from '../city/routeGeometry'
 import type {
   CityCarrierState,
   CityNodeState,
@@ -22,6 +23,7 @@ import styles from './AdvancedCityWorld.module.css'
 interface AdvancedCityWorldProps {
   cursor: number
   events: readonly ChapterSimulationEvent[]
+  motionDurationMs?: number
   onInspect: (nodeId: string) => void
   pendingRerun: boolean
   preview?: CityScenePreview
@@ -43,6 +45,7 @@ const EMPTY_PREVIEW: CityScenePreview = { nodeIds: [], routeIds: [] }
 export function AdvancedCityWorld({
   cursor,
   events,
+  motionDurationMs = 0,
   onInspect,
   pendingRerun,
   preview = EMPTY_PREVIEW,
@@ -121,8 +124,8 @@ export function AdvancedCityWorld({
       </g>
 
       <g className={styles.carrierLayer} aria-label="이동 중인 메시지와 제어 티켓">
-        {carrierLayouts.map(({ carrier, position }) => (
-          <CityCarrier key={carrier.id} carrier={carrier} position={position} />
+        {carrierLayouts.map((layout) => (
+          <CityCarrier key={layout.carrier.id} {...layout} motionDurationMs={reducedMotion ? 0 : motionDurationMs} />
         ))}
       </g>
 
@@ -176,16 +179,75 @@ function FacilitySign({ node }: { node: CityNodeState }) {
   )
 }
 
-function CityCarrier({ carrier, position }: { carrier: CityCarrierState; position: CityPoint }) {
+function CityCarrier({
+  carrier,
+  motionDurationMs,
+  offsetX,
+  position,
+  progress,
+  route,
+}: CarrierLayout & { motionDurationMs: number }) {
   const label = carrier.label ?? carrier.id
   const isTicket = carrier.kind === 'offset-ticket'
+  const motionSerial = useRef(0)
+  const previousMotion = useRef({ progress, routeId: route.id })
+  const targetKey = `${route.id}:${progress}:${motionDurationMs}`
+  const previousTargetKey = useRef(targetKey)
+  const [motion, setMotion] = useState<CarrierMotion | null>(() => (
+    motionDurationMs > 0 && progress > 0.001
+      ? { durationMs: motionDurationMs, fromProgress: 0, key: 0, path: route.path, toProgress: progress }
+      : null
+  ))
+
+  useLayoutEffect(() => {
+    if (previousTargetKey.current === targetKey) return
+    const previous = previousMotion.current
+    const fromProgress = previous.routeId === route.id ? previous.progress : 0
+    previousMotion.current = { progress, routeId: route.id }
+    previousTargetKey.current = targetKey
+    if (motionDurationMs <= 0 || Math.abs(progress - fromProgress) <= 0.001) {
+      setMotion(null)
+      return
+    }
+    motionSerial.current += 1
+    setMotion({
+      durationMs: motionDurationMs,
+      fromProgress,
+      key: motionSerial.current,
+      path: route.path,
+      toProgress: progress,
+    })
+  }, [motionDurationMs, progress, route.id, route.path, targetKey])
+
+  useEffect(() => {
+    if (!motion) return
+    const timeout = window.setTimeout(() => setMotion(null), motion.durationMs)
+    return () => window.clearTimeout(timeout)
+  }, [motion])
+
   return (
     <g
-      transform={`translate(${position.x} ${position.y})`}
+      transform={motion
+        ? offsetX === 0 ? undefined : `translate(${offsetX} 0)`
+        : `translate(${position.x + offsetX} ${position.y})`}
       className={`${styles.carrier} ${styles[carrier.state ?? 'active']} ${styles[`carrier_${carrier.kind}`]}`}
       data-city-carrier={carrier.id}
       data-carrier-kind={carrier.kind}
+      data-carrier-progress={progress.toFixed(3)}
+      data-carrier-route={route.id}
+      data-motion-mode={motion ? 'road-path' : 'instant'}
     >
+      {motion && (
+        <animateMotion
+          key={motion.key}
+          path={motion.path}
+          keyPoints={`${motion.fromProgress};${motion.toProgress}`}
+          keyTimes="0;1"
+          calcMode="linear"
+          dur={`${motion.durationMs}ms`}
+          fill="freeze"
+        />
+      )}
       {isTicket ? (
         <g className={styles.ticket}>
           <rect x="-34" y="-42" width="68" height="42" rx="7" />
@@ -195,12 +257,20 @@ function CityCarrier({ carrier, position }: { carrier: CityCarrierState; positio
       ) : (
         <CitySprite id="vehicle-kafka-van-northeast" x={0} y={0} scale={0.55} />
       )}
-      <g className={styles.cargoLabel} transform="translate(-72 20)">
+      <g className={styles.cargoLabel} transform="translate(-72 160)">
         <rect width="144" height="28" rx="7" />
         <text x="72" y="19" textAnchor="middle">{label}</text>
       </g>
     </g>
   )
+}
+
+interface CarrierMotion {
+  durationMs: number
+  fromProgress: number
+  key: number
+  path: string
+  toProgress: number
 }
 
 function SignalOverlay({
@@ -259,22 +329,37 @@ function BarrierOverlay({
   )
 }
 
-function carrierPosition(carrier: CityCarrierState, scene: CitySceneDefinition): CityPoint {
+function carrierRoute(carrier: CityCarrierState, scene: CitySceneDefinition): CityRouteDefinition | null {
   const route = scene.routes.find((candidate) => candidate.id === carrier.routeId)
-  if (!route) return { x: 0, y: 0 }
+  return route ?? null
+}
+
+function carrierProgress(carrier: CityCarrierState, route: CityRouteDefinition): number {
   const checkpoint = carrier.checkpointId
     ? route.checkpoints.find((candidate) => candidate.id === carrier.checkpointId)
     : undefined
-  if (checkpoint) return checkpoint.position
-  return interpolateRoute(route, carrier.progress ?? 0)
+  return Math.max(0, Math.min(1, carrier.progress ?? checkpoint?.progress ?? 0))
+}
+
+interface CarrierLayout {
+  carrier: CityCarrierState
+  offsetX: number
+  position: CityPoint
+  progress: number
+  route: CityRouteDefinition
 }
 
 function layoutCarriers(
   carriers: readonly CityCarrierState[],
   scene: CitySceneDefinition,
-): Array<{ carrier: CityCarrierState; position: CityPoint }> {
-  const baseLayouts = carriers.map((carrier) => ({ carrier, position: carrierPosition(carrier, scene) }))
-  const groups = new Map<string, Array<{ carrier: CityCarrierState; position: CityPoint }>>()
+): CarrierLayout[] {
+  const baseLayouts = carriers.flatMap((carrier) => {
+    const route = carrierRoute(carrier, scene)
+    if (!route) return []
+    const progress = carrierProgress(carrier, route)
+    return [{ carrier, offsetX: 0, position: interpolateRoute(route, progress), progress, route }]
+  })
+  const groups = new Map<string, CarrierLayout[]>()
   for (const layout of baseLayouts) {
     const key = `${Math.round(layout.position.x)}:${Math.round(layout.position.y)}`
     const group = groups.get(key) ?? []
@@ -288,24 +373,15 @@ function layoutCarriers(
       const slot = index - (group.length - 1) / 2
       const spacing = 150
       return {
-        carrier: layout.carrier,
-        position: {
-          x: Math.max(90, Math.min(scene.viewport.width - 90, layout.position.x + slot * spacing)),
-          y: layout.position.y,
-        },
+        ...layout,
+        offsetX: Math.max(90, Math.min(scene.viewport.width - 90, layout.position.x + slot * spacing)) - layout.position.x,
       }
     })
   })
 }
 
 function interpolateRoute(route: CityRouteDefinition, progress: number): CityPoint {
-  const first = route.checkpoints[0]?.position ?? { x: 0, y: 0 }
-  const last = route.checkpoints.at(-1)?.position ?? first
-  const bounded = Math.max(0, Math.min(1, progress))
-  return {
-    x: first.x + (last.x - first.x) * bounded,
-    y: first.y + (last.y - first.y) * bounded,
-  }
+  return interpolatePolyline(route.points, progress)
 }
 
 function barrierPosition(

@@ -6,6 +6,7 @@ import type {
   CityRouteKind,
   CitySceneDefinition,
 } from './types'
+import { interpolatePolyline } from './routeGeometry'
 
 type AdvancedChapterId = 2 | 3 | 4 | 5 | 6 | 7 | 8
 
@@ -15,8 +16,14 @@ interface AtlasAnchor {
   description: string
   hitAreaPath: string
   labelPosition: CityPoint
-  roadPosition: CityPoint
+  roadAccessIndex: number
   shortLabel?: string
+}
+
+interface RoadsideBuilding {
+  hitAreaPath: string
+  labelPosition: CityPoint
+  roadAccessIndex: number
 }
 
 export interface CityScenePreview {
@@ -24,27 +31,49 @@ export interface CityScenePreview {
   routeIds: readonly string[]
 }
 
+// The atlas has one prominent southwest-to-northeast arterial through downtown.
+// Every Chapter 2–8 facility is assigned to one of these roadside buildings so
+// every record carrier can stay on the same road spine.
+export const ADVANCED_CITY_MAIN_ROAD_POINTS = points(
+  [235, 704], [382, 646], [548, 590], [706, 642], [866, 666], [1018, 608],
+  [1164, 552], [1308, 500], [1450, 452], [1602, 410], [1760, 368],
+)
+
+const ROADSIDE_BUILDINGS = [
+  roadsideBuilding('170,590 278,538 358,604 315,718 210,754 145,680', [256, 630], 0),
+  roadsideBuilding('300,468 418,425 486,548 420,641 314,604 270,532', [382, 538], 1),
+  roadsideBuilding('477,221 584,201 630,493 506,536 431,450', [541, 410], 2),
+  roadsideBuilding('635,330 721,307 779,493 700,554 622,470', [700, 447], 3),
+  roadsideBuilding('744,356 843,333 921,560 793,637 712,565', [815, 505], 4),
+  roadsideBuilding('887,377 1002,348 1044,521 934,566 875,495', [953, 463], 5),
+  roadsideBuilding('1013,302 1155,292 1221,515 1071,583 983,488', [1098, 452], 6),
+  roadsideBuilding('1211,475 1352,465 1427,583 1282,647 1195,568', [1305, 548], 7),
+  roadsideBuilding('1262,223 1346,200 1403,357 1312,410 1238,347', [1324, 304], 8),
+  roadsideBuilding('1459,357 1601,338 1684,442 1575,524 1423,468', [1558, 430], 9),
+  roadsideBuilding('1697,400 1857,398 1906,557 1741,641 1644,554', [1780, 506], 10),
+] as const satisfies readonly RoadsideBuilding[]
+
 const ANCHORS = {
-  producer: anchor('producer', 'Producer 출발센터', 'Kafka record를 만들고 전송하는 출발 시설입니다.', '477,221 584,201 630,493 506,536 431,450', [541, 410], [430, 452], 'Producer'),
-  application: anchor('application', 'Application 처리공장', '업무 규칙과 변환, 재시도 정책을 실행합니다.', '1013,302 1155,292 1221,515 1071,583 983,488', [1098, 452], [1006, 583], 'Application'),
-  'broker-leader': anchor('broker', 'Broker Leader 기록센터', '현재 partition leader가 record를 append하는 기록센터입니다.', '744,356 843,333 921,560 793,637 712,565', [815, 505], [918, 629], 'Leader'),
-  'broker-follower-1': anchor('replica', 'Broker Follower 1', 'Leader 기록을 복제하는 follower replica입니다.', '1211,475 1352,465 1427,583 1282,647 1195,568', [1305, 548], [1218, 470], 'Follower 1'),
-  'broker-follower-2': anchor('replica', 'Broker Follower 2', 'Leader 기록을 복제하는 follower replica입니다.', '1697,400 1857,398 1906,557 1741,641 1644,554', [1780, 506], [1615, 550], 'Follower 2'),
-  'partition-p0': anchor('partition', 'Partition p0 적재장', 'p0의 독립적인 append 순서와 offset을 보관합니다.', '872,301 936,282 987,391 922,441 846,381', [918, 360], [848, 405], 'p0'),
-  'partition-p1': anchor('partition', 'Partition p1 적재장', 'p1의 독립적인 append 순서와 offset을 보관합니다.', '887,377 1002,348 1044,521 934,566 875,495', [953, 463], [1036, 579], 'p1'),
-  'partition-p2': anchor('partition', 'Partition p2 적재장', 'p2의 독립적인 append 순서와 offset을 보관합니다.', '985,626 1083,607 1162,714 1053,776 974,709', [1060, 681], [979, 639], 'p2'),
-  'consumer-c1': anchor('consumer', 'Consumer c1 수령센터', '할당받은 partition에서 record를 poll합니다.', '382,699 479,661 532,974 420,1044 344,886', [449, 842], [341, 797], 'c1'),
-  'consumer-c2': anchor('consumer', 'Consumer c2 수령센터', '할당받은 partition에서 record를 poll합니다.', '465,731 543,698 579,921 494,977 430,874', [513, 838], [583, 913], 'c2'),
-  'consumer-c3': anchor('consumer', 'Consumer c3 수령센터', '할당받은 partition에서 record를 poll합니다.', '1009,768 1195,727 1331,820 1134,929 976,866', [1139, 827], [1050, 946], 'c3'),
-  'consumer-c4': anchor('consumer', 'Consumer c4 대기 차고', 'partition을 배정받지 못하면 IDLE 상태로 대기합니다.', '1507,754 1659,710 1741,862 1596,971 1459,884', [1608, 834], [1466, 788], 'c4 · IDLE'),
-  'consumer-c5': anchor('consumer', 'Consumer c5 대기 차고', 'partition을 배정받지 못하면 IDLE 상태로 대기합니다.', '1680,677 1790,630 1882,720 1763,808 1642,751', [1764, 715], [1636, 650], 'c5 · IDLE'),
-  coordinator: anchor('coordinator', 'Group Coordinator 관제탑', '멤버십과 partition assignment를 조정합니다.', '1262,223 1346,200 1403,357 1312,410 1238,347', [1324, 304], [1216, 402], 'Coordinator'),
-  'offset-store': anchor('offset', 'Offset Store 검표소', 'Consumer group의 다음 읽기 위치를 보관합니다.', '1459,357 1601,338 1684,442 1575,524 1423,468', [1558, 430], [1474, 531], 'Offset Store'),
-  'retry-loop': anchor('retry', 'Retry 회차로', '현재 처리 경로에서 제한된 재시도를 수행합니다.', '1495,581 1657,565 1746,665 1633,747 1469,685', [1608, 650], [1459, 600], 'Retry 회차로'),
-  'retry-1m': anchor('retry', 'retry-1m 대기장', '애플리케이션이 발행한 첫 번째 지연 retry topic입니다.', '1434,674 1523,653 1580,728 1490,779 1409,724', [1495, 714], [1392, 728], 'retry-1m'),
-  'retry-10m': anchor('retry', 'retry-10m 대기장', '더 긴 backoff를 적용하는 retry topic입니다.', '1366,904 1452,875 1522,931 1437,996 1344,949', [1432, 934], [1336, 908], 'retry-10m'),
-  dlt: anchor('retry', 'DLT 격리창고', '재시도를 소진한 record와 진단 context를 격리합니다.', '620,811 720,775 768,961 663,1040 592,939', [678, 910], [770, 838], 'DLT'),
-  'transaction-coordinator': anchor('transaction', 'Transaction Coordinator', '출력과 offset의 commit 또는 abort 경계를 조정합니다.', '930,112 1035,95 1114,208 1011,279 913,215', [1003, 182], [1008, 289], 'TX Coordinator'),
+  producer: anchor('producer', 'Producer 출발센터', 'Kafka record를 만들고 전송하는 출발 시설입니다.', 0, 'Producer'),
+  application: anchor('application', 'Application 처리공장', '업무 규칙과 변환, 재시도 정책을 실행합니다.', 9, 'Application'),
+  'broker-leader': anchor('broker', 'Broker Leader 기록센터', '현재 partition leader가 record를 append하는 기록센터입니다.', 5, 'Leader'),
+  'broker-follower-1': anchor('replica', 'Broker Follower 1', 'Leader 기록을 복제하는 follower replica입니다.', 6, 'Follower 1'),
+  'broker-follower-2': anchor('replica', 'Broker Follower 2', 'Leader 기록을 복제하는 follower replica입니다.', 8, 'Follower 2'),
+  'partition-p0': anchor('partition', 'Partition p0 적재장', 'p0의 독립적인 append 순서와 offset을 보관합니다.', 1, 'p0'),
+  'partition-p1': anchor('partition', 'Partition p1 적재장', 'p1의 독립적인 append 순서와 offset을 보관합니다.', 2, 'p1'),
+  'partition-p2': anchor('partition', 'Partition p2 적재장', 'p2의 독립적인 append 순서와 offset을 보관합니다.', 3, 'p2'),
+  'consumer-c1': anchor('consumer', 'Consumer c1 수령센터', '할당받은 partition에서 record를 poll합니다.', 4, 'c1'),
+  'consumer-c2': anchor('consumer', 'Consumer c2 수령센터', '할당받은 partition에서 record를 poll합니다.', 5, 'c2'),
+  'consumer-c3': anchor('consumer', 'Consumer c3 수령센터', '할당받은 partition에서 record를 poll합니다.', 6, 'c3'),
+  'consumer-c4': anchor('consumer', 'Consumer c4 대기 차고', 'partition을 배정받지 못하면 IDLE 상태로 대기합니다.', 7, 'c4 · IDLE'),
+  'consumer-c5': anchor('consumer', 'Consumer c5 대기 차고', 'partition을 배정받지 못하면 IDLE 상태로 대기합니다.', 8, 'c5 · IDLE'),
+  coordinator: anchor('coordinator', 'Group Coordinator 관제탑', '멤버십과 partition assignment를 조정합니다.', 0, 'Coordinator'),
+  'offset-store': anchor('offset', 'Offset Store 검표소', 'Consumer group의 다음 읽기 위치를 보관합니다.', 10, 'Offset Store'),
+  'retry-loop': anchor('retry', 'Retry 회차로', '현재 처리 경로에서 제한된 재시도를 수행합니다.', 7, 'Retry 회차로'),
+  'retry-1m': anchor('retry', 'retry-1m 대기장', '애플리케이션이 발행한 첫 번째 지연 retry topic입니다.', 5, 'retry-1m'),
+  'retry-10m': anchor('retry', 'retry-10m 대기장', '더 긴 backoff를 적용하는 retry topic입니다.', 6, 'retry-10m'),
+  dlt: anchor('retry', 'DLT 격리창고', '재시도를 소진한 record와 진단 context를 격리합니다.', 8, 'DLT'),
+  'transaction-coordinator': anchor('transaction', 'Transaction Coordinator', '출력과 offset의 commit 또는 abort 경계를 조정합니다.', 8, 'TX Coordinator'),
 } as const satisfies Record<string, AtlasAnchor>
 
 export type AdvancedCityNodeId = keyof typeof ANCHORS
@@ -131,54 +160,6 @@ function createSceneRoutes(): Record<AdvancedChapterId, readonly CityRouteDefini
   }
 }
 
-// Measured atlas road intersections. Kafka semantics reference route/checkpoint
-// ids only; these waypoints can be remeasured without changing domain events.
-const ROUTE_WAYPOINTS: Readonly<Record<string, readonly CityPoint[]>> = {
-  'producer-p0': points([600, 500], [720, 455]),
-  'producer-p1': points([600, 535], [760, 620], [910, 670]),
-  'producer-p2': points([600, 535], [760, 620], [910, 670]),
-  'p0-application': points([930, 440], [1040, 505]),
-  'p1-application': points([1020, 610]),
-  'p2-application': points([1020, 620]),
-  'application-producer-result': points([910, 670], [760, 620], [600, 535]),
-  'producer-leader': points([600, 535], [760, 620], [890, 675]),
-  'leader-follower-1': points([1040, 620], [1150, 560], [1270, 500]),
-  'leader-follower-2': points([1040, 620], [1200, 550], [1400, 600], [1530, 620]),
-  'producer-retry-loop': points([600, 535], [760, 620], [930, 680], [1110, 620], [1280, 550]),
-  'retry-loop-leader': points([1400, 620], [1240, 680], [1060, 700]),
-  'leader-partition': points([960, 630]),
-  'leader-producer-ack': points([890, 675], [760, 620], [600, 535]),
-  'partition-application': points([1000, 600]),
-  'follower-1-producer': points([1270, 500], [1150, 560], [1040, 620], [890, 675], [760, 620], [600, 535]),
-  'p0-consumer': points([760, 480], [650, 600], [540, 700], [420, 780]),
-  'consumer-application': points([500, 720], [700, 700], [890, 675]),
-  'application-offset': points([1160, 555], [1270, 500], [1400, 560]),
-  'consumer-offset': points([500, 720], [700, 700], [890, 675], [1050, 620], [1270, 500], [1400, 560]),
-  'offset-consumer-commit': points([1400, 560], [1270, 500], [1050, 620], [890, 675], [700, 700], [500, 720]),
-  'coordinator-c1': points([1270, 500], [1160, 555], [1050, 620], [890, 675], [700, 700], [500, 720], [420, 780]),
-  'coordinator-c2': points([1270, 500], [1160, 555], [1050, 620], [890, 675], [760, 700], [650, 820]),
-  'coordinator-c3': points([1270, 500], [1160, 555], [1050, 620], [1050, 760], [1050, 900]),
-  'coordinator-c4': points([1270, 500], [1350, 580], [1400, 680]),
-  'coordinator-c5': points([1270, 500], [1400, 560], [1530, 620]),
-  'p0-c1': points([760, 480], [650, 600], [540, 700], [420, 780]),
-  'p1-c1': points([910, 670], [760, 700], [600, 720], [420, 780]),
-  'p1-c2': points([910, 670], [760, 700], [650, 820]),
-  'p2-c3': points([1050, 700], [1050, 820]),
-  'c1-offset': points([500, 720], [700, 700], [890, 675], [1050, 620], [1270, 500], [1400, 560]),
-  'c2-offset': points([650, 820], [760, 700], [910, 670], [1050, 620], [1270, 500], [1400, 560]),
-  'c1-application': points([500, 720], [700, 700], [890, 675]),
-  'application-retry-loop': points([1160, 555], [1270, 500], [1400, 560]),
-  'application-retry-1m': points([1160, 650], [1260, 700]),
-  'retry-1m-retry-10m': points([1410, 780], [1370, 850]),
-  'retry-10m-application': points([1250, 850], [1120, 760], [1040, 650]),
-  'application-dlt': points([900, 675], [760, 700], [700, 800]),
-  'application-producer': points([890, 675], [760, 620], [600, 535]),
-  'transaction-application': points([1050, 380], [1160, 470], [1100, 540]),
-  'producer-transaction': points([600, 500], [760, 440], [900, 360]),
-  'transaction-offset': points([1130, 360], [1270, 430], [1400, 500]),
-  'transaction-consumer-result': points([1130, 360], [1270, 430], [1270, 520], [1100, 620], [900, 675], [700, 700], [500, 720], [420, 780]),
-}
-
 const SCENE_ROUTES = createSceneRoutes()
 
 export const ADVANCED_CHAPTER_SCENES: Readonly<Record<AdvancedChapterId, CitySceneDefinition>> = {
@@ -259,19 +240,29 @@ function anchor(
   kind: CityNodeKind,
   label: string,
   description: string,
-  polygonPoints: string,
-  [x, y]: readonly [number, number],
-  [roadX, roadY]: readonly [number, number],
+  roadAccessIndex: number,
   shortLabel?: string,
 ): AtlasAnchor {
+  const building = ROADSIDE_BUILDINGS[roadAccessIndex]
+  if (!building) throw new Error(`Roadside building ${roadAccessIndex} is not defined.`)
   return {
     kind,
     label,
     description,
+    ...building,
+    ...(shortLabel ? { shortLabel } : {}),
+  }
+}
+
+function roadsideBuilding(
+  polygonPoints: string,
+  [x, y]: readonly [number, number],
+  roadAccessIndex: number,
+): RoadsideBuilding {
+  return {
     hitAreaPath: `M${polygonPoints.replaceAll(' ', 'L')}Z`,
     labelPosition: { x, y },
-    roadPosition: { x: roadX, y: roadY },
-    ...(shortLabel ? { shortLabel } : {}),
+    roadAccessIndex,
   }
 }
 
@@ -292,6 +283,7 @@ function node(id: AdvancedCityNodeId): CityNodeDefinition {
     description: source.description,
     hitAreaPath: source.hitAreaPath,
     position: source.labelPosition,
+    roadAccessIndex: source.roadAccessIndex,
     ariaLabel: source.label,
   }
 }
@@ -302,12 +294,14 @@ function route(
   toNodeId: AdvancedCityNodeId,
   kind: CityRouteKind,
 ): CityRouteDefinition {
-  const start = ANCHORS[fromNodeId].roadPosition
-  const end = ANCHORS[toNodeId].roadPosition
-  const waypoints = ROUTE_WAYPOINTS[id]
-  if (!waypoints) throw new Error(`Route ${id} requires measured atlas waypoints.`)
-  const pathPoints = [start, ...waypoints, end]
-  const midpoint = pathPoints[Math.floor(pathPoints.length / 2)] ?? start
+  const pathPoints = roadSlice(
+    ADVANCED_CITY_MAIN_ROAD_POINTS,
+    ANCHORS[fromNodeId].roadAccessIndex,
+    ANCHORS[toNodeId].roadAccessIndex,
+  )
+  const start = pathPoints[0]!
+  const end = pathPoints.at(-1)!
+  const midpoint = interpolatePolyline(pathPoints, 0.5)
   return {
     id,
     fromNodeId,
@@ -315,12 +309,20 @@ function route(
     kind,
     label: `${ANCHORS[fromNodeId].label} → ${ANCHORS[toNodeId].label}`,
     path: pathPoints.map((point, index) => `${index === 0 ? 'M' : 'L'}${point.x} ${point.y}`).join(' '),
+    points: pathPoints,
     checkpoints: [
-      { id: `${id}:start`, position: start, nodeId: fromNodeId },
-      { id: `${id}:mid`, position: midpoint, label: '이동 중' },
-      { id: `${id}:end`, position: end, nodeId: toNodeId },
+      { id: `${id}:start`, position: start, progress: 0, nodeId: fromNodeId },
+      { id: `${id}:mid`, position: midpoint, progress: 0.5, label: '이동 중' },
+      { id: `${id}:end`, position: end, progress: 1, nodeId: toNodeId },
     ],
   }
+}
+
+function roadSlice(points: readonly CityPoint[], fromIndex: number, toIndex: number): readonly CityPoint[] {
+  const start = Math.min(fromIndex, toIndex)
+  const end = Math.max(fromIndex, toIndex)
+  const slice = points.slice(start, end + 1)
+  return fromIndex <= toIndex ? slice : slice.reverse()
 }
 
 function scene(chapterId: AdvancedChapterId, label: string): CitySceneDefinition {
@@ -328,6 +330,11 @@ function scene(chapterId: AdvancedChapterId, label: string): CitySceneDefinition
     id: `chapter-${chapterId}-city`,
     label,
     viewport: { width: 1920, height: 1047 },
+    mainRoad: {
+      id: 'downtown-main-arterial',
+      path: ADVANCED_CITY_MAIN_ROAD_POINTS.map((point, index) => `${index === 0 ? 'M' : 'L'}${point.x} ${point.y}`).join(' '),
+      points: ADVANCED_CITY_MAIN_ROAD_POINTS,
+    },
     nodes: SCENE_NODE_IDS[chapterId].map(node),
     routes: SCENE_ROUTES[chapterId],
     ...(chapterId === 8

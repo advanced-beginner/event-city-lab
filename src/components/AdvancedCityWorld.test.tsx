@@ -22,11 +22,13 @@ function makeRun(choiceId: string): ChapterSimulationRun {
 function renderWorld({
   run = null,
   cursor = -1,
+  motionDurationMs = 0,
   onInspect = vi.fn(),
   reducedMotion = false,
 }: {
   run?: ChapterSimulationRun | null
   cursor?: number
+  motionDurationMs?: number
   onInspect?: (nodeId: string) => void
   reducedMotion?: boolean
 } = {}) {
@@ -35,6 +37,7 @@ function renderWorld({
       scene={getAdvancedChapterScene(2)}
       events={run?.events ?? []}
       cursor={cursor}
+      motionDurationMs={motionDurationMs}
       pendingRerun={false}
       reducedMotion={reducedMotion}
       onInspect={onInspect}
@@ -87,5 +90,17 @@ describe('AdvancedCityWorld', () => {
 
     expect(document.querySelector('[data-city-world]')).toHaveAttribute('data-reduced-motion', 'true')
     expect(document.querySelector('[data-city-world]')).toHaveClass('city-world-reduced-motion')
+  })
+
+  it('animates an arriving carrier along its declared road path', () => {
+    const succeededRun = makeRun('stable-customer-key')
+    renderWorld({ run: succeededRun, cursor: succeededRun.events.length - 1, motionDurationMs: 420 })
+
+    const carrier = document.querySelector('[data-city-carrier^="receipt-"]')
+    const routeId = carrier?.getAttribute('data-carrier-route')
+    const route = getAdvancedChapterScene(2).routes.find((candidate) => candidate.id === routeId)
+
+    expect(carrier).toHaveAttribute('data-motion-mode', 'road-path')
+    expect(carrier?.querySelector('animateMotion')).toHaveAttribute('path', route?.path)
   })
 })

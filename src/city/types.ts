@@ -32,6 +32,7 @@ export interface CityNodeDefinition {
   label: string
   description: string
   position: CityPoint
+  roadAccessIndex: number
   hitAreaPath: string
   size?: CitySize
   ariaLabel?: string
@@ -40,6 +41,7 @@ export interface CityNodeDefinition {
 export interface CityCheckpointDefinition {
   id: string
   position: CityPoint
+  progress: number
   label?: string
   nodeId?: string
 }
@@ -50,8 +52,15 @@ export interface CityRouteDefinition {
   fromNodeId: string
   toNodeId: string
   path: string
+  points: readonly CityPoint[]
   checkpoints: readonly CityCheckpointDefinition[]
   label?: string
+}
+
+export interface CityMainRoadDefinition {
+  id: string
+  path: string
+  points: readonly CityPoint[]
 }
 
 export interface CityBoundaryDefinition {
@@ -66,6 +75,7 @@ export interface CitySceneDefinition {
   id: string
   label: string
   viewport: CitySize
+  mainRoad: CityMainRoadDefinition
   nodes: readonly CityNodeDefinition[]
   routes: readonly CityRouteDefinition[]
   boundaries?: readonly CityBoundaryDefinition[]

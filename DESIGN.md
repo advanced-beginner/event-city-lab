@@ -3,7 +3,7 @@
 ## Source of truth
 
 - Status: Active
-- Last refreshed: 2026-08-18
+- Last refreshed: 2026-08-20
 - Product: Event City Lab
 - Scope: Chapter 1–8 — 실패 중심 Kafka 실험, 증거 조사, 수정과 재실행
 - Primary evidence: 사용자 제공 기존 화면 캡처, Chapter 1 승인 도시 배경, Chapter 2–8 승인 고해상도 도시 atlas, 본 문서에 기록된 인터뷰 합의
@@ -118,7 +118,9 @@ Visual asset 규칙:
 
 Standard view에는 승인된 도시 배경 전체와 중앙 Kafka 핵심 건물 3개가 보인다. 장식 건물·공원·나무·도로는 배경 자체에 포함되며 별도 runtime sprite 수량을 관리하지 않는다.
 
-Chapter 1과 Chapter 2–8은 공통 inline SVG renderer `CityWorld`와 키보드 조작 가능한 `CityFacility`를 공유한다. Chapter 2–8은 `event-city-atlas.webp` 한 장과 `CitySceneDefinition`을 사용한다. scene은 배경과 분리된 viewBox, 실제 건물 silhouette polygon, 시설 표지 위치, 실제 도로 path와 checkpoint만 소유한다. 같은 Kafka 역할은 모든 실험에서 같은 건물을 사용하며 챕터에 필요한 시설만 활성화한다.
+Chapter 1과 Chapter 2–8은 공통 inline SVG renderer `CityWorld`와 키보드 조작 가능한 `CityFacility`를 공유한다. Chapter 2–8은 `event-city-atlas.webp` 한 장과 `CitySceneDefinition`을 사용한다. scene은 배경과 분리된 viewBox, 실제 건물 silhouette polygon, 시설 표지 위치, 주도로 path와 checkpoint만 소유한다. Chapter 2–8의 선택 가능한 시설은 atlas 중앙의 남서–북동 간선도로에 인접한 11개 roadside building slot만 사용한다. 한 챕터 안에서는 slot을 중복 사용하지 않으며, 같은 Kafka 역할은 모든 실험에서 같은 slot을 사용한다.
+
+모든 Chapter 2–8 운송 route는 `downtown-main-arterial`의 연속 부분 구간이다. 도메인 이벤트는 기존 route/checkpoint ID를 유지하고, scene validator가 시설의 road access index, route의 ordered points, checkpoint progress가 공통 간선도로 계약과 일치하는지 검증한다. 역할 간 직접 직선을 새로 만들거나 atlas의 보조 도로로 우회하지 않는다.
 
 중앙 사각형 component map은 사용하지 않는다. Worker가 생성한 각 이벤트의 구조화된 `cityCue`가 focus node, node/route 상태, carrier checkpoint, 반환 신호와 barrier를 지정하고, 순수 projection reducer가 현재 cursor의 도시 상태를 계산한다. 로그 문자열과 상세 문구를 파싱해 애니메이션을 추론하지 않는다. 배경 교체 시 scene 좌표만 다시 측정하며 Kafka 이벤트 의미는 유지한다.
 
@@ -135,7 +137,7 @@ Chapter 1과 Chapter 2–8은 공통 inline SVG renderer `CityWorld`와 키보�
 - 메시지 이동은 노란 소형 배송 밴 한 대가 담당한다.
 - 실행 전 Producer 상차 구역에 주차한다.
 - 지붕 또는 번호판에 `order-2401`, 화물 라벨에 `OrderEvent`, 실행 중 `attempt`를 표시한다.
-- 정상 재생은 도로를 따라 이동하고 검사소마다 정차한다. 타임라인 직접 선택은 해당 체크포인트로 즉시 이동한다.
+- 정상 재생은 ordered road points의 누적 거리 기준 progress와 SVG motion path를 사용해 간선도로를 따라 이동하고 검사소마다 정차한다. 이동 시간은 0.5×/1×/2× 재생 간격에 맞춰 조정한다. 타임라인 직접 선택과 시설 조사는 애니메이션 없이 해당 체크포인트로 즉시 이동한다.
 - 1× 성공 실행의 화면 재생은 약 4초다.
 - reduced motion에서는 체크포인트 사이를 즉시 전환하며 깜빡임, 진동, 도로 흐름 애니메이션을 제거한다.
 
@@ -191,6 +193,7 @@ Chapter 1과 Chapter 2–8은 공통 inline SVG renderer `CityWorld`와 키보�
 - React 19, TypeScript strict, Vite 8, CSS Modules, inline SVG.
 - 순수 TypeScript 엔진과 Web Worker가 Kafka 결과와 이벤트 기록을 계산한다. React UI는 결과를 재계산하지 않는다.
 - `ChapterEventTemplate.cityCue`의 모든 node·route·checkpoint 참조는 scene validator와 Zod Worker schema를 통과해야 한다. 좌표는 scene에만 있고 엔진 이벤트에는 이동 의미와 식별자만 있다.
+- Chapter 2–8 `CitySceneDefinition`은 공통 `mainRoad`, 시설별 `roadAccessIndex`, route별 ordered `points`, checkpoint별 누적 거리 `progress`를 소유한다. 모든 route는 main road의 정방향 또는 역방향 연속 slice여야 한다.
 - Zustand vanilla store는 workspace와 UI 상태를 관리한다.
 - IndexedDB `event-city-lab-v1`에 진행을 저장하고 작은 환경 설정은 `ecl:*` localStorage 키를 사용한다.
 - 외부 JSON과 저장 데이터는 Zod 4의 비권장되지 않은 API로 검증한다.
@@ -208,6 +211,8 @@ Chapter 1과 Chapter 2–8은 공통 inline SVG renderer `CityWorld`와 키보�
 4. 성공 — Broker 하역, 통신 신호, Producer 도착 문자.
 
 각 상태를 `1280 × 720`, `1440 × 900`, `1920 × 1080`에서 확인한다. 성공 기준은 페이지 overflow 없음, 잘린 핵심 문구 없음, 패널·도시·타임라인 중첩 없음, 상태별 차이가 명확함이다. 타입 검사, 단위 테스트, production build와 GitHub Pages base artifact도 통과해야 한다.
+
+Chapter 2–8 이동 변경은 route geometry 단위 테스트로 누적 거리 보간·bend·역방향·반복 좌표를 검증하고, 브라우저 smoke에서 재생 중 carrier의 `animateMotion.path`와 활성 route의 SVG path가 동일한지 확인한다.
 
 ## Content and asset governance
 

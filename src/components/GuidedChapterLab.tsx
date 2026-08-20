@@ -91,6 +91,7 @@ export function GuidedChapterLab({ chapter }: { chapter: ChapterMetadata }) {
   const [showInspectedRole, setShowInspectedRole] = useState(false)
   const [saveStatus, setSaveStatus] = useState('진도 불러오는 중')
   const [speed, setSpeed] = useState<PlaybackSpeed>(1)
+  const [animateCarrierMotion, setAnimateCarrierMotion] = useState(false)
   const [appReducedMotion, setAppReducedMotion] = useState(readReducedMotionSetting)
   const [osReducedMotion, setOsReducedMotion] = useState(readOsReducedMotionPreference)
   const reducedMotion = appReducedMotion || osReducedMotion
@@ -118,6 +119,7 @@ export function GuidedChapterLab({ chapter }: { chapter: ChapterMetadata }) {
     setRun(null)
     setEventCursor(-1)
     setIsPlaying(false)
+    setAnimateCarrierMotion(false)
     setIsRunning(false)
     setEngineError(null)
     setInspectedNodeId(null)
@@ -152,7 +154,10 @@ export function GuidedChapterLab({ chapter }: { chapter: ChapterMetadata }) {
       return
     }
     const timeout = window.setTimeout(
-      () => setEventCursor((cursor) => cursor + 1),
+      () => {
+        setAnimateCarrierMotion(true)
+        setEventCursor((cursor) => cursor + 1)
+      },
       reducedMotion ? 80 : 500 / speed,
     )
     return () => window.clearTimeout(timeout)
@@ -183,6 +188,7 @@ export function GuidedChapterLab({ chapter }: { chapter: ChapterMetadata }) {
     setRun(null)
     setEventCursor(-1)
     setIsPlaying(false)
+    setAnimateCarrierMotion(false)
     setEngineError(null)
     setInspectedNodeId(null)
     setShowInspectedRole(false)
@@ -204,6 +210,7 @@ export function GuidedChapterLab({ chapter }: { chapter: ChapterMetadata }) {
       setInspectedNodeId(null)
       setShowInspectedRole(false)
       setEventCursor(0)
+      setAnimateCarrierMotion(true)
       setIsPlaying(nextRun.events.length > 1)
       labStore.getState().recordExperimentAttempt(chapterId, experiment.id, nextRun.status === 'succeeded')
       setSaveStatus('저장 중…')
@@ -219,6 +226,7 @@ export function GuidedChapterLab({ chapter }: { chapter: ChapterMetadata }) {
   const inspectFacility = (nodeId: string) => {
     setInspectedNodeId(nodeId)
     setIsPlaying(false)
+    setAnimateCarrierMotion(false)
     if (!run || eventCursor < 0) {
       setShowInspectedRole(true)
       return
@@ -321,6 +329,7 @@ export function GuidedChapterLab({ chapter }: { chapter: ChapterMetadata }) {
             <AdvancedCityWorld
               scene={scene}
               events={run?.events ?? []}
+              motionDurationMs={animateCarrierMotion ? Math.max(120, Math.round((500 / speed) * 0.84)) : 0}
               cursor={eventCursor}
               reducedMotion={reducedMotion}
               pendingRerun={pendingRerun}
@@ -380,7 +389,7 @@ export function GuidedChapterLab({ chapter }: { chapter: ChapterMetadata }) {
       </section>
 
       <section className={styles.timeline} aria-label="이벤트 타임라인">
-        <button type="button" disabled={!run} onClick={() => { setEventCursor(0); setIsPlaying(false) }}>처음</button>
+        <button type="button" disabled={!run} onClick={() => { setAnimateCarrierMotion(false); setEventCursor(0); setIsPlaying(false) }}>처음</button>
         <button type="button" disabled={!run} onClick={() => setIsPlaying((value) => !value)}>{isPlaying ? '일시정지' : '재생'}</button>
         <label className={styles.speedControl}>
           <span>속도</span>
@@ -396,7 +405,7 @@ export function GuidedChapterLab({ chapter }: { chapter: ChapterMetadata }) {
               key={event.id}
               type="button"
               className={index === eventCursor ? styles.activeEvent : index < eventCursor ? styles.seenEvent : undefined}
-              onClick={() => { setEventCursor(index); setIsPlaying(false) }}
+              onClick={() => { setAnimateCarrierMotion(false); setEventCursor(index); setIsPlaying(false) }}
               title={event.title}
             ><span>{index + 1}</span><small>{event.title}</small></button>
           )) ?? <p>실행 후 사건 순서를 되감아 조사할 수 있습니다.</p>}

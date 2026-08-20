@@ -1,5 +1,6 @@
 import { z } from 'zod'
 
+import { interpolatePolyline } from './routeGeometry'
 import type { ChapterCityCue, CitySceneDefinition } from './types'
 
 const positiveNumberSchema = z.number().finite().positive()
@@ -36,6 +37,7 @@ export const cityNodeDefinitionSchema = z.strictObject({
   label: z.string().min(1),
   description: z.string().min(1),
   position: cityPointSchema,
+  roadAccessIndex: z.number().int().nonnegative(),
   hitAreaPath: z.string().min(1),
   size: citySizeSchema.optional(),
   ariaLabel: z.string().min(1).optional(),
@@ -44,6 +46,7 @@ export const cityNodeDefinitionSchema = z.strictObject({
 export const cityCheckpointDefinitionSchema = z.strictObject({
   id: idSchema,
   position: cityPointSchema,
+  progress: z.number().finite().min(0).max(1),
   label: z.string().min(1).optional(),
   nodeId: idSchema.optional(),
 })
@@ -54,8 +57,15 @@ export const cityRouteDefinitionSchema = z.strictObject({
   fromNodeId: idSchema,
   toNodeId: idSchema,
   path: z.string().min(1),
+  points: z.array(cityPointSchema).min(2),
   checkpoints: z.array(cityCheckpointDefinitionSchema),
   label: z.string().min(1).optional(),
+})
+
+const cityMainRoadDefinitionSchema = z.strictObject({
+  id: idSchema,
+  path: z.string().min(1),
+  points: z.array(cityPointSchema).min(2),
 })
 
 export const cityBoundaryDefinitionSchema = z.strictObject({
@@ -70,6 +80,7 @@ export const citySceneDefinitionSchema = z.strictObject({
   id: idSchema,
   label: z.string().min(1),
   viewport: citySizeSchema,
+  mainRoad: cityMainRoadDefinitionSchema,
   nodes: z.array(cityNodeDefinitionSchema),
   routes: z.array(cityRouteDefinitionSchema),
   boundaries: z.array(cityBoundaryDefinitionSchema).optional(),
@@ -128,6 +139,16 @@ export function validateCityScene(scene: CitySceneDefinition): void {
     'node',
   )
   const checkpointIds = new Set<string>()
+  const nodeById = new Map(parsed.nodes.map((node) => [node.id, node]))
+
+  if (parsed.mainRoad.path !== pointsToPath(parsed.mainRoad.points)) {
+    throw new Error(`Main road ${parsed.mainRoad.id} path must match its ordered points.`)
+  }
+  for (const node of parsed.nodes) {
+    if (!parsed.mainRoad.points[node.roadAccessIndex]) {
+      throw new Error(`Node ${node.id} references unknown main-road access index: ${node.roadAccessIndex}`)
+    }
+  }
 
   assertUniqueIds(
     parsed.routes.map((route) => route.id),
@@ -154,6 +175,16 @@ export function validateCityScene(scene: CitySceneDefinition): void {
       throw new Error(`Route ${route.id} references unknown toNodeId: ${route.toNodeId}`)
     }
 
+    const fromNode = nodeById.get(route.fromNodeId)!
+    const toNode = nodeById.get(route.toNodeId)!
+    const expectedPoints = roadSlice(parsed.mainRoad.points, fromNode.roadAccessIndex, toNode.roadAccessIndex)
+    if (!pointsEqual(route.points, expectedPoints)) {
+      throw new Error(`Route ${route.id} must be a contiguous segment of ${parsed.mainRoad.id}.`)
+    }
+    if (route.path !== pointsToPath(route.points)) {
+      throw new Error(`Route ${route.id} path must match its ordered points.`)
+    }
+
     for (const checkpoint of route.checkpoints) {
       if (checkpointIds.has(checkpoint.id)) {
         throw new Error(`Duplicate checkpoint id: ${checkpoint.id}`)
@@ -163,8 +194,32 @@ export function validateCityScene(scene: CitySceneDefinition): void {
       if (checkpoint.nodeId && !nodeIds.has(checkpoint.nodeId)) {
         throw new Error(`Checkpoint ${checkpoint.id} references unknown nodeId: ${checkpoint.nodeId}`)
       }
+      if (!pointsEqual([checkpoint.position], [interpolatePolyline(route.points, checkpoint.progress)])) {
+        throw new Error(`Checkpoint ${checkpoint.id} must lie at its declared route progress.`)
+      }
     }
   }
+}
+
+function roadSlice(points: readonly { x: number; y: number }[], fromIndex: number, toIndex: number) {
+  const start = Math.min(fromIndex, toIndex)
+  const end = Math.max(fromIndex, toIndex)
+  const slice = points.slice(start, end + 1)
+  return fromIndex <= toIndex ? slice : slice.reverse()
+}
+
+function pointsToPath(points: readonly { x: number; y: number }[]): string {
+  return points.map((point, index) => `${index === 0 ? 'M' : 'L'}${point.x} ${point.y}`).join(' ')
+}
+
+function pointsEqual(
+  actual: readonly { x: number; y: number }[],
+  expected: readonly { x: number; y: number }[],
+): boolean {
+  return actual.length === expected.length && actual.every((point, index) => {
+    const target = expected[index]
+    return Boolean(target && Math.abs(point.x - target.x) < 0.001 && Math.abs(point.y - target.y) < 0.001)
+  })
 }
 
 export function validateChapterCityCue(scene: CitySceneDefinition, cue: ChapterCityCue): void {

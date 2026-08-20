@@ -8,6 +8,11 @@ const scene: CitySceneDefinition = {
   id: 'chapter-advanced',
   label: 'Advanced chapter city',
   viewport: { width: 1200, height: 720 },
+  mainRoad: {
+    id: 'main-road',
+    path: 'M100 360 L400 320 L700 280',
+    points: [{ x: 100, y: 360 }, { x: 400, y: 320 }, { x: 700, y: 280 }],
+  },
   nodes: [
     {
       id: 'producer',
@@ -15,6 +20,7 @@ const scene: CitySceneDefinition = {
       label: 'Producer',
       description: 'Records start here.',
       position: { x: 100, y: 360 },
+      roadAccessIndex: 0,
       hitAreaPath: 'M80 330h80v70h-80Z',
     },
     {
@@ -23,6 +29,7 @@ const scene: CitySceneDefinition = {
       label: 'Partition',
       description: 'Partition selection is inspected here.',
       position: { x: 380, y: 320 },
+      roadAccessIndex: 1,
       hitAreaPath: 'M340 290h90v70h-90Z',
     },
     {
@@ -31,6 +38,7 @@ const scene: CitySceneDefinition = {
       label: 'Broker',
       description: 'Records are appended here.',
       position: { x: 700, y: 280 },
+      roadAccessIndex: 2,
       hitAreaPath: 'M650 240h100v80h-100Z',
     },
   ],
@@ -40,11 +48,12 @@ const scene: CitySceneDefinition = {
       kind: 'data',
       fromNodeId: 'producer',
       toNodeId: 'broker',
-      path: 'M100 360L380 320L700 280',
+      path: 'M100 360 L400 320 L700 280',
+      points: [{ x: 100, y: 360 }, { x: 400, y: 320 }, { x: 700, y: 280 }],
       checkpoints: [
-        { id: 'loaded', position: { x: 140, y: 350 }, nodeId: 'producer' },
-        { id: 'partitioned', position: { x: 380, y: 330 }, nodeId: 'partition' },
-        { id: 'appended', position: { x: 670, y: 290 }, nodeId: 'broker' },
+        { id: 'loaded', position: { x: 100, y: 360 }, progress: 0, nodeId: 'producer' },
+        { id: 'partitioned', position: { x: 400, y: 320 }, progress: 0.5, nodeId: 'partition' },
+        { id: 'appended', position: { x: 700, y: 280 }, progress: 1, nodeId: 'broker' },
       ],
     },
   ],

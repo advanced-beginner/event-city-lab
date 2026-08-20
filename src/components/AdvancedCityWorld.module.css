@@ -47,7 +47,7 @@
 .facilitySign text { fill: #302840; font-family: "Nanum Gothic", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; font-size: 17px; font-weight: 800; }
 .facilitySign text:last-child { fill: #66758a; font-size: 14px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 
-.carrier { filter: url(#advanced-city-shadow); transition: transform 480ms cubic-bezier(.2, .8, .2, 1), opacity 180ms ease; }
+.carrier { filter: url(#advanced-city-shadow); transition: opacity 180ms ease; }
 .carrier image { image-rendering: pixelated; }
 .carrier_ghost-record { opacity: .45; }
 .carrier_failed { animation: advanced-shake .3s ease-in-out 2; }

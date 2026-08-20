@@ -1,6 +1,6 @@
 {
   "version": 3,
-  "updatedAt": "2026-08-18",
+  "updatedAt": "2026-08-20",
   "background": {
     "id": "event-city-main",
     "file": "background/event-city-main.webp",
@@ -24,7 +24,7 @@
     "fit": "contain",
     "postProcessing": ["resize-width-1920", "webp-quality-78"],
     "runtime": true,
-    "usage": "Chapter 2–8 shared city atlas with scene-defined SVG facility polygons, road routes, carriers, signals, and barriers"
+    "usage": "Chapter 2–8 shared city atlas with 11 roadside facility slots and routes constrained to the downtown-main-arterial SVG spine"
   },
   "assets": [
     { "id": "vehicle-coral-car", "file": "sprites/vehicle-coral-car.png", "category": "vehicle", "nativeSize": [165, 135], "anchor": [0.5, 1], "runtime": false },
