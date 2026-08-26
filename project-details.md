@@ -287,6 +287,16 @@ Chapter 1 light-city 구현에서 확인한 내용:
 - 0.5×/1×/2× 차량 motion duration을 이벤트 재생 간격의 84%로 맞춰 다음 이벤트와 겹치지 않게 했다. 차량 화물 라벨은 주도로 아래쪽 공통 anchor를 사용해 시설 표지와 겹치지 않는다.
 - 2026-08-20 최종 검증은 typecheck와 production build, Vitest 28파일 141개, Playwright 51개 실행 통과와 의도된 시각 범위 밖 48개 skip이다. Chromium `1280×720`·`1440×900`·`1920×1080`에서 Chapter 2–8 전체 실패→권장 수정→성공, page/world bounds, 표지 중첩과 재생 중 SVG motion path를 확인했고 Firefox·WebKit도 동일 semantic smoke를 통과했다. 변경된 Darwin 시각 baseline 37장을 재검토해 갱신했다.
 
+2026-08-26 Chapter 2–8 단일 직선도로·단일 차량 수렴:
+
+- 사용자가 `1672×941` 브라우저 화면 기준 `(670,550) → (1050,330)`을 공통 중앙도로로 승인했다. 이를 atlas `1920×1047` 내부 좌표 `(664,794) → (1493,316)`의 5개 collinear role slot으로 변환했다. 2026-08-20의 굴곡진 11개 building slot 계약은 이 승인안으로 대체한다.
+- Chapter별 논리 노드를 Source/Producer, Kafka Ingress, Kafka Cluster, Consumer/Processor, Application/Sink의 5개 물리 건물로 묶고 필요한 3~5개만 표시한다. p0·p1·p2, replica, consumer member 같은 세부 상태는 건물 내부 배지로 유지한다.
+- projection reducer가 carrier cue를 하나의 지속적인 `vehicle` identity로 축소한다. 여러 record는 한 대의 밴과 `N records · 순차` batch 표지로 합치며, offset ticket과 역방향 제어 cue는 차량을 추가·제거·후진시키지 않는다. Chapter 2–8은 모두 실행 전에 승인된 8시 시작점 progress `0`에 한 대가 주차하고, 이후 같은 주도로 위에서만 progress가 증가한다.
+- 전체 route network 대신 승인된 8시→2시 주도로 전체를 항상 표시하고, 현재 밴의 단일 처리 구간만 그 위에 상태선으로 겹친다. 각 시설은 주도로의 고정 anchor dot과 connector에 결합하며 구간별 motion duration은 전체 주도로 대비 실제 이동거리 비율로 계산한다.
+- 로컬 in-app browser `1280×720`에서 Chapter 2–8 첫 실험을 100ms 간격으로 재생 샘플링했다. 모든 Chapter에서 초기·재생·완료 차량 수가 항상 1, 활성 route 수가 최대 1, 물리 시설 수가 3~5였다. Chapter 2 실패 완료 화면은 시설 3개와 p0·p1·p2 배지, Application에 정차한 실패 밴을 확인했다.
+- 차단기와 control signal은 승인된 도로 좌표를 바꾸지 않는다. 제어·ACK·transaction 신호는 도로를 가로지르는 곡선을 제거하고 상단 상태 칩과 대상 시설 pulse로 축소했다. Chapter 8의 원자적 경계도 지도 전체 polygon 대신 compact banner로 표시하며, 논리 노드가 4개 이상인 시설은 단일 요약 배지를 사용한다.
+- 최종 검증은 typecheck, Vitest 28파일 148개, production build, Chromium·Firefox·WebKit × 3개 viewport의 semantic Playwright 36개를 모두 통과했다. 37개 Chromium 시각 baseline을 갱신한 뒤 대상 visual test 15개도 재실행 통과했다. 실제 브라우저 화면을 사용한 Visual Ralph식 판정은 58 → 78 → 91점으로 반복해 통과 기준 90을 넘겼다.
+
 ## 9. 알려진 미비점
 
 ### 배포와 운영
@@ -302,6 +312,11 @@ Chapter 1 light-city 구현에서 확인한 내용:
 - 세 viewport의 page overflow와 핵심 production asset 로딩은 Chromium, Firefox, WebKit 조합으로 자동화했다. 핵심 텍스트의 시각적 clipping 판정은 아직 수동 검토가 필요하다.
 - SVG 시설의 role/name과 Enter/Space 조작 회귀 테스트를 유지한다. 전용 WCAG scanner를 사용하는 자동 감사는 아직 없다.
 - coverage report 설정은 있으나 threshold가 없다.
+
+### 시각적 후속 polish
+
+- Visual verdict 91점의 비차단 잔여 항목으로 Chapter 3 성공 terminal의 차량이 2시 끝점보다 중간 처리 지점에 가깝게 보이는 경우가 있다. 실제 event progress를 끝점으로 왜곡하지 않고 완료 상태 표지를 보강하는 방향을 우선한다.
+- Chapter 4·6 실패 표지와 Chapter 8 terminal의 상단 상태 칩 밀도는 자동 중첩 기준을 통과하지만, 후속 콘텐츠 변경 시 도로 위 주석을 늘리지 않고 상태 칩을 요약하는 원칙을 유지한다.
 
 ### 저장과 복구
 
@@ -364,7 +379,7 @@ Chapter 1 light-city 구현에서 확인한 내용:
 - [x] chapter별 learning goal, event schema, diagnosis, trade-off와 실험 definition 분리.
 - [x] 공통 city atlas와 chapter별 scene-defined facility/route/carrier/signal/barrier 경계 정의.
 - [x] Chapter 1의 시설 선택·이동·실패·반환 신호 문법을 Chapter 2–8 공통 `CityWorld` 계약으로 통합.
-- [x] Chapter 2–8 시설을 중앙 간선도로의 11개 building slot으로 제한하고, 누적 거리 기반 route geometry와 SVG motion path를 적용.
+- [x] Chapter 2–8 시설을 승인된 중앙 직선도로의 5개 물리 role slot으로 제한하고, 논리 상태 배지와 단일 차량 projection을 적용.
 - [x] 엔진을 chapter별 rule module로 확장하고 결정론과 schema validation 유지.
 - [x] Chapter 완료 상태와 chapter 간 진도 저장 schema 및 v1→v2 migration 구현.
 - [x] 전체 챕터 navigation과 잠금 없는 복습 정책 구현.

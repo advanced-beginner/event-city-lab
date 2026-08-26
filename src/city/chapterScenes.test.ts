@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { getChapterRule } from '../domain/chapterEngine'
 import type { AdvancedChapterId } from '../domain/chapterSimulation'
 import { getAdvancedChapterScene, getExperimentCityPreview } from './chapterScenes'
+import { projectCityWorld } from './projection'
 import { isPointOnPolyline } from './routeGeometry'
 import { validateCityScene } from './validation'
 
@@ -17,8 +18,60 @@ describe('advanced chapter city scenes', () => {
 
       expect(() => validateCityScene(scene)).not.toThrow()
       expect(scene.mainRoad.id).toBe('downtown-main-arterial')
-      expect(scene.mainRoad.points).toHaveLength(11)
-      expect(new Set(scene.nodes.map((node) => node.roadAccessIndex)).size).toBe(scene.nodes.length)
+      expect(scene.mainRoad.points).toEqual([
+        { x: 664, y: 794 },
+        { x: 871.25, y: 674.5 },
+        { x: 1078.5, y: 555 },
+        { x: 1285.75, y: 435.5 },
+        { x: 1493, y: 316 },
+      ])
+      expect(scene.physicalFacilities.map((facility) => ({
+        hitAreaPath: facility.hitAreaPath,
+        label: facility.label,
+        position: facility.position,
+        roadAccessIndex: facility.roadAccessIndex,
+      }))).toEqual([
+        {
+          hitAreaPath: 'M535,690L668,650L745,704L712,790L610,826L535,770Z',
+          label: 'Source / Producer',
+          position: { x: 625, y: 714 },
+          roadAccessIndex: 0,
+        },
+        {
+          hitAreaPath: 'M690,430L815,390L925,490L902,625L790,670L690,590Z',
+          label: 'Kafka Ingress',
+          position: { x: 805, y: 510 },
+          roadAccessIndex: 1,
+        },
+        {
+          hitAreaPath: 'M885,305L1030,275L1115,360L1088,512L990,560L885,485Z',
+          label: 'Kafka Cluster',
+          position: { x: 997, y: 405 },
+          roadAccessIndex: 2,
+        },
+        {
+          hitAreaPath: 'M1160,472L1320,430L1435,515L1400,645L1270,690L1160,600Z',
+          label: 'Consumer / Processor',
+          position: { x: 1292, y: 548 },
+          roadAccessIndex: 3,
+        },
+        {
+          hitAreaPath: 'M1408,228L1575,195L1665,285L1630,405L1510,450L1408,360Z',
+          label: 'Application / Sink',
+          position: { x: 1530, y: 285 },
+          roadAccessIndex: 4,
+        },
+      ])
+      expect(scene.routes.find((route) => route.id === scene.initialVehicleRouteId)).toMatchObject({
+        kind: 'data',
+      })
+      expect(new Set(scene.nodes.map((node) => node.roadAccessIndex)).size).toBeLessThanOrEqual(5)
+      expect(new Set(scene.nodes.map((node) => node.roadAccessIndex)).size).toBeGreaterThanOrEqual(3)
+      expect(scene.mainRoad.points.every((point) => isPointOnPolyline([
+        scene.mainRoad.points[0]!,
+        scene.mainRoad.points.at(-1)!,
+      ], point, 0.01))).toBe(true)
+      expect(Object.keys(projectCityWorld(scene, [], -1).carriers)).toEqual(['vehicle'])
       expect(scene.routes.every((route) => route.path.includes(' L') && !route.path.includes(' Q'))).toBe(true)
       expect(scene.routes.every((route) => route.points.length >= 2)).toBe(true)
       for (const route of scene.routes) {

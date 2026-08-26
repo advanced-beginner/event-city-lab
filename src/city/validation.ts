@@ -43,6 +43,14 @@ export const cityNodeDefinitionSchema = z.strictObject({
   ariaLabel: z.string().min(1).optional(),
 })
 
+export const cityPhysicalFacilityDefinitionSchema = z.strictObject({
+  id: idSchema,
+  label: z.string().min(1),
+  position: cityPointSchema,
+  roadAccessIndex: z.number().int().nonnegative(),
+  hitAreaPath: z.string().min(1),
+})
+
 export const cityCheckpointDefinitionSchema = z.strictObject({
   id: idSchema,
   position: cityPointSchema,
@@ -81,6 +89,8 @@ export const citySceneDefinitionSchema = z.strictObject({
   label: z.string().min(1),
   viewport: citySizeSchema,
   mainRoad: cityMainRoadDefinitionSchema,
+  physicalFacilities: z.array(cityPhysicalFacilityDefinitionSchema).min(1),
+  initialVehicleRouteId: idSchema,
   nodes: z.array(cityNodeDefinitionSchema),
   routes: z.array(cityRouteDefinitionSchema),
   boundaries: z.array(cityBoundaryDefinitionSchema).optional(),
@@ -149,11 +159,34 @@ export function validateCityScene(scene: CitySceneDefinition): void {
       throw new Error(`Node ${node.id} references unknown main-road access index: ${node.roadAccessIndex}`)
     }
   }
+  assertUniqueIds(
+    parsed.physicalFacilities.map((facility) => facility.id),
+    'physical facility',
+  )
+  const facilityAccessIndexes = new Set<number>()
+  for (const facility of parsed.physicalFacilities) {
+    if (!parsed.mainRoad.points[facility.roadAccessIndex]) {
+      throw new Error(`Physical facility ${facility.id} references unknown main-road access index: ${facility.roadAccessIndex}`)
+    }
+    if (facilityAccessIndexes.has(facility.roadAccessIndex)) {
+      throw new Error(`Duplicate physical facility road access index: ${facility.roadAccessIndex}`)
+    }
+    facilityAccessIndexes.add(facility.roadAccessIndex)
+  }
+  for (const node of parsed.nodes) {
+    if (!facilityAccessIndexes.has(node.roadAccessIndex)) {
+      throw new Error(`Node ${node.id} references missing physical facility access index: ${node.roadAccessIndex}`)
+    }
+  }
 
   assertUniqueIds(
     parsed.routes.map((route) => route.id),
     'route',
   )
+  const initialRoute = parsed.routes.find((route) => route.id === parsed.initialVehicleRouteId)
+  if (!initialRoute) {
+    throw new Error(`Initial vehicle route references unknown route id: ${parsed.initialVehicleRouteId}`)
+  }
   assertUniqueIds(
     (parsed.boundaries ?? []).map((boundary) => boundary.id),
     'boundary',
@@ -199,9 +232,22 @@ export function validateCityScene(scene: CitySceneDefinition): void {
       }
     }
   }
+
+  const initialFromNode = nodeById.get(initialRoute.fromNodeId)!
+  const initialToNode = nodeById.get(initialRoute.toNodeId)!
+  if (initialRoute.kind !== 'data') {
+    throw new Error(`Initial vehicle route ${initialRoute.id} must be a data route.`)
+  }
+  if (initialFromNode.roadAccessIndex >= initialToNode.roadAccessIndex) {
+    throw new Error(`Initial vehicle route ${initialRoute.id} must move forward on ${parsed.mainRoad.id}.`)
+  }
+  if (pointsEqual([initialRoute.points[0]!], [initialRoute.points.at(-1)!])) {
+    throw new Error(`Initial vehicle route ${initialRoute.id} must be nondegenerate.`)
+  }
 }
 
 function roadSlice(points: readonly { x: number; y: number }[], fromIndex: number, toIndex: number) {
+  if (fromIndex === toIndex) return [points[fromIndex]!, points[fromIndex]!]
   const start = Math.min(fromIndex, toIndex)
   const end = Math.max(fromIndex, toIndex)
   const slice = points.slice(start, end + 1)

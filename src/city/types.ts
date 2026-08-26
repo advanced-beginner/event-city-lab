@@ -63,6 +63,14 @@ export interface CityMainRoadDefinition {
   points: readonly CityPoint[]
 }
 
+export interface CityPhysicalFacilityDefinition {
+  id: string
+  label: string
+  position: CityPoint
+  roadAccessIndex: number
+  hitAreaPath: string
+}
+
 export interface CityBoundaryDefinition {
   id: string
   kind: 'transaction'
@@ -76,6 +84,8 @@ export interface CitySceneDefinition {
   label: string
   viewport: CitySize
   mainRoad: CityMainRoadDefinition
+  physicalFacilities: readonly CityPhysicalFacilityDefinition[]
+  initialVehicleRouteId: string
   nodes: readonly CityNodeDefinition[]
   routes: readonly CityRouteDefinition[]
   boundaries?: readonly CityBoundaryDefinition[]
@@ -140,6 +150,10 @@ export interface CityRouteState extends CityRouteDefinition {
 
 export interface CityCarrierState extends CityCarrierChange {
   id: string
+  batchLabels: readonly string[]
+  batchSize: number
+  roadProgress: number
+  sourceCarrierId: string
 }
 
 export interface CityWorldState {

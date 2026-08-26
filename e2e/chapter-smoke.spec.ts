@@ -71,7 +71,7 @@ async function expectWorldElementsInsideSvg(page: import('@playwright/test').Pag
     const labels = [...document.querySelectorAll<SVGGraphicsElement>([
       '[data-city-node] > g',
       '[data-city-carrier] > g:last-child',
-      '[data-city-signal] > g',
+      '[data-city-signal-label]',
       '[data-city-barrier] > g',
     ].join(','))]
       .map((element, index) => ({
@@ -152,29 +152,48 @@ test('direct and invalid chapter hashes resolve without page overflow', async ({
   expect(await pageOverflow(page)).toEqual({ horizontal: false, vertical: false })
 })
 
-test('Chapter 2 carrier stays on the declared main-road path during playback', async ({ page }) => {
+test('Chapter 2 carrier stays on the approved forward main road and exposes the record batch', async ({ page }) => {
   await page.goto('#/chapter/2')
   await page.getByRole('button', { name: '실패한다' }).click()
   await page.getByRole('button', { name: '예측한 조건 실행' }).click()
 
-  await page.waitForFunction(() => document.querySelector('[data-city-carrier][data-motion-mode="road-path"] animateMotion'))
+  await page.waitForFunction(() => {
+    const carrier = document.querySelector('[data-city-carrier][data-motion-mode="road-path"]')
+    return carrier?.getAttribute('data-carrier-direction') === 'forward'
+      && carrier.getAttribute('data-carrier-batch-size') === '3'
+      && carrier.querySelector('animateMotion') !== null
+  })
+  const carrier = page.locator('[data-city-carrier="vehicle"]')
 
   const motion = await page.evaluate(() => {
     const carrier = document.querySelector<SVGGElement>('[data-city-carrier][data-motion-mode="road-path"]')
-    const routeId = carrier?.getAttribute('data-carrier-route')
-    const routePath = routeId
-      ? document.querySelector<SVGPathElement>(`[data-city-route="${routeId}"] path:last-of-type`)
-      : null
     const animateMotion = carrier?.querySelector<SVGAnimateMotionElement>('animateMotion')
     return {
       animatePath: animateMotion?.getAttribute('path') ?? null,
-      routeId,
-      routePath: routePath?.getAttribute('d') ?? null,
+      direction: carrier?.getAttribute('data-carrier-direction') ?? null,
     }
   })
 
-  expect(motion.routeId).toBeTruthy()
-  expect(motion.animatePath).toBe(motion.routePath)
+  expect(motion.direction).toBe('forward')
+  expect(motion.animatePath).toBe('M664 794 L871.25 674.5 L1078.5 555 L1285.75 435.5 L1493 316')
+
+  const samples: Array<{ progress: number; x: number; y: number }> = []
+  for (let index = 0; index < 10; index += 1) {
+    samples.push(await carrier.evaluate((element) => {
+      const matrix = (element as unknown as SVGGraphicsElement).getCTM()
+      return {
+        progress: Number(element.getAttribute('data-carrier-progress') ?? 0),
+        x: matrix?.e ?? 0,
+        y: matrix?.f ?? 0,
+      }
+    }))
+    await page.waitForTimeout(50)
+  }
+  for (let index = 1; index < samples.length; index += 1) {
+    expect(samples[index]!.progress).toBeGreaterThanOrEqual(samples[index - 1]!.progress)
+    expect(samples[index]!.x).toBeGreaterThanOrEqual(samples[index - 1]!.x - 1)
+    expect(samples[index]!.y).toBeLessThanOrEqual(samples[index - 1]!.y + 1)
+  }
 })
 
 test('Chapter 2–8 each expose a spatial failure, recommended repair, and successful return signal', async ({ page }) => {
@@ -205,13 +224,26 @@ test('Chapter 2–8 each expose a spatial failure, recommended repair, and succe
     await expect(page.getByRole('button', { name: /예측한 조건 실행/ })).toBeDisabled()
     await expect(page.locator('aside[aria-label="실험 설정"] input[type="radio"]')).toHaveCount(2)
     await expect(page.locator('[data-city-world]')).toHaveAttribute('preserveAspectRatio', 'xMidYMid meet')
+    await expect(page.locator('[data-city-main-road]')).toHaveCount(1)
+    await expect(page.locator('[data-city-main-road] path:last-of-type')).toHaveAttribute(
+      'd',
+      'M664 794 L871.25 674.5 L1078.5 555 L1285.75 435.5 L1493 316',
+    )
     await expect(page.locator('[data-city-node]')).not.toHaveCount(0)
+    expect(await page.locator('[data-city-node]').count()).toBeGreaterThanOrEqual(3)
+    expect(await page.locator('[data-city-node]').count()).toBeLessThanOrEqual(5)
+    await expect(page.locator('[data-city-carrier]')).toHaveCount(1)
+    await expect(page.locator('[data-city-carrier]')).toHaveAttribute('data-carrier-progress', '0.000')
+    await expect(page.locator('[data-city-route]')).toHaveCount(1)
+    await expect(page.locator('[data-city-facility-slot]')).toHaveCount(await page.locator('[data-city-node]').count())
     await expect(page.locator('[data-city-node]').first()).toHaveAttribute('role', 'button')
     await expect(page.locator('[data-city-node]').first()).toHaveAttribute('tabindex', '0')
 
     await page.getByRole('button', { name: '실패한다' }).click()
     await page.getByRole('button', { name: /예측한 조건 실행|같은 조건으로 재실행/ }).click()
     await seekToTerminalEvent(page)
+    await expect(page.locator('[data-city-carrier]')).toHaveCount(1)
+    await expect(page.locator('[data-city-route]')).toHaveCount(1)
     await expect(page.locator('[data-city-barrier="closed"]')).toBeVisible()
     if (chapterId === 8) {
       await expect(page.locator('[data-city-boundary="consume-transform-produce-tx"]')).toHaveAttribute(
@@ -226,6 +258,8 @@ test('Chapter 2–8 each expose a spatial failure, recommended repair, and succe
     await expect(page.getByText('설정은 바뀌었지만 이 실행은 그대로입니다.')).toBeVisible()
     await page.getByRole('button', { name: /같은 조건으로 재실행/ }).click()
     await seekToTerminalEvent(page)
+    await expect(page.locator('[data-city-carrier]')).toHaveCount(1)
+    await expect(page.locator('[data-city-route]')).toHaveCount(1)
     await expect(page.getByText('실험 통과')).toBeVisible()
     await expect(page.locator('[data-city-signal]')).toBeVisible()
     if (chapterId === 8) {

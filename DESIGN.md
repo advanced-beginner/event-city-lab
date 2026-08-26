@@ -118,26 +118,26 @@ Visual asset 규칙:
 
 Standard view에는 승인된 도시 배경 전체와 중앙 Kafka 핵심 건물 3개가 보인다. 장식 건물·공원·나무·도로는 배경 자체에 포함되며 별도 runtime sprite 수량을 관리하지 않는다.
 
-Chapter 1과 Chapter 2–8은 공통 inline SVG renderer `CityWorld`와 키보드 조작 가능한 `CityFacility`를 공유한다. Chapter 2–8은 `event-city-atlas.webp` 한 장과 `CitySceneDefinition`을 사용한다. scene은 배경과 분리된 viewBox, 실제 건물 silhouette polygon, 시설 표지 위치, 주도로 path와 checkpoint만 소유한다. Chapter 2–8의 선택 가능한 시설은 atlas 중앙의 남서–북동 간선도로에 인접한 11개 roadside building slot만 사용한다. 한 챕터 안에서는 slot을 중복 사용하지 않으며, 같은 Kafka 역할은 모든 실험에서 같은 slot을 사용한다.
+Chapter 1과 Chapter 2–8은 공통 inline SVG renderer `CityWorld`와 키보드 조작 가능한 `CityFacility`를 공유한다. Chapter 2–8은 `event-city-atlas.webp` 한 장과 `CitySceneDefinition`을 사용한다. scene은 배경과 분리된 viewBox, 실제 건물 silhouette polygon, 시설 표지 위치, 주도로 path와 checkpoint만 소유한다. Chapter 2–8의 선택 가능한 물리 시설은 사용자가 승인한 atlas 중앙의 남서–북동 직선도로에 접한 5개 role slot만 사용한다: Source/Producer, Kafka Ingress, Kafka Cluster, Consumer/Processor, Application/Sink. 한 챕터에서는 필요한 3~5개 slot만 표시하며 partition, replica, consumer member, retry topic, offset store 같은 논리 노드는 해당 물리 시설 내부 배지로 묶는다.
 
-모든 Chapter 2–8 운송 route는 `downtown-main-arterial`의 연속 부분 구간이다. 도메인 이벤트는 기존 route/checkpoint ID를 유지하고, scene validator가 시설의 road access index, route의 ordered points, checkpoint progress가 공통 간선도로 계약과 일치하는지 검증한다. 역할 간 직접 직선을 새로 만들거나 atlas의 보조 도로로 우회하지 않는다.
+모든 Chapter 2–8 운송 route는 `downtown-main-arterial`의 연속 부분 구간이다. 공통 주도로 전체는 초기·재생·완료 상태에 관계없이 항상 한 줄로 표시하고, 현재 처리 구간만 그 위에 상태선으로 겹친다. 각 물리 시설은 주도로 anchor dot과 connector로 연결한다. 도메인 이벤트는 기존 route/checkpoint ID를 유지하고, scene validator가 시설의 road access index, route의 ordered points, checkpoint progress가 공통 간선도로 계약과 일치하는지 검증한다. 역할 간 직접 직선을 새로 만들거나 atlas의 보조 도로로 우회하지 않는다.
 
 중앙 사각형 component map은 사용하지 않는다. Worker가 생성한 각 이벤트의 구조화된 `cityCue`가 focus node, node/route 상태, carrier checkpoint, 반환 신호와 barrier를 지정하고, 순수 projection reducer가 현재 cursor의 도시 상태를 계산한다. 로그 문자열과 상세 문구를 파싱해 애니메이션을 추론하지 않는다. 배경 교체 시 scene 좌표만 다시 측정하며 Kafka 이벤트 의미는 유지한다.
 
 공통 운송 문법은 다음과 같다.
 
-- record는 노란 Kafka 밴, retry record는 동일 밴과 재시도 표지, duplicate는 반투명 ghost 밴으로 표시한다.
-- offset은 차량과 구분되는 ticket으로 표시한다.
-- ACK·commit은 녹색 반환 신호, metadata·assignment·revocation·transaction 제어는 보라색 신호다.
+- record와 retry record는 동일한 노란 Kafka 밴 한 대와 현재 상태 표지로 표시한다. 여러 record는 차량을 늘리지 않고 `N records · 순차` batch 표지로 묶는다. 실패도 같은 밴을 유지하고 오류 표지를 더한다.
+- offset, replication, assignment, transaction은 추가 차량을 만들지 않고 시설 내부 배지 또는 pulse로 표시한다.
+- ACK·commit과 metadata·assignment·revocation·transaction 제어는 도로를 횡단하는 별도 경로를 만들지 않는다. 상단 상태 칩과 대상 시설 pulse로만 표시하며 성공은 녹색, 제어는 보라색, 실패는 빨간색을 사용한다.
 - 실패·abort·min ISR·LSO·설정 충돌은 빨간 차단기와 끊긴 경로로 표시한다.
-- transaction은 출력 record와 offset ticket을 같은 원자적 결과로 보여 주며 terminal event에서 commit 또는 abort를 명시한다.
+- transaction은 출력 record와 offset ticket을 같은 원자적 결과로 보여 주며 terminal event에서 commit 또는 abort를 명시한다. Chapter 8의 transaction boundary는 지도 전체 polygon이 아니라 상단 compact status banner로 표현한다.
 
 ### Delivery vehicle
 
 - 메시지 이동은 노란 소형 배송 밴 한 대가 담당한다.
 - 실행 전 Producer 상차 구역에 주차한다.
 - 지붕 또는 번호판에 `order-2401`, 화물 라벨에 `OrderEvent`, 실행 중 `attempt`를 표시한다.
-- 정상 재생은 ordered road points의 누적 거리 기준 progress와 SVG motion path를 사용해 간선도로를 따라 이동하고 검사소마다 정차한다. 이동 시간은 0.5×/1×/2× 재생 간격에 맞춰 조정한다. 타임라인 직접 선택과 시설 조사는 애니메이션 없이 해당 체크포인트로 즉시 이동한다.
+- 정상 재생은 승인된 직선도로의 ordered points와 SVG motion path를 사용해 이동하고 시설마다 정차한다. 이동 시간은 실제 구간 거리 비율과 0.5×/1×/2× 재생 속도를 함께 반영해 시각 속도를 일정하게 유지한다. 타임라인 직접 선택과 시설 조사는 해당 체크포인트로 즉시 이동한다.
 - 1× 성공 실행의 화면 재생은 약 4초다.
 - reduced motion에서는 체크포인트 사이를 즉시 전환하며 깜빡임, 진동, 도로 흐름 애니메이션을 제거한다.
 

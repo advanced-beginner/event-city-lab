@@ -54,7 +54,7 @@ describe('GuidedChapterLab', () => {
   it('shows a facility role for Enter and Space without moving an empty timeline', () => {
     render(<GuidedChapterLab chapter={getChapter(2)} />)
 
-    const producer = screen.getByRole('button', { name: 'Producer 출발센터, 대기' })
+    const producer = screen.getByRole('button', { name: 'Source / Producer, 대기' })
     fireEvent.keyDown(producer, { key: 'Enter' })
     expect(screen.getByText('Kafka record를 만들고 전송하는 출발 시설입니다.')).toBeVisible()
     expect(screen.getByRole('region', { name: '이벤트 타임라인' })).toHaveTextContent('0ms')

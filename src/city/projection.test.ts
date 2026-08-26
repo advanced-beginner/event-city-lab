@@ -13,6 +13,30 @@ const scene: CitySceneDefinition = {
     path: 'M100 360 L400 320 L700 280',
     points: [{ x: 100, y: 360 }, { x: 400, y: 320 }, { x: 700, y: 280 }],
   },
+  physicalFacilities: [
+    {
+      id: 'slot-producer',
+      label: 'Source / Producer',
+      position: { x: 100, y: 360 },
+      roadAccessIndex: 0,
+      hitAreaPath: 'M80 330h80v70h-80Z',
+    },
+    {
+      id: 'slot-partition',
+      label: 'Kafka Cluster',
+      position: { x: 380, y: 320 },
+      roadAccessIndex: 1,
+      hitAreaPath: 'M340 290h90v70h-90Z',
+    },
+    {
+      id: 'slot-broker',
+      label: 'Application / Sink',
+      position: { x: 700, y: 280 },
+      roadAccessIndex: 2,
+      hitAreaPath: 'M650 240h100v80h-100Z',
+    },
+  ],
+  initialVehicleRouteId: 'produce-route',
   nodes: [
     {
       id: 'producer',
@@ -168,7 +192,7 @@ describe('projectCityWorld', () => {
     expect(atStart.focusNodeIds).toEqual(['producer'])
     expect(atStart.nodes.producer?.focused).toBe(true)
     expect(atStart.nodes.producer?.badge).toBe('ready')
-    expect(atStart.carriers.message?.checkpointId).toBe('loaded')
+    expect(atStart.carriers.vehicle?.checkpointId).toBe('loaded')
 
     const blocked = projectCityWorld(scene, events, 1)
     expect(blocked.focusNodeIds).toEqual(['partition'])
@@ -176,11 +200,11 @@ describe('projectCityWorld', () => {
     expect(blocked.nodes.producer?.state).toBe('complete')
     expect(blocked.nodes.partition?.state).toBe('blocked')
     expect(blocked.routes['produce-route']?.disabled).toBe(true)
-    expect(blocked.carriers.message?.progress).toBe(0.45)
+    expect(blocked.carriers.vehicle?.progress).toBe(0.45)
     expect(blocked.barrier?.state).toBe('closed')
   })
 
-  it('returns the base scene for a cursor before the first event and supports carrier removal', () => {
+  it('returns the base scene with one parked vehicle and does not remove its identity', () => {
     expect(projectCityWorld(scene, [], 0).nodes.producer?.state).toBe('idle')
     expect(projectCityWorld(scene, [{ cityCue: { focusNodeIds: [] } }], -1).focusNodeIds).toEqual([])
 
@@ -189,6 +213,149 @@ describe('projectCityWorld', () => {
       { cityCue: { focusNodeIds: [], carrierChanges: { message: null } } },
     ], 1)
 
-    expect(world.carriers.message).toBeUndefined()
+    expect(Object.keys(world.carriers)).toEqual(['vehicle'])
+    expect(world.carriers.vehicle).toMatchObject({ kind: 'record', routeId: 'produce-route' })
+  })
+
+  it('keeps one persistent message vehicle and ignores control tickets', () => {
+    const world = projectCityWorld(scene, [
+      {
+        cityCue: {
+          focusNodeIds: [],
+          carrierChanges: {
+            primary: { kind: 'record', routeId: 'produce-route', progress: 0.5 },
+            replica: { kind: 'record', routeId: 'produce-route', progress: 1 },
+          },
+        },
+      },
+      {
+        cityCue: {
+          focusNodeIds: [],
+          carrierChanges: {
+            receipt: { kind: 'offset-ticket', routeId: 'produce-route', progress: 1 },
+          },
+        },
+      },
+    ], 1)
+
+    expect(Object.keys(world.carriers)).toEqual(['vehicle'])
+    expect(world.carriers.vehicle).toMatchObject({
+      batchLabels: ['primary', 'replica'],
+      batchSize: 2,
+      kind: 'record',
+      label: '2 records · 순차',
+      progress: 1,
+      roadProgress: 1,
+      sourceCarrierId: 'replica',
+    })
+  })
+
+  it('parks the initial vehicle on the scene-declared route', () => {
+    const customScene = {
+      ...scene,
+      initialVehicleRouteId: 'partition-route',
+      routes: [
+        {
+          id: 'unused-route',
+          kind: 'data' as const,
+          fromNodeId: 'producer',
+          toNodeId: 'partition',
+          path: 'M100 360 L400 320',
+          points: [{ x: 100, y: 360 }, { x: 400, y: 320 }],
+          checkpoints: [
+            { id: 'unused-route:start', position: { x: 100, y: 360 }, progress: 0, nodeId: 'producer' },
+            { id: 'unused-route:end', position: { x: 400, y: 320 }, progress: 1, nodeId: 'partition' },
+          ],
+        },
+        {
+          id: 'partition-route',
+          kind: 'data' as const,
+          fromNodeId: 'partition',
+          toNodeId: 'broker',
+          path: 'M400 320 L700 280',
+          points: [{ x: 400, y: 320 }, { x: 700, y: 280 }],
+          checkpoints: [
+            { id: 'partition-route:start', position: { x: 400, y: 320 }, progress: 0, nodeId: 'partition' },
+            { id: 'partition-route:end', position: { x: 700, y: 280 }, progress: 1, nodeId: 'broker' },
+          ],
+        },
+      ],
+    }
+
+    expect(projectCityWorld(customScene, [], -1).carriers.vehicle).toMatchObject({
+      roadProgress: 0,
+      routeId: 'partition-route',
+    })
+  })
+
+  it('does not turn reverse signals into a southwest vehicle trip', () => {
+    const reverseScene: CitySceneDefinition = {
+      ...scene,
+      routes: [
+        ...scene.routes,
+        {
+          id: 'broker-producer',
+          kind: 'return',
+          fromNodeId: 'broker',
+          toNodeId: 'producer',
+          path: 'M700 280 L400 320 L100 360',
+          points: [{ x: 700, y: 280 }, { x: 400, y: 320 }, { x: 100, y: 360 }],
+          checkpoints: [
+            { id: 'broker-producer:start', position: { x: 700, y: 280 }, progress: 0, nodeId: 'broker' },
+            { id: 'broker-producer:mid', position: { x: 400, y: 320 }, progress: 0.5, nodeId: 'partition' },
+            { id: 'broker-producer:end', position: { x: 100, y: 360 }, progress: 1, nodeId: 'producer' },
+          ],
+        },
+      ],
+    }
+
+    const world = projectCityWorld(reverseScene, [
+      {
+        cityCue: {
+          focusNodeIds: [],
+          carrierChanges: {
+            record: { kind: 'record', routeId: 'produce-route', progress: 1, state: 'complete' },
+          },
+        },
+      },
+      {
+        cityCue: {
+          focusNodeIds: [],
+          carrierChanges: {
+            ack: { kind: 'record', routeId: 'broker-producer', progress: 1, state: 'complete', label: 'ack' },
+          },
+        },
+      },
+    ], 1)
+
+    expect(world.carriers.vehicle).toMatchObject({ routeId: 'produce-route', progress: 1 })
+  })
+
+  it('never moves the persistent vehicle backward when a later forward cue targets an earlier checkpoint', () => {
+    const world = projectCityWorld(scene, [
+      {
+        cityCue: {
+          focusNodeIds: [],
+          carrierChanges: {
+            arrived: { kind: 'record', routeId: 'produce-route', progress: 1, state: 'complete' },
+          },
+        },
+      },
+      {
+        cityCue: {
+          focusNodeIds: [],
+          carrierChanges: {
+            staleRetry: { kind: 'retry-record', routeId: 'produce-route', progress: 0.5, state: 'active' },
+          },
+        },
+      },
+    ], 1)
+
+    expect(world.carriers.vehicle).toMatchObject({
+      progress: 1,
+      roadProgress: 1,
+      routeId: 'produce-route',
+      state: 'active',
+    })
   })
 })

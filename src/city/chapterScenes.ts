@@ -1,6 +1,7 @@
 import type {
   CityNodeDefinition,
   CityNodeKind,
+  CityPhysicalFacilityDefinition,
   CityPoint,
   CityRouteDefinition,
   CityRouteKind,
@@ -21,9 +22,11 @@ interface AtlasAnchor {
 }
 
 interface RoadsideBuilding {
+  id: string
   hitAreaPath: string
   labelPosition: CityPoint
   roadAccessIndex: number
+  slotLabel: string
 }
 
 export interface CityScenePreview {
@@ -31,49 +34,49 @@ export interface CityScenePreview {
   routeIds: readonly string[]
 }
 
-// The atlas has one prominent southwest-to-northeast arterial through downtown.
-// Every Chapter 2–8 facility is assigned to one of these roadside buildings so
-// every record carrier can stay on the same road spine.
+// Approved against the 1672×941 browser capture: (670,550) → (1050,330).
+// Intermediate points are deliberately collinear and define five physical slots.
 export const ADVANCED_CITY_MAIN_ROAD_POINTS = points(
-  [235, 704], [382, 646], [548, 590], [706, 642], [866, 666], [1018, 608],
-  [1164, 552], [1308, 500], [1450, 452], [1602, 410], [1760, 368],
+  [664, 794], [871.25, 674.5], [1078.5, 555], [1285.75, 435.5], [1493, 316],
 )
 
 const ROADSIDE_BUILDINGS = [
-  roadsideBuilding('170,590 278,538 358,604 315,718 210,754 145,680', [256, 630], 0),
-  roadsideBuilding('300,468 418,425 486,548 420,641 314,604 270,532', [382, 538], 1),
-  roadsideBuilding('477,221 584,201 630,493 506,536 431,450', [541, 410], 2),
-  roadsideBuilding('635,330 721,307 779,493 700,554 622,470', [700, 447], 3),
-  roadsideBuilding('744,356 843,333 921,560 793,637 712,565', [815, 505], 4),
-  roadsideBuilding('887,377 1002,348 1044,521 934,566 875,495', [953, 463], 5),
-  roadsideBuilding('1013,302 1155,292 1221,515 1071,583 983,488', [1098, 452], 6),
-  roadsideBuilding('1211,475 1352,465 1427,583 1282,647 1195,568', [1305, 548], 7),
-  roadsideBuilding('1262,223 1346,200 1403,357 1312,410 1238,347', [1324, 304], 8),
-  roadsideBuilding('1459,357 1601,338 1684,442 1575,524 1423,468', [1558, 430], 9),
-  roadsideBuilding('1697,400 1857,398 1906,557 1741,641 1644,554', [1780, 506], 10),
+  roadsideBuilding('slot-source', 'Source / Producer', '535,690 668,650 745,704 712,790 610,826 535,770', [625, 714], 0),
+  roadsideBuilding('slot-ingress', 'Kafka Ingress', '690,430 815,390 925,490 902,625 790,670 690,590', [805, 510], 1),
+  roadsideBuilding('slot-cluster', 'Kafka Cluster', '885,305 1030,275 1115,360 1088,512 990,560 885,485', [997, 405], 2),
+  roadsideBuilding('slot-consumer', 'Consumer / Processor', '1160,472 1320,430 1435,515 1400,645 1270,690 1160,600', [1292, 548], 3),
+  roadsideBuilding('slot-application', 'Application / Sink', '1408,228 1575,195 1665,285 1630,405 1510,450 1408,360', [1530, 285], 4),
 ] as const satisfies readonly RoadsideBuilding[]
+
+const PHYSICAL_FACILITIES: readonly CityPhysicalFacilityDefinition[] = ROADSIDE_BUILDINGS.map((building) => ({
+  id: building.id,
+  label: building.slotLabel,
+  hitAreaPath: building.hitAreaPath,
+  position: building.labelPosition,
+  roadAccessIndex: building.roadAccessIndex,
+}))
 
 const ANCHORS = {
   producer: anchor('producer', 'Producer 출발센터', 'Kafka record를 만들고 전송하는 출발 시설입니다.', 0, 'Producer'),
-  application: anchor('application', 'Application 처리공장', '업무 규칙과 변환, 재시도 정책을 실행합니다.', 9, 'Application'),
-  'broker-leader': anchor('broker', 'Broker Leader 기록센터', '현재 partition leader가 record를 append하는 기록센터입니다.', 5, 'Leader'),
-  'broker-follower-1': anchor('replica', 'Broker Follower 1', 'Leader 기록을 복제하는 follower replica입니다.', 6, 'Follower 1'),
-  'broker-follower-2': anchor('replica', 'Broker Follower 2', 'Leader 기록을 복제하는 follower replica입니다.', 8, 'Follower 2'),
-  'partition-p0': anchor('partition', 'Partition p0 적재장', 'p0의 독립적인 append 순서와 offset을 보관합니다.', 1, 'p0'),
+  application: anchor('application', 'Application 처리공장', '업무 규칙과 변환, 재시도 정책을 실행합니다.', 4, 'Application'),
+  'broker-leader': anchor('broker', 'Broker Leader 기록센터', '현재 partition leader가 record를 append하는 기록센터입니다.', 1, 'Leader'),
+  'broker-follower-1': anchor('replica', 'Broker Follower 1', 'Leader 기록을 복제하는 follower replica입니다.', 2, 'Follower 1'),
+  'broker-follower-2': anchor('replica', 'Broker Follower 2', 'Leader 기록을 복제하는 follower replica입니다.', 2, 'Follower 2'),
+  'partition-p0': anchor('partition', 'Partition p0 적재장', 'p0의 독립적인 append 순서와 offset을 보관합니다.', 2, 'p0'),
   'partition-p1': anchor('partition', 'Partition p1 적재장', 'p1의 독립적인 append 순서와 offset을 보관합니다.', 2, 'p1'),
-  'partition-p2': anchor('partition', 'Partition p2 적재장', 'p2의 독립적인 append 순서와 offset을 보관합니다.', 3, 'p2'),
-  'consumer-c1': anchor('consumer', 'Consumer c1 수령센터', '할당받은 partition에서 record를 poll합니다.', 4, 'c1'),
-  'consumer-c2': anchor('consumer', 'Consumer c2 수령센터', '할당받은 partition에서 record를 poll합니다.', 5, 'c2'),
-  'consumer-c3': anchor('consumer', 'Consumer c3 수령센터', '할당받은 partition에서 record를 poll합니다.', 6, 'c3'),
-  'consumer-c4': anchor('consumer', 'Consumer c4 대기 차고', 'partition을 배정받지 못하면 IDLE 상태로 대기합니다.', 7, 'c4 · IDLE'),
-  'consumer-c5': anchor('consumer', 'Consumer c5 대기 차고', 'partition을 배정받지 못하면 IDLE 상태로 대기합니다.', 8, 'c5 · IDLE'),
-  coordinator: anchor('coordinator', 'Group Coordinator 관제탑', '멤버십과 partition assignment를 조정합니다.', 0, 'Coordinator'),
-  'offset-store': anchor('offset', 'Offset Store 검표소', 'Consumer group의 다음 읽기 위치를 보관합니다.', 10, 'Offset Store'),
-  'retry-loop': anchor('retry', 'Retry 회차로', '현재 처리 경로에서 제한된 재시도를 수행합니다.', 7, 'Retry 회차로'),
-  'retry-1m': anchor('retry', 'retry-1m 대기장', '애플리케이션이 발행한 첫 번째 지연 retry topic입니다.', 5, 'retry-1m'),
-  'retry-10m': anchor('retry', 'retry-10m 대기장', '더 긴 backoff를 적용하는 retry topic입니다.', 6, 'retry-10m'),
-  dlt: anchor('retry', 'DLT 격리창고', '재시도를 소진한 record와 진단 context를 격리합니다.', 8, 'DLT'),
-  'transaction-coordinator': anchor('transaction', 'Transaction Coordinator', '출력과 offset의 commit 또는 abort 경계를 조정합니다.', 8, 'TX Coordinator'),
+  'partition-p2': anchor('partition', 'Partition p2 적재장', 'p2의 독립적인 append 순서와 offset을 보관합니다.', 2, 'p2'),
+  'consumer-c1': anchor('consumer', 'Consumer c1 수령센터', '할당받은 partition에서 record를 poll합니다.', 3, 'c1'),
+  'consumer-c2': anchor('consumer', 'Consumer c2 수령센터', '할당받은 partition에서 record를 poll합니다.', 3, 'c2'),
+  'consumer-c3': anchor('consumer', 'Consumer c3 수령센터', '할당받은 partition에서 record를 poll합니다.', 3, 'c3'),
+  'consumer-c4': anchor('consumer', 'Consumer c4 대기 차고', 'partition을 배정받지 못하면 IDLE 상태로 대기합니다.', 3, 'c4 · IDLE'),
+  'consumer-c5': anchor('consumer', 'Consumer c5 대기 차고', 'partition을 배정받지 못하면 IDLE 상태로 대기합니다.', 3, 'c5 · IDLE'),
+  coordinator: anchor('coordinator', 'Group Coordinator 관제탑', '멤버십과 partition assignment를 조정합니다.', 1, 'Coordinator'),
+  'offset-store': anchor('offset', 'Offset Store 검표소', 'Consumer group의 다음 읽기 위치를 보관합니다.', 2, 'Offset Store'),
+  'retry-loop': anchor('retry', 'Retry 회차로', '현재 처리 경로에서 제한된 재시도를 수행합니다.', 3, 'Retry 회차로'),
+  'retry-1m': anchor('retry', 'retry-1m 대기장', '애플리케이션이 발행한 첫 번째 지연 retry topic입니다.', 2, 'retry-1m'),
+  'retry-10m': anchor('retry', 'retry-10m 대기장', '더 긴 backoff를 적용하는 retry topic입니다.', 1, 'retry-10m'),
+  dlt: anchor('retry', 'DLT 격리창고', '재시도를 소진한 record와 진단 context를 격리합니다.', 2, 'DLT'),
+  'transaction-coordinator': anchor('transaction', 'Transaction Coordinator', '출력과 offset의 commit 또는 abort 경계를 조정합니다.', 1, 'TX Coordinator'),
 } as const satisfies Record<string, AtlasAnchor>
 
 export type AdvancedCityNodeId = keyof typeof ANCHORS
@@ -255,14 +258,18 @@ function anchor(
 }
 
 function roadsideBuilding(
+  id: string,
+  label: string,
   polygonPoints: string,
   [x, y]: readonly [number, number],
   roadAccessIndex: number,
 ): RoadsideBuilding {
   return {
+    id,
     hitAreaPath: `M${polygonPoints.replaceAll(' ', 'L')}Z`,
     labelPosition: { x, y },
     roadAccessIndex,
+    slotLabel: label,
   }
 }
 
@@ -319,6 +326,7 @@ function route(
 }
 
 function roadSlice(points: readonly CityPoint[], fromIndex: number, toIndex: number): readonly CityPoint[] {
+  if (fromIndex === toIndex) return [points[fromIndex]!, points[fromIndex]!]
   const start = Math.min(fromIndex, toIndex)
   const end = Math.max(fromIndex, toIndex)
   const slice = points.slice(start, end + 1)
@@ -335,6 +343,8 @@ function scene(chapterId: AdvancedChapterId, label: string): CitySceneDefinition
       path: ADVANCED_CITY_MAIN_ROAD_POINTS.map((point, index) => `${index === 0 ? 'M' : 'L'}${point.x} ${point.y}`).join(' '),
       points: ADVANCED_CITY_MAIN_ROAD_POINTS,
     },
+    physicalFacilities: PHYSICAL_FACILITIES,
+    initialVehicleRouteId: initialVehicleRouteId(chapterId),
     nodes: SCENE_NODE_IDS[chapterId].map(node),
     routes: SCENE_ROUTES[chapterId],
     ...(chapterId === 8
@@ -349,4 +359,16 @@ function scene(chapterId: AdvancedChapterId, label: string): CitySceneDefinition
         }
       : {}),
   }
+}
+
+function initialVehicleRouteId(chapterId: AdvancedChapterId): string {
+  return ({
+    2: 'producer-p1',
+    3: 'producer-leader',
+    4: 'producer-leader',
+    5: 'p0-consumer',
+    6: 'p0-c1',
+    7: 'p0-consumer',
+    8: 'consumer-application',
+  } as const satisfies Record<AdvancedChapterId, string>)[chapterId]
 }

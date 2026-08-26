@@ -2,21 +2,28 @@
 .backdrop { image-rendering: auto; }
 .wash { fill: #0e2b36; opacity: .12; pointer-events: none; }
 
-.transactionBoundary { color: #7656c9; opacity: .28; pointer-events: none; }
-.transactionBoundary > path { fill: #7656c9; fill-opacity: .035; stroke: currentColor; stroke-width: 7; stroke-dasharray: 22 15; }
-.transactionBoundary rect { fill: #f8f3ffed; stroke: currentColor; stroke-width: 3; }
-.transactionBoundary text { fill: currentColor; font: 800 17px ui-monospace, SFMono-Regular, Menlo, monospace; }
+.transactionBoundary { color: #7656c9; opacity: .62; pointer-events: none; }
+.transactionBadge rect { fill: #f8f3fff2; stroke: currentColor; stroke-width: 3; }
+.transactionBadge circle { fill: currentColor; stroke: #fff; stroke-width: 2; }
+.transactionBadge text { fill: currentColor; font: 800 16px ui-monospace, SFMono-Regular, Menlo, monospace; }
+.transactionBadge circle + text { fill: #fff; font-size: 12px; }
 .transactionBoundary.active, .transactionBoundary.complete, .previewBoundary { opacity: .88; }
 .transactionBoundary.failed, .transactionBoundary.blocked { color: #d84a5b; opacity: .94; }
 
-.route { color: #2e8f91; opacity: .5; transition: opacity 180ms ease, color 180ms ease; }
-.routeHalo { fill: none; stroke: #fff; stroke-width: 13; stroke-linecap: round; stroke-linejoin: round; opacity: .72; }
-.routeLine { fill: none; stroke: currentColor; stroke-width: 7; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 17 14; }
+.mainRoadGuide { color: #0b7e85; pointer-events: none; }
+.mainRoadGuideHalo { fill: none; stroke: #f7fffdf2; stroke-width: 18; stroke-linecap: round; stroke-linejoin: round; opacity: .82; }
+.mainRoadGuideLine { fill: none; stroke: currentColor; stroke-width: 8; stroke-linecap: round; stroke-linejoin: round; opacity: .86; }
+.mainRoadAnchor { fill: #fff; stroke: currentColor; stroke-width: 7; }
+.mainRoadEndpoint rect { fill: #123743ed; stroke: #e7fffb; stroke-width: 2; }
+.mainRoadEndpoint text { fill: #fff; font: 800 14px "Nanum Gothic", sans-serif; }
+.route { color: #15989b; opacity: .82; transition: opacity 180ms ease, color 180ms ease; }
+.routeHalo { fill: none; stroke: #fff; stroke-width: 9; stroke-linecap: round; stroke-linejoin: round; opacity: .66; }
+.routeLine { fill: none; stroke: currentColor; stroke-width: 5; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 15 13; }
 .route_replication { color: #2e8f91; }
 .route_control, .route_transaction { color: #7656c9; }
 .route_retry { color: #d88925; }
 .route_return { color: #238a5b; }
-.route_idle, .route_muted { opacity: .22; }
+.route_idle, .route_muted { opacity: 0; }
 .route_active { opacity: .96; }
 .route_complete { opacity: .85; }
 .route_failed, .route_blocked { color: #d84a5b; opacity: .95; }
@@ -25,17 +32,20 @@
 .previewRoute { color: #7656c9; opacity: .82; }
 .previewRoute .routeLine { stroke-dasharray: 11 10; }
 
+.facilityRoadLink { color: #f4dc8a; pointer-events: none; }
+.facilityRoadLink path { fill: none; stroke: currentColor; stroke-width: 5; stroke-linecap: round; opacity: .92; filter: drop-shadow(0 0 3px #173743); }
+.facilityRoadLink path + circle { fill: currentColor; stroke: #173743; stroke-width: 4; }
 .facility { cursor: pointer; outline: none; transition: filter 180ms ease, opacity 180ms ease; }
 .hitArea { fill: #fff; fill-opacity: .001; stroke: transparent; stroke-width: 6; transition: fill-opacity 180ms ease, stroke 180ms ease; }
 .facility:hover .hitArea { fill-opacity: .08; stroke: #fff4b8; }
 .facility:focus-visible .hitArea { fill-opacity: .11; stroke: #fff; }
 .facility:focus-visible, .focused { filter: url(#advanced-city-glow); }
-.facility.failed .hitArea { fill: #d84a5b; fill-opacity: .13; stroke: #d84a5b; }
-.facility.blocked .hitArea { fill: #e9a23b; fill-opacity: .12; stroke: #e9a23b; stroke-dasharray: 12 10; }
-.facility.complete .hitArea { fill: #238a5b; fill-opacity: .09; stroke: #57c789; }
+.facility.failed .hitArea { fill: #d84a5b; fill-opacity: .025; stroke: #d84a5b99; stroke-width: 3; }
+.facility.blocked .hitArea { fill: #e9a23b; fill-opacity: .025; stroke: #e9a23b99; stroke-width: 3; stroke-dasharray: 12 10; }
+.facility.focused .hitArea { fill: #20aaa8; fill-opacity: .02; stroke: #55d7d080; stroke-width: 3; }
 .facility.muted { opacity: .52; }
-.previewFacility { filter: drop-shadow(0 0 10px #7656c9aa); }
-.previewFacility .hitArea { fill: #7656c9; fill-opacity: .1; stroke: #7656c9; stroke-dasharray: 10 8; }
+.previewFacility { filter: none; }
+.previewFacility .hitArea { fill-opacity: .001; stroke: transparent; }
 
 .facilitySign { filter: url(#advanced-city-shadow); pointer-events: none; }
 .facilitySign rect { fill: #fefcf4ed; stroke: #302840; stroke-width: 3; }
@@ -46,11 +56,21 @@
 .facilitySign circle[data-state='complete'] { fill: #61db94; }
 .facilitySign text { fill: #302840; font-family: "Nanum Gothic", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; font-size: 17px; font-weight: 800; }
 .facilitySign text:last-child { fill: #66758a; font-size: 14px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.logicalBadges rect { fill: #f8fbfbf2; stroke: #5b6879; stroke-width: 2; }
+.facilitySign .logicalBadges text { fill: #405166; font: 800 12px ui-monospace, SFMono-Regular, Menlo, monospace; }
+.logicalBadges [data-logical-state='active'] rect { fill: #dffafa; stroke: #15989b; }
+.logicalBadges [data-logical-state='complete'] rect { fill: #e5f8ed; stroke: #238a5b; }
+.logicalBadges [data-logical-state='failed'] rect,
+.logicalBadges [data-logical-state='blocked'] rect { fill: #fff0f2; stroke: #d84a5b; }
+.logicalSummary rect { fill: #eef7f7f2; stroke: #5b6879; stroke-width: 2; }
+.facilitySign .logicalSummary text { fill: #405166; font: 800 12px ui-monospace, SFMono-Regular, Menlo, monospace; }
 
 .carrier { filter: url(#advanced-city-shadow); transition: opacity 180ms ease; }
 .carrier image { image-rendering: pixelated; }
-.carrier_ghost-record { opacity: .45; }
+.carrier_ghost-record { opacity: .88; }
 .carrier_failed { animation: advanced-shake .3s ease-in-out 2; }
+.carrierError circle { fill: #d84a5b; stroke: white; stroke-width: 5; }
+.carrierError text { fill: white; font: 900 28px ui-monospace, SFMono-Regular, Menlo, monospace; }
 .ticket rect { fill: #f4edff; stroke: #7656c9; stroke-width: 4; }
 .ticket path { fill: none; stroke: #7656c9; stroke-width: 3; }
 .ticket text { fill: #5c439a; font: 800 13px ui-monospace, SFMono-Regular, Menlo, monospace; }
@@ -58,9 +78,10 @@
 .cargoLabel text { fill: #302840; font: 800 15px ui-monospace, SFMono-Regular, Menlo, monospace; }
 
 .signal { pointer-events: none; }
-.signal > path { fill: none; stroke: currentColor; stroke-width: 7; stroke-linecap: round; stroke-dasharray: 16 15; animation: advanced-route-flow 1s linear infinite; }
-.signal rect { fill: #fff; stroke: currentColor; stroke-width: 3; }
-.signal text { fill: currentColor; font: 800 15px ui-monospace, SFMono-Regular, Menlo, monospace; }
+.signalStatus rect { fill: #fff; stroke: currentColor; stroke-width: 3; }
+.signalStatus text { fill: currentColor; font: 800 14px ui-monospace, SFMono-Regular, Menlo, monospace; }
+.signalPulse circle:first-child { fill: currentColor; opacity: .14; }
+.signalPulse circle:last-child { fill: currentColor; stroke: #fff; stroke-width: 3; }
 .successSignal { color: #238a5b; }
 .controlSignal { color: #7656c9; }
 .signal.failed, .signal.blocked { color: #d84a5b; }
@@ -75,13 +96,12 @@
 .pendingLabel rect { fill: #fff8e9; stroke: #7656c9; stroke-width: 3; }
 .pendingLabel text { fill: #664ca6; font: 800 21px "Nanum Gothic", sans-serif; }
 
-:global(.city-world-reduced-motion) .route_active .routeLine,
-:global(.city-world-reduced-motion) .signal > path { animation: none; }
+:global(.city-world-reduced-motion) .route_active .routeLine { animation: none; }
 :global(.city-world-reduced-motion) .carrier,
 :global(.city-world-reduced-motion) .facility { transition: none; }
 
 @media (prefers-reduced-motion: reduce) {
-  .route_active .routeLine, .signal > path, .carrier_failed { animation: none; }
+  .route_active .routeLine, .carrier_failed { animation: none; }
   .carrier, .facility { transition: none; }
 }
 
