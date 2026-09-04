@@ -103,6 +103,7 @@ npm run build
 - 사용자 여정, 챕터 내용, 구현 현황, 알려진 문제, 로드맵과 TODO는 `project-details.md`에 작성한다.
 - 디자인 token, 화면 구성, 반응 상태의 source of truth는 `DESIGN.md`에 작성한다.
 - 설치, 로컬 실행, 배포 진입점은 `README.md`를 간결하게 유지한다.
+- 개선 backlog와 tick 이력은 `BACKLOG.md`와 `workflows/continuous-improvement.md`에 둔다. `project-details.md` §10은 그 링크만 유지한다.
 - 같은 정보를 여러 문서에 장문으로 복제하지 말고 각 source of truth를 링크한다.
 
 ## 커밋과 완료 기준

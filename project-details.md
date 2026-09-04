@@ -349,6 +349,8 @@ Chapter 1 light-city 구현에서 확인한 내용:
 
 ## 10. TODO
 
+개선 항목의 단일 기록은 [`BACKLOG.md`](./BACKLOG.md)다. 아래 체크박스는 2026-09-04 이전 기록이며, 새 항목은 BACKLOG.md에만 추가한다.
+
 ### P0 — Chapter 1 공개 완료 확인
 
 - [x] 단일 도시 배경과 새 차량 방향 이미지가 Git 추적 상태인지 확인.

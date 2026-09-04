@@ -1,0 +1,735 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <title>Architecture review for event-city-lab</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script type="module">
+      import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+      mermaid.initialize({ startOnLoad: true, theme: "neutral", securityLevel: "loose", flowchart: { htmlLabels: true, curve: "basis" } });
+    </script>
+    <style>
+      .seam { border-style: dashed; }
+      .leak { border-color: #dc2626 !important; color: #b91c1c; }
+      .deep { background: linear-gradient(135deg, #0f172a, #1e293b); color: #f8fafc; }
+      .mermaid svg { max-height: 340px; width: 100%; }
+      .band { min-height: 2.75rem; }
+      .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+    </style>
+  </head>
+  <body class="bg-stone-50 text-slate-900 font-sans antialiased">
+    <main class="max-w-5xl mx-auto px-6 py-12 space-y-14">
+
+      <header class="space-y-4">
+        <p class="text-xs uppercase tracking-wider text-slate-500">Architecture review</p>
+        <h1 class="font-serif text-4xl">event-city-lab</h1>
+        <div class="flex flex-wrap gap-x-6 gap-y-1 text-sm text-slate-600">
+          <span>2026-09-04</span>
+          <span>branch <span class="mono">main</span> · commit <span class="mono">22455eb</span></span>
+          <span>baseline <span class="mono">vitest run</span> → 148 tests / 28 files 통과 (node 26.7.0)</span>
+        </div>
+        <div class="flex flex-wrap gap-4 text-xs text-slate-600 pt-2">
+          <span class="inline-flex items-center gap-2"><i class="inline-block w-5 h-3 border border-slate-500 bg-white"></i> module</span>
+          <span class="inline-flex items-center gap-2"><i class="inline-block w-5 h-3 border border-dashed border-slate-500"></i> seam</span>
+          <span class="inline-flex items-center gap-2"><i class="inline-block w-5 h-0.5 bg-red-600"></i> 누출(leak)</span>
+          <span class="inline-flex items-center gap-2"><i class="inline-block w-5 h-3 deep border border-slate-900"></i> deep module</span>
+        </div>
+        <p class="text-sm text-slate-600 pt-2">
+          범위 결정: 최근 커밋 10개가 모두 도시 시각 계층(<span class="mono">src/city</span>, <span class="mono">components/*City*</span>)을 건드렸다.
+          그래서 도시와 도메인이 만나는 seam에 무게를 두었다. <span class="mono">CONTEXT.md</span>와 <span class="mono">docs/adr/</span>는 없어서
+          <span class="mono">AGENTS.md</span>의 불변 조건과 <span class="mono">NOTES.md</span>의 시각 어휘를 도메인 용어의 기준으로 썼다.
+        </p>
+        <p class="text-sm text-slate-600">
+          검증 범위: 아래 모든 수치는 <span class="mono">22455eb</span>의 소스를 grep·sed로 직접 세었고, 단위 테스트는 실제로 실행했다.
+          e2e(Playwright)는 실행하지 않았다. 슬라이스 두 개를 하위 에이전트 둘이 걸었고, 그들이 낸 강한 주장은 모두 원문 코드에서 다시 확인했다.
+        </p>
+      </header>
+
+      <nav class="text-sm">
+        <ol class="grid sm:grid-cols-2 gap-x-8 gap-y-1 list-decimal list-inside text-slate-700">
+          <li><a class="hover:underline" href="#c1">연출(stage direction)을 Kafka 실행 기록에서 떼어낸다</a> <span class="text-emerald-700">Strong</span></li>
+          <li><a class="hover:underline" href="#c2">실험 하나에 identity 하나</a> <span class="text-emerald-700">Strong</span></li>
+          <li><a class="hover:underline" href="#c3">두 화면 뒤에 lab session module 하나</a> <span class="text-emerald-700">Strong</span></li>
+          <li><a class="hover:underline" href="#c4">worker 왕복 body 하나, adapter 둘</a> <span class="text-amber-700">Worth exploring</span></li>
+          <li><a class="hover:underline" href="#c5">챕터 authoring dialect 하나, seed는 사실만</a> <span class="text-amber-700">Worth exploring</span></li>
+          <li><a class="hover:underline" href="#c6">도시 화면의 interface를 props로 되돌리고, 시각 결정은 projection에 모은다</a> <span class="text-emerald-700">Strong</span></li>
+          <li><a class="hover:underline" href="#c7">scene 검증은 한 번</a> <span class="text-amber-700">Worth exploring</span></li>
+        </ol>
+      </nav>
+
+      <section id="candidates" class="space-y-16">
+
+        <!-- ============================ C1 ============================ -->
+        <article id="c1" class="space-y-6">
+          <div class="space-y-3">
+            <h2 class="font-serif text-2xl">1. 연출(stage direction)을 Kafka 실행 기록에서 떼어낸다</h2>
+            <div class="flex flex-wrap gap-2 text-xs">
+              <span class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-semibold">Strong</span>
+              <span class="px-2 py-0.5 rounded bg-slate-100 text-slate-700">in-process</span>
+              <span class="px-2 py-0.5 rounded bg-slate-100 text-slate-700">hot spot · 최근 커밋 10개</span>
+            </div>
+          </div>
+
+          <div class="mono text-sm text-slate-700 leading-6 bg-white border border-slate-200 rounded-lg p-4">
+            src/domain/chapterSimulation.ts:1-4, 127-140, 174-193<br/>
+            src/domain/chapterSchemas.ts:3, 60 · src/worker/protocol.ts:3-4, 32-35<br/>
+            src/city/choreography/index.ts · types.ts:1-4<br/>
+            src/city/choreography/chapter2_3.ts (426줄) · chapter4_5.ts (500줄) · chapter6_8.ts (402줄)<br/>
+            src/city/projection.ts:43-44
+          </div>
+
+          <div class="grid md:grid-cols-2 gap-4">
+            <div class="rounded-lg border border-slate-200 bg-white p-4">
+              <p class="text-xs uppercase tracking-wider text-slate-500 mb-2">Before · 도메인이 city를 호출해 자기 이벤트의 뜻을 짓는다</p>
+              <pre class="mermaid">
+flowchart LR
+  R["rule module<br/>chapter4.ts · 데이터"] --> S["chapterSimulation<br/>runChapterRule"]
+  S -.->|"import 값 3개"| CH["city/choreography<br/>1,328줄 · id·순번 추측"]
+  S -.-> V["city/validation"]
+  S -.-> SC["city/chapterScenes"]
+  CH -.->|"import type"| S
+  S --> RUN["ChapterSimulationRun<br/>events[].cityCue 포함"]
+  RUN --> W["worker protocol<br/>cue schema 왕복"]
+  W --> P["projection"]
+  classDef leak stroke:#dc2626,stroke-width:2px,color:#991b1b;
+  class CH,V,SC leak
+              </pre>
+            </div>
+            <div class="rounded-lg border border-slate-200 bg-white p-4">
+              <p class="text-xs uppercase tracking-wider text-slate-500 mb-2">After · 실행 기록은 Kafka 증거만, cue는 projection 쪽 seam에서</p>
+              <pre class="mermaid">
+flowchart LR
+  R["rule module<br/>event template<br/>+ 도시 의미(시설·경로·종결) 선언"] --> S["runChapterRule"]
+  S --> RUN["ChapterSimulationRun<br/>Kafka 증거만"]
+  RUN --> W["worker protocol<br/>cue 없음"]
+  W --> P["projection<br/>scene + 의미 → cue → world"]
+  SC["chapterScenes"] --> P
+  classDef deep fill:#0f172a,color:#f8fafc,stroke:#0f172a;
+  class P deep
+              </pre>
+            </div>
+          </div>
+
+          <dl class="grid md:grid-cols-[7rem_1fr] gap-x-4 gap-y-3 text-sm">
+            <dt class="font-semibold text-slate-700">Problem</dt>
+            <dd>도메인 module이 <span class="mono">src/city</span>의 값 세 개를 import해 실행 기록의 모든 이벤트에 cue를 굽고, choreography는 그 cue를 <span class="mono">experimentId</span>·<span class="mono">choiceId</span> 문자열과 <span class="mono">sequence</span> 순번으로 다시 추측한다.</dd>
+            <dt class="font-semibold text-slate-700">Solution</dt>
+            <dd>rule module의 event template이 도시 의미(어느 시설, 어느 경로, 종결 여부)를 작은 데이터로 선언하고, cue는 projection 쪽 seam 한 곳에서 scene과 결합해 만든다. run과 worker protocol에서 cue가 사라진다.</dd>
+            <dt class="font-semibold text-slate-700">Evidence</dt>
+            <dd>
+              <ul class="list-disc list-inside space-y-1">
+                <li><span class="mono">event.cityCue ?? createChapterCityCue(...)</span>의 왼쪽 분기는 죽은 코드다. <span class="mono">grep cityCue src/domain/chapters/</span> → 0건.</li>
+                <li><span class="mono">context.sequence</span> 참조 109회(1 / 48 / 60). 실험 파일에 이벤트 하나를 끼우면 <span class="mono">sequence &gt;= 3 ? 'failed' : 'active'</span> 같은 문턱이 전부 어긋난다(<span class="mono">chapter6_8.ts:143-149</span>).</li>
+                <li>세 파일은 helper를 하나도 공유하지 않는다. 최상위 함수 59개(상수 포함 69개)가 focus·node 변화·경로 선택·carrier·signal·barrier를 각자 다시 발명했다. 파일마다 <span class="mono">NodeId</span>/<span class="mono">RouteId</span> union도 따로 선언한다(<span class="mono">chapter2_3.ts:12-37</span>, <span class="mono">chapter6_8.ts:4-21</span>). route id는 어디에도 타입이 없다.</li>
+                <li>choreography 테스트 세 파일은 <span class="mono">index.ts</span>를 거치지 않고 파일별 builder를 직접 import한다. seam 자체의 interface에는 테스트가 없다. builder 셋 중 둘만 <span class="mono">ChapterCityCueBuilder</span> 타입을 선언한다.</li>
+                <li>"terminal"의 정의가 네 가지다. kind 기준(<span class="mono">chapter2_3.ts:396</span>, <span class="mono">chapter6_8.ts:40</span>), 순번 기준(<span class="mono">chapter4_5.ts:486</span>), <span class="mono">cues.at(-1)</span>(<span class="mono">chapterSimulation.ts:187</span>).</li>
+                <li>차량이 움직일지는 <span class="mono">routeId.includes('coordinator')</span> 같은 문자열 부분 일치가 정한다(<span class="mono">chapter6_8.ts:297-303</span>). cue 타입 어디에도 그 규칙이 없다.</li>
+                <li>choreography 테스트 세 파일은 production wiring(<span class="mono">chapterSimulation.ts:129-137</span>)을 각자 재구성해 builder를 직접 호출한다. 화면이 실제로 읽는 <span class="mono">run.events[i].cityCue</span>는 검사하지 않는다(<span class="mono">chapter4_5.test.ts:115-128</span>).</li>
+              </ul>
+            </dd>
+            <dt class="font-semibold text-slate-700">Deletion test</dt>
+            <dd>choreography package를 지우면 복잡도가 rule module 7곳에 다시 나타난다. 지식으로서는 제값을 한다. 그러나 <span class="mono">chapterSimulation.ts</span>의 호출만 지우고 projection 쪽으로 옮기면 잃는 것이 없다. 호출 지점이 잘못이고, module은 잘못이 아니다.</dd>
+            <dt class="font-semibold text-slate-700">Wins</dt>
+            <dd>
+              <ul class="list-disc list-inside space-y-1">
+                <li>도메인의 city import 0개</li>
+                <li>run이 시각 변경과 무관한 증거</li>
+                <li>locality: 연출 규칙이 seam 한 곳</li>
+                <li>leverage: cue builder 하나, 챕터 7개</li>
+                <li>테스트가 interface를 통과해 cue를 검사</li>
+                <li>worker protocol에서 cue schema 삭제</li>
+              </ul>
+            </dd>
+          </dl>
+
+          <div class="rounded-md border border-amber-300 bg-amber-50 text-amber-900 text-sm px-4 py-3">
+            AGENTS.md의 "<span class="mono">src/domain/</span>에 UI 의존성을 두지 않는다"는 지금 문자 그대로는 지켜진다(React·CSS import 0). 이 후보는 그 규칙을 실질로 만든다. ADR 충돌 없음.
+          </div>
+        </article>
+
+        <!-- ============================ C2 ============================ -->
+        <article id="c2" class="space-y-6">
+          <div class="space-y-3">
+            <h2 class="font-serif text-2xl">2. 실험 하나에 identity 하나</h2>
+            <div class="flex flex-wrap gap-2 text-xs">
+              <span class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-semibold">Strong</span>
+              <span class="px-2 py-0.5 rounded bg-slate-100 text-slate-700">in-process</span>
+              <span class="px-2 py-0.5 rounded bg-red-100 text-red-800">살아 있는 결함 14건</span>
+            </div>
+          </div>
+
+          <div class="mono text-sm text-slate-700 leading-6 bg-white border border-slate-200 rounded-lg p-4">
+            src/domain/chapters/chapter2.ts … chapter8.ts (id 선언 63개)<br/>
+            src/city/choreography/chapter2_3.ts · chapter4_5.ts · chapter6_8.ts (문자열 재타이핑 12 / 15 / 17)<br/>
+            src/city/chapterScenes.ts:182-240 (EXPERIMENT_PREVIEWS 21 · CHOICE_PREVIEWS 28 · 재타이핑 49)<br/>
+            src/content/chapterScenarioSpecs.ts (runtime importer 0개)
+          </div>
+
+          <div class="grid md:grid-cols-2 gap-4">
+            <div class="rounded-lg border border-slate-200 bg-white p-4 space-y-3">
+              <p class="text-xs uppercase tracking-wider text-slate-500">Before · 같은 id를 네 표가 각자 기억한다</p>
+              <div class="grid grid-cols-2 gap-3 text-xs">
+                <div class="border border-slate-400 rounded p-2 bg-slate-50">
+                  <p class="uppercase tracking-wider text-slate-500">rule modules</p>
+                  <p class="mono">21 experiment · 42 choice</p>
+                  <p class="text-slate-500">유일한 선언</p>
+                </div>
+                <div class="border leak rounded p-2 bg-red-50 seam">
+                  <p class="uppercase tracking-wider">choreography</p>
+                  <p class="mono">id 문자열 44회 비교</p>
+                  <p>불일치 시 fallback cue</p>
+                </div>
+                <div class="border leak rounded p-2 bg-red-50 seam">
+                  <p class="uppercase tracking-wider">chapterScenes previews</p>
+                  <p class="mono">21 + 28 항목</p>
+                  <p>choice 14/42 누락 → 형제와 동일 preview</p>
+                </div>
+                <div class="border leak rounded p-2 bg-red-50 seam">
+                  <p class="uppercase tracking-wider">chapterScenarioSpecs</p>
+                  <p class="mono">21 experiment (산문)</p>
+                  <p>아무도 import하지 않음</p>
+                </div>
+              </div>
+              <p class="text-xs text-slate-600">네 표를 잇는 것은 문자열이 우연히 같다는 사실뿐이다. 검사하는 테스트는 없다.</p>
+            </div>
+            <div class="rounded-lg border border-slate-200 bg-white p-4 space-y-3">
+              <p class="text-xs uppercase tracking-wider text-slate-500">After · Experiment가 자기 preview와 연출 anchor를 지닌다</p>
+              <div class="deep rounded-lg p-4 text-xs space-y-2">
+                <p class="uppercase tracking-wider text-slate-300">Experiment (deep module)</p>
+                <p class="mono">id · mission · choices[] · referenceIds</p>
+                <p class="mono text-slate-300">+ preview(nodeIds, routeIds)</p>
+                <p class="mono text-slate-300">+ 각 event template의 도시 의미</p>
+                <p class="text-slate-400">id 타입이 닫혀 있어 표에 없는 id는 컴파일되지 않는다</p>
+              </div>
+              <div class="flex gap-2 text-xs">
+                <span class="border border-slate-400 rounded px-2 py-1 bg-slate-50">guided lab</span>
+                <span class="border border-slate-400 rounded px-2 py-1 bg-slate-50">projection</span>
+                <span class="border border-slate-400 rounded px-2 py-1 bg-slate-50">docs (파생)</span>
+              </div>
+            </div>
+          </div>
+
+          <dl class="grid md:grid-cols-[7rem_1fr] gap-x-4 gap-y-3 text-sm">
+            <dt class="font-semibold text-slate-700">Problem</dt>
+            <dd>id 63개 중 60개가 <span class="mono">src/city</span>에 문자열로 다시 타이핑되고, 표들을 잇는 검사가 없어 choice 14개가 상대 choice와 같은 preview로 조용히 떨어진다.</dd>
+            <dt class="font-semibold text-slate-700">Solution</dt>
+            <dd>실험이 preview와 연출 anchor를 스스로 지니고, id를 타입으로 닫아 어떤 표도 모르는 id를 쓸 수 없게 한다. <span class="mono">chapterScenarioSpecs.ts</span>는 rule module에서 파생하거나 삭제한다.</dd>
+            <dt class="font-semibold text-slate-700">Evidence</dt>
+            <dd>
+              <ul class="list-disc list-inside space-y-1">
+                <li>preview가 없는 choice 14개 중 서로 반대인 쌍이 같은 그림을 보여준다. <span class="mono">inspect-current-isr</span> vs <span class="mono">trust-replication-factor</span>(Chapter 4), <span class="mono">read-committed-to-lso</span> vs <span class="mono">read-uncommitted-results</span>(Chapter 8 실험 C의 핵심).</li>
+                <li><span class="mono">chapterScenes.test.ts:88-97</span>은 preview가 비어 있지 않은지만 검사한다. 형제 choice와 구별되는지 검사하면 오늘 실패한다.</li>
+                <li><span class="mono">referenceIds: readonly string[]</span>(<span class="mono">chapterSimulation.ts:78</span>)은 <span class="mono">KafkaReferenceId</span>로 닫혀 있지 않아 오타가 조용히 링크를 지운다.</li>
+              </ul>
+            </dd>
+            <dt class="font-semibold text-slate-700">Deletion test</dt>
+            <dd><span class="mono">chapterScenarioSpecs.ts</span>를 지우면 실행 중인 앱은 아무것도 바뀌지 않는다. pass-through 문서다. <span class="mono">CHOICE_PREVIEWS</span>를 지우면 28개가 experiment 기본값으로 떨어지는데, 14개는 이미 그렇게 동작한다.</dd>
+            <dt class="font-semibold text-slate-700">Wins</dt>
+            <dd>
+              <ul class="list-disc list-inside space-y-1">
+                <li>오타가 컴파일 오류가 된다</li>
+                <li>preview 결함 14건이 테스트에 드러난다</li>
+                <li>locality: 실험 하나 = 파일 하나</li>
+                <li>표 두 개 삭제(specs, previews)</li>
+              </ul>
+            </dd>
+          </dl>
+          <p class="text-xs text-slate-500">후보 1과 겹친다. 1을 먼저 하면 preview는 각 choice의 첫 cue에서 파생할 수 있어 표 자체가 필요 없어진다.</p>
+        </article>
+
+        <!-- ============================ C3 ============================ -->
+        <article id="c3" class="space-y-6">
+          <div class="space-y-3">
+            <h2 class="font-serif text-2xl">3. 두 화면 뒤에 lab session module 하나</h2>
+            <div class="flex flex-wrap gap-2 text-xs">
+              <span class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-semibold">Strong</span>
+              <span class="px-2 py-0.5 rounded bg-slate-100 text-slate-700">local-substitutable</span>
+              <span class="px-2 py-0.5 rounded bg-red-100 text-red-800">살아 있는 결함 · chapterCompleted</span>
+              <span class="px-2 py-0.5 rounded bg-red-100 text-red-800">접근성 회귀 · Chapter 1이 OS 모션 줄임 무시</span>
+            </div>
+          </div>
+
+          <div class="mono text-sm text-slate-700 leading-6 bg-white border border-slate-200 rounded-lg p-4">
+            src/App.tsx:38-44, 121-197, 238-250 (ChapterOneLab)<br/>
+            src/components/GuidedChapterLab.tsx:29-69, 85, 113-172, 226-246<br/>
+            src/state/labStore.ts:17-42 (필드 16 · 액션 11 · guided lab이 쓰는 것 2)<br/>
+            src/domain/simulation.ts:80-97 · src/domain/schemas.ts:82-94 (WorkspaceSnapshot)
+          </div>
+
+          <div class="grid md:grid-cols-2 gap-4">
+            <div class="rounded-lg border border-slate-200 bg-white p-4">
+              <p class="text-xs uppercase tracking-wider text-slate-500 mb-3">Before · 같은 단면이 두 기둥에</p>
+              <div class="grid grid-cols-2 gap-3 text-xs">
+                <div class="space-y-1">
+                  <p class="uppercase tracking-wider text-slate-500 text-center">Chapter 1 · App.tsx</p>
+                  <div class="band border-l-4 border-slate-400 bg-slate-50 px-2 py-1">hydrate → labStore</div>
+                  <div class="band border-l-4 border-slate-400 bg-slate-50 px-2 py-1">autosave 350ms · makeSnapshot()</div>
+                  <div class="band border-l-4 border-slate-400 bg-slate-50 px-2 py-1">runSimulation → addRun (저장됨)</div>
+                  <div class="band border-l-4 border-slate-400 bg-slate-50 px-2 py-1">cursor·isPlaying in labStore · 타이머 <b>120ms</b></div>
+                  <div class="band border-l-4 border-slate-400 bg-slate-50 px-2 py-1">reduced-motion localStorage 읽기</div>
+                </div>
+                <div class="space-y-1">
+                  <p class="uppercase tracking-wider text-slate-500 text-center">Chapter 2–8 · GuidedChapterLab.tsx</p>
+                  <div class="band border-l-4 border-slate-400 bg-slate-50 px-2 py-1">hydrate → labStore</div>
+                  <div class="band border-l-4 border-slate-400 bg-slate-50 px-2 py-1">save on run · makeSnapshot() <span class="text-red-700">동일 코드</span></div>
+                  <div class="band border-l-4 border-red-600 bg-red-50 px-2 py-1">runChapterSimulation → <b>useState</b> (저장 안 됨)</div>
+                  <div class="band border-l-4 border-slate-400 bg-slate-50 px-2 py-1">cursor·isPlaying in useState · 타이머 <b>80ms</b></div>
+                  <div class="band border-l-4 border-slate-400 bg-slate-50 px-2 py-1">reduced-motion localStorage 읽기</div>
+                </div>
+              </div>
+              <p class="text-xs text-red-700 mt-3"><span class="mono">chapterCompleted: state.runs.some(succeeded)</span> — Chapter 4 화면에서 저장해도 Chapter 1의 runs를 읽는다.</p>
+            </div>
+            <div class="rounded-lg border border-slate-200 bg-white p-4">
+              <p class="text-xs uppercase tracking-wider text-slate-500 mb-3">After · 한 deep module, 두 adapter</p>
+              <div class="grid grid-cols-2 gap-3 text-xs mb-3">
+                <div class="border border-slate-400 rounded px-2 py-2 bg-slate-50 text-center">Chapter 1 화면<br/><span class="text-slate-500">설정·코드·비교 탭 렌더링</span></div>
+                <div class="border border-slate-400 rounded px-2 py-2 bg-slate-50 text-center">Guided 화면<br/><span class="text-slate-500">실험·예측·진단 렌더링</span></div>
+              </div>
+              <div class="border-t border-dashed border-slate-400 my-2"></div>
+              <div class="deep rounded-lg p-4 text-xs space-y-1">
+                <p class="uppercase tracking-wider text-slate-300">lab session</p>
+                <p>run 요청 → 증거(run) 보관 → playback cursor·속도·모션 → snapshot·autosave</p>
+                <p class="text-slate-400">interface: run(input) · seek(i) · play/pause · state</p>
+                <p class="text-slate-400">내부 seam: storage · simulation runner</p>
+              </div>
+            </div>
+          </div>
+
+          <dl class="grid md:grid-cols-[7rem_1fr] gap-x-4 gap-y-3 text-sm">
+            <dt class="font-semibold text-slate-700">Problem</dt>
+            <dd>화면 두 개가 hydration, autosave, 재생 타이머, snapshot 생성을 각자 구현했고(이미 120ms/80ms로 갈라짐), Chapter 2–8 실행 기록은 <span class="mono">useState</span>에만 살아 저장되지 않으며 <span class="mono">chapterCompleted</span>는 Chapter 1 runs를 읽어 잘못 기록된다.</dd>
+            <dt class="font-semibold text-slate-700">Solution</dt>
+            <dd>실행 요청, 증거 보관, 재생 커서, 저장을 module 하나 뒤에 두고, 두 화면은 그 state를 그리기만 하는 adapter가 된다. snapshot은 어느 챕터의 run이든 하나의 증거 개념으로 담는다(storage v3).</dd>
+            <dt class="font-semibold text-slate-700">Evidence</dt>
+            <dd>
+              <ul class="list-disc list-inside space-y-1">
+                <li><span class="mono">makeSnapshot</span>이 <span class="mono">App.tsx:145-157</span>과 <span class="mono">GuidedChapterLab.tsx:29-44</span>에 글자 그대로 두 번 있다.</li>
+                <li><span class="mono">ChapterSimulationRun</span>은 store 필드에도 저장 schema에도 없다. 비테스트 참조는 worker 쌍, 엔진 시그니처, 타입 선언, <span class="mono">useState</span> 하나뿐이다.</li>
+                <li><span class="mono">addRun</span>의 production 호출은 <span class="mono">App.tsx:217</span> 한 곳이다. 그러므로 guided 화면이 쓰는 <span class="mono">chapterCompleted</span>는 항상 Chapter 1의 답이다. 이 값은 <span class="mono">workspaceDb.ts:130-134</span>의 v1→v2 migration에도 쓰인다.</li>
+                <li>시설 조사(inspect) 시 "가장 최근 관측 이벤트로 되감기" 로직이 <span class="mono">App.tsx:244-246</span>과 <span class="mono">GuidedChapterLab.tsx:234-239</span>에 각각 있다.</li>
+                <li>모션 줄임: <span class="mono">GuidedChapterLab.tsx:63-69, 174-180</span>은 localStorage와 <span class="mono">matchMedia('prefers-reduced-motion')</span>를 모두 읽고 구독한다. <span class="mono">App.tsx:38-44</span>는 localStorage만 읽는다. <span class="mono">grep -rln matchMedia src</span> → GuidedChapterLab와 그 테스트만. Chapter 1의 <span class="mono">reducedMotion</span> boolean은 OS 설정을 모른다(CSS media query는 별도로 있음). AGENTS.md "prefers-reduced-motion 유지"와 어긋난다.</li>
+                <li>같은 localStorage 키 <span class="mono">ecl:reduced-motion</span>을 두 곳에서 쓴다(<span class="mono">App.tsx:289</span>, <span class="mono">GuidedChapterLab.tsx:168</span>). CSS module 두 개에 같은 class 이름이 10개다(<span class="mono">controlPanel evidencePanel footer headerMeta saveState speedControl timeline workspace worldPanel worldStatus</span>). <span class="mono">useState</span>는 8개 대 16개.</li>
+              </ul>
+            </dd>
+            <dt class="font-semibold text-slate-700">Deletion test</dt>
+            <dd><span class="mono">chapterCompleted</span>를 지우면 guided lab은 아무것도 눈치채지 못한다. <span class="mono">learningProgress</span>로 이미 완료를 계산한다(<span class="mono">GuidedChapterLab.tsx:99-101</span>). 두 화면의 오케스트레이션을 지우면 같은 복잡도가 한 module에 다시 나타난다. 그것이 원하는 결과다.</dd>
+            <dt class="font-semibold text-slate-700">Wins</dt>
+            <dd>
+              <ul class="list-disc list-inside space-y-1">
+                <li>재생 규칙 한 곳(120/80ms 분기 소멸)</li>
+                <li>챕터 run이 불변 증거로 저장</li>
+                <li>chapterCompleted 삭제</li>
+                <li>화면 테스트는 렌더링만 검사</li>
+                <li>storage·worker mock이 한 벌</li>
+                <li>모션 줄임 계약이 구현 하나</li>
+              </ul>
+            </dd>
+          </dl>
+
+          <div class="rounded-md border border-amber-300 bg-amber-50 text-amber-900 text-sm px-4 py-3">
+            AGENTS.md "완료된 <span class="mono">SimulationRun</span>은 불변 증거"는 Chapter 2–8에 지금 적용되지 않는다. 이 후보는 <span class="mono">storageSchemaVersion</span> 3과 migration을 동반한다. AGENTS.md의 migration 규칙과 충돌하지 않는다.
+          </div>
+          <p class="text-xs text-slate-500">project-details.md의 TODO "App.tsx를 shell·left control·evidence·playback으로 분리"는 <em>화면</em>을 자르는 계획이다. 여기서 제안하는 자르기는 <em>화면과 세션</em> 사이다. 화면을 먼저 잘라도 오케스트레이션 중복은 남는다.</p>
+        </article>
+
+        <!-- ============================ C4 ============================ -->
+        <article id="c4" class="space-y-6">
+          <div class="space-y-3">
+            <h2 class="font-serif text-2xl">4. worker 왕복 body 하나, adapter 둘</h2>
+            <div class="flex flex-wrap gap-2 text-xs">
+              <span class="px-2 py-0.5 rounded bg-amber-100 text-amber-800 font-semibold">Worth exploring</span>
+              <span class="px-2 py-0.5 rounded bg-slate-100 text-slate-700">ports &amp; adapters</span>
+            </div>
+          </div>
+
+          <div class="mono text-sm text-slate-700 leading-6 bg-white border border-slate-200 rounded-lg p-4">
+            src/worker/client.ts:27-84 vs 86-145 (58줄 × 2) · src/worker/protocol.ts (75줄, deep)<br/>
+            src/worker/client.test.ts:8-47 (FakeWorker) · simulation.worker.test.ts:5-16 (FakeWorkerScope)<br/>
+            src/components/GuidedChapterLab.test.tsx:21-29 (vi.mock + in-thread 엔진) · src/App.test.tsx (mock 없음)
+          </div>
+
+          <div class="grid md:grid-cols-2 gap-4">
+            <div class="rounded-lg border border-slate-200 bg-white p-4">
+              <p class="text-xs uppercase tracking-wider text-slate-500 mb-3">Before · 같은 body 둘, 즉석 fake 셋</p>
+              <div class="grid grid-cols-2 gap-3 text-xs">
+                <div class="border border-slate-400 rounded p-2 bg-slate-50 h-40 flex flex-col justify-between">
+                  <p class="mono">runSimulation</p>
+                  <p class="text-slate-500 leading-5">validate · requestId · Promise · listener 2개 · cleanup · discardWorker</p>
+                </div>
+                <div class="border border-slate-400 rounded p-2 bg-slate-50 h-40 flex flex-col justify-between">
+                  <p class="mono">runChapterSimulation</p>
+                  <p class="text-slate-500 leading-5">validate · requestId · Promise · listener 2개 · cleanup · discardWorker <span class="text-red-700">+ cast + 주석</span></p>
+                </div>
+              </div>
+              <div class="flex gap-2 mt-3 text-xs">
+                <span class="border leak seam rounded px-2 py-1">FakeWorker</span>
+                <span class="border leak seam rounded px-2 py-1">FakeWorkerScope</span>
+                <span class="border leak seam rounded px-2 py-1">vi.mock(client)</span>
+              </div>
+            </div>
+            <div class="rounded-lg border border-slate-200 bg-white p-4">
+              <p class="text-xs uppercase tracking-wider text-slate-500 mb-3">After · 왕복 하나, seam에 adapter 둘</p>
+              <div class="deep rounded-lg p-3 text-xs mb-3">
+                <p class="uppercase tracking-wider text-slate-300">simulation runner</p>
+                <p class="mono">request(schemaPair, payload) → Promise</p>
+                <p class="text-slate-400">listener 생명주기·requestId 필터·worker 폐기 한 번만</p>
+              </div>
+              <div class="border-t border-dashed border-slate-400 my-2"></div>
+              <div class="grid grid-cols-2 gap-3 text-xs">
+                <div class="border border-slate-400 rounded p-2 bg-slate-50">adapter · Worker<br/><span class="text-slate-500">production</span></div>
+                <div class="border border-slate-400 rounded p-2 bg-slate-50">adapter · in-thread 엔진<br/><span class="text-slate-500">테스트가 import하는 정식 module</span></div>
+              </div>
+            </div>
+          </div>
+
+          <dl class="grid md:grid-cols-[7rem_1fr] gap-x-4 gap-y-3 text-sm">
+            <dt class="font-semibold text-slate-700">Problem</dt>
+            <dd>58줄짜리 같은 Promise·listener 정리 코드가 두 번 있고, 두 번째 adapter(in-thread 엔진)는 테스트 세 곳이 각자 다른 방식으로 즉석 제작한다.</dd>
+            <dt class="font-semibold text-slate-700">Solution</dt>
+            <dd>schema 쌍으로 매개화한 왕복 함수 하나를 두고, in-thread 엔진 adapter를 테스트가 import하는 정식 module로 제공한다.</dd>
+            <dt class="font-semibold text-slate-700">Evidence</dt>
+            <dd>
+              <ul class="list-disc list-inside space-y-1">
+                <li><span class="mono">App.test.tsx</span>는 worker도 client도 mock하지 않는다. Chapter 2·8을 렌더링하지만 아무 테스트가 실행 버튼을 누르지 않아 <span class="mono">new Worker</span>에 닿지 않는다. 다음 App 테스트를 쓰는 사람에게 잠재 함정이다.</li>
+                <li>chapter 분기만 <span class="mono">as ChapterSimulationRun</span> 캐스트와 세 줄 주석을 지닌다. 주석 금지 규칙을 뚫고 살아남은 주석은 형태가 타입 시스템과 싸우고 있다는 신호다.</li>
+                <li>adapter가 실제로 둘 있으므로 이 seam은 실제(real)다. 다만 세 번 발명됐다.</li>
+              </ul>
+            </dd>
+            <dt class="font-semibold text-slate-700">Deletion test</dt>
+            <dd><span class="mono">protocol.ts</span>를 지우면 client와 worker 양쪽에 union과 requestId 판독이 다시 생긴다. 제값을 한다. 두 client 함수의 중복만 지우면 잃는 것이 없다.</dd>
+            <dt class="font-semibold text-slate-700">Wins</dt>
+            <dd>
+              <ul class="list-disc list-inside space-y-1">
+                <li>cleanup 버그를 한 번만 고친다</li>
+                <li>App.test 잠재 함정 제거</li>
+                <li>client.test.ts:169-205 중복 삭제</li>
+                <li>캐스트와 주석 소멸</li>
+              </ul>
+            </dd>
+          </dl>
+        </article>
+
+        <!-- ============================ C5 ============================ -->
+        <article id="c5" class="space-y-6">
+          <div class="space-y-3">
+            <h2 class="font-serif text-2xl">5. 챕터 authoring dialect 하나, seed는 사실만</h2>
+            <div class="flex flex-wrap gap-2 text-xs">
+              <span class="px-2 py-0.5 rounded bg-amber-100 text-amber-800 font-semibold">Worth exploring</span>
+              <span class="px-2 py-0.5 rounded bg-slate-100 text-slate-700">in-process</span>
+            </div>
+          </div>
+
+          <div class="mono text-sm text-slate-700 leading-6 bg-white border border-slate-200 rounded-lg p-4">
+            src/domain/chapters/chapter2.ts:1-16, 369-371 · chapter3.ts:1-16, 414 (dialect A)<br/>
+            src/domain/chapters/chapter4.ts · chapter5.ts (dialect B · 객체 리터럴 18개씩)<br/>
+            src/domain/chapters/chapter6.ts:7-26 ≡ chapter7.ts:7-26 ≡ chapter8.ts:7-26 (dialect C · helper 3벌 복사)<br/>
+            seed: src/domain/chapterSimulation.ts:88, 96, 122 · chapterSchemas.ts:17, 65 · GuidedChapterLab.tsx:204
+          </div>
+
+          <div class="grid md:grid-cols-2 gap-4">
+            <div class="rounded-lg border border-slate-200 bg-white p-4">
+              <p class="text-xs uppercase tracking-wider text-slate-500 mb-3">Before · interface 폭 ≈ implementation 폭</p>
+              <div class="grid grid-cols-3 gap-2 text-xs items-end">
+                <div>
+                  <div class="border border-slate-500 bg-white h-14 flex items-center justify-center text-center leading-4">interface<br/>started() · runChapter2Rule</div>
+                  <div class="border border-slate-400 bg-slate-100 h-16 flex items-center justify-center">데이터</div>
+                  <p class="text-center text-slate-500 mt-1">A · ch2·3</p>
+                </div>
+                <div>
+                  <div class="border border-slate-500 bg-white h-14 flex items-center justify-center text-center leading-4">interface<br/>리터럴 전개</div>
+                  <div class="border border-slate-400 bg-slate-100 h-16 flex items-center justify-center">데이터</div>
+                  <p class="text-center text-slate-500 mt-1">B · ch4·5</p>
+                </div>
+                <div>
+                  <div class="border border-slate-500 bg-white h-14 flex items-center justify-center text-center leading-4">interface<br/>event() · diagnosis()</div>
+                  <div class="border border-slate-400 bg-slate-100 h-16 flex items-center justify-center">데이터</div>
+                  <p class="text-center text-slate-500 mt-1">C · ch6·7·8</p>
+                </div>
+              </div>
+              <p class="text-xs text-red-700 mt-3"><span class="mono">seed</span>: 선언 → 검증 → 복사 → 복사 → 복사. 읽는 곳 0.</p>
+            </div>
+            <div class="rounded-lg border border-slate-200 bg-white p-4">
+              <p class="text-xs uppercase tracking-wider text-slate-500 mb-3">After · authoring helper 하나, 챕터는 데이터만</p>
+              <div class="text-xs">
+                <div class="border border-slate-500 bg-white h-8 flex items-center justify-center">interface · event() · diagnosis() · experiment()</div>
+                <div class="deep h-28 flex items-center justify-center text-center leading-5 rounded-b">chapter2 … chapter8<br/>Kafka 내용만 다름<br/><span class="text-slate-400">validateChapterRule이 유일한 형태 검사</span></div>
+              </div>
+              <p class="text-xs text-slate-600 mt-3">입력 = <span class="mono">chapterId · experimentId · choiceId</span>. 결정론은 정의상 성립하므로 검사하지 않는다.</p>
+            </div>
+          </div>
+
+          <dl class="grid md:grid-cols-[7rem_1fr] gap-x-4 gap-y-3 text-sm">
+            <dt class="font-semibold text-slate-700">Problem</dt>
+            <dd>rule module 7개가 세 가지 문법으로 쓰였고 <span class="mono">event()</span>·<span class="mono">diagnosis()</span> helper가 세 번 복사됐으며, <span class="mono">seed</span>는 다섯 module을 통과하지만 읽는 곳이 없다.</dd>
+            <dt class="font-semibold text-slate-700">Solution</dt>
+            <dd>도메인에 authoring helper 한 벌을 두고 <span class="mono">runChapter2Rule</span> 같은 pass-through를 지운다. <span class="mono">seed</span>는 입력에서 빼거나 실제 generator와 함께 들여온다. 범용 실험 엔진으로 합치지는 않는다. 챕터는 데이터만 다르므로 그 결과는 shallow generic이다.</dd>
+            <dt class="font-semibold text-slate-700">Evidence</dt>
+            <dd>
+              <ul class="list-disc list-inside space-y-1">
+                <li><span class="mono">seed: chapterId * 1000 + experimentIndex * 100 + attempts + 1</span>(<span class="mono">GuidedChapterLab.tsx:204</span>). <span class="mono">attempts</span>가 섞여 같은 입력의 두 실행이 서로 다른 seed를 기록한다. seed의 목적과 반대다.</li>
+                <li>챕터 테스트 7개가 결정론을 검사한다. 고정 리터럴을 두 번 조회해 같은지 보는 것이다(<span class="mono">chapter2.test.ts:21-31</span> 외 6개).</li>
+                <li>챕터 테스트 7개가 여는 validity 블록(choice 2개 이상, 실패 1개, 권장 choice 성공)은 <span class="mono">validateChapterRule</span>을 일곱 번 다시 쓴 것이다. <span class="mono">chapterEngine.ts:26</span>이 이미 import 시 실행한다.</li>
+                <li>21 experiment · 42 choice · 183 event template. 남길 가치가 있는 테스트는 Kafka 내용을 고정하는 것들이다(예: <span class="mono">chapter4.test.ts:71</span>의 <span class="mono">NotEnoughReplicas</span>).</li>
+              </ul>
+            </dd>
+            <dt class="font-semibold text-slate-700">Deletion test</dt>
+            <dd><span class="mono">chapterEngine.ts</span>(38줄)를 지우면 호출자 3곳이 각자 rule 7개를 import해 map을 만든다. 얇지만 무료가 아니다. 남긴다. <span class="mono">runChapter2Rule</span>·<span class="mono">runChapter3Rule</span>은 테스트 두 파일만 바뀐다. pass-through다. <span class="mono">seed</span>를 지우면 schema 두 줄, UI 식 하나, 테스트 7개가 사라지고 동작은 그대로다.</dd>
+            <dt class="font-semibold text-slate-700">Wins</dt>
+            <dd>
+              <ul class="list-disc list-inside space-y-1">
+                <li>validity 블록 7개 삭제</li>
+                <li>결정론 테스트 7개 삭제</li>
+                <li>interface가 사실을 말한다</li>
+                <li>새 챕터 = 데이터 파일 하나</li>
+              </ul>
+            </dd>
+          </dl>
+        </article>
+
+        <!-- ============================ C6 ============================ -->
+        <article id="c6" class="space-y-6">
+          <div class="space-y-3">
+            <h2 class="font-serif text-2xl">6. 도시 화면의 interface를 props로 되돌리고, 시각 결정은 projection에 모은다</h2>
+            <div class="flex flex-wrap gap-2 text-xs">
+              <span class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-semibold">Strong</span>
+              <span class="px-2 py-0.5 rounded bg-slate-100 text-slate-700">in-process</span>
+              <span class="px-2 py-0.5 rounded bg-red-100 text-red-800">Chapter 6·7 badge가 화면에 안 나옴</span>
+            </div>
+          </div>
+
+          <div class="mono text-sm text-slate-700 leading-6 bg-white border border-slate-200 rounded-lg p-4">
+            src/components/AdvancedCityWorld.tsx:24-33 (props 8개) · :217-247 (slot 묶기) · :249-253 (접근 이름) · :270-291 (badge 렌더 분기) · :499-534 (layoutCarriers)<br/>
+            src/city/choreography/chapter6_8.ts:123-170 (badge 계산) · :297-303 (이동 여부)<br/>
+            src/city/projection.ts:89-144 (단일 차량) · :181-190 (roadProgress)<br/>
+            src/components/AdvancedCityWorld.test.tsx:149 (cast) · e2e/chapter-smoke.spec.ts:236
+          </div>
+
+          <div class="overflow-x-auto">
+            <table class="text-xs w-full border border-slate-200 bg-white">
+              <thead class="bg-slate-50 text-slate-600"><tr><th class="px-2 py-1 text-left">Chapter</th><th class="px-2 py-1 text-left">논리 노드</th><th class="px-2 py-1 text-left">slot별 노드 수</th><th class="px-2 py-1 text-left">badge</th></tr></thead>
+              <tbody class="divide-y divide-slate-200 mono">
+                <tr><td class="px-2 py-1">2</td><td class="px-2 py-1">5</td><td class="px-2 py-1">1 / 3 / 1</td><td class="px-2 py-1 text-emerald-700">표시</td></tr>
+                <tr><td class="px-2 py-1">3</td><td class="px-2 py-1">7</td><td class="px-2 py-1">1 / 1 / 3 / 1 / 1</td><td class="px-2 py-1 text-emerald-700">표시</td></tr>
+                <tr><td class="px-2 py-1">4 · 5</td><td class="px-2 py-1">4</td><td class="px-2 py-1">2개 slot 하나</td><td class="px-2 py-1 text-emerald-700">표시</td></tr>
+                <tr><td class="px-2 py-1">6</td><td class="px-2 py-1">11</td><td class="px-2 py-1">1 / <b class="text-red-700">4</b> / <b class="text-red-700">5</b> / 1</td><td class="px-2 py-1 text-red-700">두 slot에서 버려짐</td></tr>
+                <tr><td class="px-2 py-1">7</td><td class="px-2 py-1">8</td><td class="px-2 py-1">1 / <b class="text-red-700">4</b> / 2 / 1</td><td class="px-2 py-1 text-red-700">한 slot에서 버려짐</td></tr>
+                <tr><td class="px-2 py-1">8</td><td class="px-2 py-1">5</td><td class="px-2 py-1">1 / 1 / 1 / 1 / 1</td><td class="px-2 py-1 text-slate-500">단일 노드</td></tr>
+              </tbody>
+            </table>
+            <p class="text-xs text-slate-500 mt-1"><span class="mono">SCENE_NODE_IDS</span>(<span class="mono">chapterScenes.ts:84-92</span>)와 anchor의 <span class="mono">roadAccessIndex</span>(<span class="mono">:59-80</span>)에서 계산. 렌더 분기는 <span class="mono">nodes.length &gt; 1 &amp;&amp; nodes.length &lt;= 3</span>.</p>
+          </div>
+
+          <div class="grid md:grid-cols-2 gap-4">
+            <div class="rounded-lg border border-slate-200 bg-white p-4">
+              <p class="text-xs uppercase tracking-wider text-slate-500 mb-3">Before · "무엇이 보이는가"를 세 module이 나눠 결정</p>
+              <div class="space-y-1 text-xs">
+                <div class="band border-l-4 border-slate-400 bg-slate-50 px-2 py-1"><b>choreography</b> · progress 0.52/0.64/0.72 선택 · badge <span class="mono">'old p1'</span> · route id에 <span class="mono">coordinator</span> 포함 시 이동 없음</div>
+                <div class="band border-l-4 border-slate-400 bg-slate-50 px-2 py-1"><b>projection</b> · route progress → main road progress · 전진만 채택 · 한 대만 남김</div>
+                <div class="band border-l-4 border-red-600 bg-red-50 px-2 py-1"><b>AdvancedCityWorld</b> · 다시 interpolate · slot에 노드 4개 이상이면 <b>badge 버리고 개수 요약</b> (Chapter 6: 4개·5개)</div>
+              </div>
+              <p class="text-xs text-slate-600 mt-3">choreography가 계산한 Chapter 6 badge는 화면에 한 번도 나타나지 않는다. 그 사실을 아는 module은 없다.</p>
+            </div>
+            <div class="rounded-lg border border-slate-200 bg-white p-4">
+              <p class="text-xs uppercase tracking-wider text-slate-500 mb-3">After · world state가 끝까지 결정, 화면은 그린다</p>
+              <div class="deep rounded-lg p-3 text-xs mb-2">
+                <p class="uppercase tracking-wider text-slate-300">projection (deep)</p>
+                <p>cue → 차량 위치(점) · slot별 표지(badge 목록 또는 요약) · 신호 · 차단기</p>
+                <p class="text-slate-400">interface: <span class="mono">projectCityWorld(scene, events, cursor)</span> 그대로. 반환값이 더 많은 결정을 담는다.</p>
+              </div>
+              <div class="border-t border-dashed border-slate-400 my-2"></div>
+              <div class="border border-slate-400 rounded p-2 bg-slate-50 text-xs">AdvancedCityWorld · SVG로 옮겨 그리기만. 분기 없음.</div>
+            </div>
+          </div>
+
+          <dl class="grid md:grid-cols-[7rem_1fr] gap-x-4 gap-y-3 text-sm">
+            <dt class="font-semibold text-slate-700">Problem</dt>
+            <dd><span class="mono">AdvancedCityWorld</span>의 선언된 interface는 props 8개지만 호출자와 테스트가 실제로 의존하는 interface는 <span class="mono">data-*</span> attribute 22개이고, 그 안에서 choreography가 계산한 badge는 Chapter 6·7의 slot 용량 한계(3개)에 걸려 버려지며, 차량 위치는 세 module이 나눠 계산한다.</dd>
+            <dt class="font-semibold text-slate-700">Solution</dt>
+            <dd>"무엇이 보이는가"는 projection이 반환하는 world state가 끝까지 결정하고(표지가 목록인지 요약인지, slot 용량을 scene 계약에 포함), <span class="mono">AdvancedCityWorld</span>는 좌표를 SVG로 옮기기만 한다. 테스트는 attribute를 뒤지지 않고 layout 값을 직접 단언한다.</dd>
+            <dt class="font-semibold text-slate-700">Evidence</dt>
+            <dd>
+              <ul class="list-disc list-inside space-y-1">
+                <li><span class="mono">chapter6NodeChanges</span>(<span class="mono">chapter6_8.ts:123-170</span>)가 쓰는 <span class="mono">'old p1' 'new p1' 'revoked' '41' 'c1' 'p0'</span> 등 badge는 하나도 표지에 도달하지 않는다. 그런데 접근 이름(<span class="mono">:249-253</span>)에는 모두 들어간다. 스크린리더 사용자가 시각 사용자보다 더 많은 정보를 받는다. AGENTS.md "상태는 색상만으로 표현하지 않는다"의 취지와 반대 방향으로 한 채널에만 실렸다.</li>
+                <li><span class="mono">data-*</span> attribute 22개 중 17개가 단위·e2e 테스트나 CSS가 읽는다. 5개(<span class="mono">data-carrier-route data-city-boundary-badge data-route-kind data-route-state data-signal-marker</span>)는 아무도 읽지 않는다. props 타입 어디에도 이 계약이 없다.</li>
+                <li><span class="mono">events: readonly ChapterSimulationEvent[]</span>는 과잉 명세다. projection은 <span class="mono">{ cityCue }</span>만 필요하다. 그래서 테스트가 <span class="mono">as unknown as readonly ChapterSimulationEvent[]</span>로 자기 prop 타입을 우회한다(<span class="mono">AdvancedCityWorld.test.tsx:149</span>).</li>
+                <li><span class="mono">layoutCarriers</span>의 그룹 분기(<span class="mono">:524-533</span>, 150px 간격)는 실행될 수 없다. projection은 <span class="mono">vehicle</span> 키 하나만 만든다(<span class="mono">projection.ts:113-126, 148-166</span>). 프로젝트 규칙이 금지한 다중 차량 세계를 위한 죽은 코드다.</li>
+                <li>e2e <span class="mono">chapter-smoke.spec.ts:236</span>은 slot 수와 <span class="mono">data-city-node</span> 수가 같다고 단언하지만, 둘은 <span class="mono">AdvancedCityWorld.tsx:136, 143</span>에서 항상 쌍으로 방출된다. 실패할 수 없는 단언이다.</li>
+                <li>Kafka 결과 계산은 없다. <span class="mono">visualStatePriority</span>와 <span class="mono">showPreview</span>는 표시 집계다. "React는 Kafka 결과를 계산하지 않는다"는 여기서 지켜진다.</li>
+              </ul>
+            </dd>
+            <dt class="font-semibold text-slate-700">Deletion test</dt>
+            <dd><span class="mono">AdvancedCityWorld</span>의 <span class="mono">groupPhysicalFacilities</span>·<span class="mono">layoutCarriers</span>·badge 분기를 지우면 그 복잡도는 projection 한 곳에 다시 나타난다. 그것이 원하는 결과다. 렌더링 module에서는 사라진다.</dd>
+            <dt class="font-semibold text-slate-700">Wins</dt>
+            <dd>
+              <ul class="list-disc list-inside space-y-1">
+                <li>locality: 시각 결정이 한 module</li>
+                <li>projection.test가 badge 요약도 검사</li>
+                <li>slot 용량 초과가 scene 구성 시 실패</li>
+                <li>버려지는 계산·죽은 분기 소멸</li>
+                <li>interface = props, attribute 아님</li>
+              </ul>
+            </dd>
+          </dl>
+          <p class="text-xs text-slate-500">후보 1이 먼저다. cue 생성이 projection 쪽으로 오면 이 결정들을 한 module에 모으는 것이 자연스럽다. e2e 중 <span class="mono">chapter-smoke.spec.ts:180-196</span>(10 프레임 <span class="mono">getCTM</span>으로 전진만 하는지 검사)은 단위 테스트가 할 수 없는 일을 하므로 그대로 둔다.</p>
+        </article>
+
+        <!-- ============================ C7 ============================ -->
+        <article id="c7" class="space-y-6">
+          <div class="space-y-3">
+            <h2 class="font-serif text-2xl">7. scene 검증은 한 번</h2>
+            <div class="flex flex-wrap gap-2 text-xs">
+              <span class="px-2 py-0.5 rounded bg-amber-100 text-amber-800 font-semibold">Worth exploring</span>
+              <span class="px-2 py-0.5 rounded bg-slate-100 text-slate-700">in-process</span>
+            </div>
+          </div>
+
+          <div class="mono text-sm text-slate-700 leading-6 bg-white border border-slate-200 rounded-lg p-4">
+            src/domain/chapterEngine.ts:26 · src/domain/chapterSimulation.ts:146-195<br/>
+            src/city/validation.ts:271-273 (validateChapterCityCue → validateCityScene) · :145-247 · :249-259 (roadSlice·path 재구현)<br/>
+            src/city/projection.ts:10, 44 · src/city/projection.test.ts:86-145 (검증 테스트가 projection 테스트 안에)
+          </div>
+
+          <div class="grid md:grid-cols-2 gap-4">
+            <div class="rounded-lg border border-slate-200 bg-white p-4">
+              <p class="text-xs uppercase tracking-wider text-slate-500 mb-3">Before · import 한 번에 scene 검증 183회</p>
+              <div class="text-xs space-y-1">
+                <div class="border border-slate-400 rounded px-2 py-1 bg-slate-50">import chapterEngine (worker + UI 스레드)</div>
+                <div class="ml-4 border border-slate-400 rounded px-2 py-1 bg-slate-50">validateChapterRule × 7</div>
+                <div class="ml-8 border border-slate-400 rounded px-2 py-1 bg-slate-50">createChapterCityCue × 183</div>
+                <div class="ml-12 border border-slate-400 rounded px-2 py-1 bg-slate-50">validateChapterCityCue × 183</div>
+                <div class="ml-16 border leak rounded px-2 py-1 bg-red-50">validateCityScene × 183 · Zod 전체 파싱 + 모든 route·checkpoint 기하 검사</div>
+                <div class="border border-slate-400 rounded px-2 py-1 bg-slate-50 mt-2">projectCityWorld (렌더마다) → validateCityScene + 이벤트마다 validateChapterCityCue</div>
+              </div>
+            </div>
+            <div class="rounded-lg border border-slate-200 bg-white p-4">
+              <p class="text-xs uppercase tracking-wider text-slate-500 mb-3">After · 검증된 scene index 하나</p>
+              <div class="text-xs space-y-2">
+                <div class="deep rounded px-2 py-2">validated scene index · chapter마다 한 번 · id 조회 O(1)</div>
+                <div class="border border-slate-400 rounded px-2 py-1 bg-slate-50">cue 검사 = 검증된 index에 대한 id 조회만</div>
+                <div class="border border-slate-400 rounded px-2 py-1 bg-slate-50">projection은 index를 받는다. 재검증 없음</div>
+              </div>
+              <p class="text-xs text-slate-600 mt-3">import 시 sweep을 유지할지, 테스트 시간으로 옮길지는 설계 질문이다. 손으로 쓴 rule이 첫 import에서 크게 실패하는 성질은 남길 가치가 있다.</p>
+            </div>
+          </div>
+
+          <dl class="grid md:grid-cols-[7rem_1fr] gap-x-4 gap-y-3 text-sm">
+            <dt class="font-semibold text-slate-700">Problem</dt>
+            <dd><span class="mono">validateChapterCityCue</span>의 interface에 "전달받은 scene 전체를 다시 검증한다"가 숨어 있어, import 한 번에 같은 scene 7개가 183번 검증되고 두 스레드에서 반복된다.</dd>
+            <dt class="font-semibold text-slate-700">Solution</dt>
+            <dd>scene 검증과 cue 검사를 분리하고, 검증된 scene index를 한 번 만들어 projection과 validator가 함께 쓴다.</dd>
+            <dt class="font-semibold text-slate-700">Evidence</dt>
+            <dd>
+              <ul class="list-disc list-inside space-y-1">
+                <li>같은 데이터가 다섯 번 검증된다. import sweep(두 스레드), projection의 scene 재검증(렌더마다), projection의 cue 재검증(이벤트마다), worker protocol의 cue schema(나갈 때·들어올 때). 7이벤트 Chapter 8 run을 끝까지 재생하면 scene Zod 파싱 42회.</li>
+                <li><span class="mono">validation.ts</span>가 export하는 schema 13개 중 12개는 아무 파일도 import하지 않는다. <span class="mono">chapterCityCueSchema</span> 하나만 <span class="mono">chapterSchemas.ts:3</span>이 쓴다.</li>
+                <li><span class="mono">roadSlice</span>가 <span class="mono">chapterScenes.ts:328-334</span>와 <span class="mono">validation.ts:249-255</span>에 구조적으로 같게 두 번 있다. "route는 main road의 연속 조각이어야 한다"는 검사(<span class="mono">validation.ts:213-216</span>)는 유일한 생산자가 main road를 잘라 route를 만들기 때문에 항진이다.</li>
+                <li><span class="mono">projection.test.ts</span>는 두 주제를 섞는다. 86-145행은 validation, 146-361행은 projection.</li>
+              </ul>
+            </dd>
+            <dt class="font-semibold text-slate-700">Deletion test</dt>
+            <dd><span class="mono">validation.ts</span>를 지우면 production 동작은 바뀌지 않는다. scene 생산자와 cue 생산자가 모두 컴파일 시점 module이기 때문이다. 사라지는 것은 테스트 oracle이다. 그러므로 런타임 guard가 아니라 테스트 oracle로서 제값을 한다. 자리가 잘못됐을 뿐이다. import 시 sweep을 지우면 보증은 테스트 시간으로 옮겨간다. <span class="mono">chapter4.test.ts:8</span>과 형제 6개가 이미 <span class="mono">validateChapterRule</span>을 직접 호출한다.</dd>
+            <dt class="font-semibold text-slate-700">Wins</dt>
+            <dd>
+              <ul class="list-disc list-inside space-y-1">
+                <li>locality: 불변식 검사 위치가 명확</li>
+                <li>시작 비용 예측 가능</li>
+                <li>테스트 표면 = scene index</li>
+              </ul>
+            </dd>
+          </dl>
+          <p class="text-xs text-slate-500">사용자 체감 영향은 측정하지 않았다. 성능 주장이 아니라 locality 주장이다.</p>
+        </article>
+
+      </section>
+
+      <!-- ============================ LEFT ALONE ============================ -->
+      <section class="space-y-4">
+        <h2 class="font-serif text-2xl">이미 deep한 module · 그대로 둔다</h2>
+        <ul class="text-sm space-y-2 text-slate-700">
+          <li><b><span class="mono">storage/workspaceDb.ts</span></b> — <span class="mono">recoverWorkspace(candidate: unknown)</span>은 신뢰하지 않는 값 하나를 받아 세 상태 결과를 돌려주는 순수 함수다. IndexedDB 껍데기는 네 줄. 테스트 7건이 interface를 통해 migration과 거부를 검사한다. 이 슬라이스의 나머지가 따라야 할 모델이다. 문제는 <em>무엇을</em> 저장하느냐(후보 3)이고 <em>어떻게</em>가 아니다.</li>
+          <li><b><span class="mono">city/projection.ts</span></b> — <span class="mono">(scene, events, cursor)</span> 세 인자 뒤에 fold 전체가 있다. 361줄 테스트가 interface로 검사한다. 후보 6은 이 module에 결정을 <em>더</em> 맡기자는 것이다.</li>
+          <li><b><span class="mono">city/validation.ts</span></b> — 352줄이지만 제값을 한다. 기하 불변식, id 유일성, 노드·경로·checkpoint 상호 참조. 문제는 호출 빈도(후보 7)이고 module이 아니다.</li>
+          <li><b><span class="mono">city/routeGeometry.ts</span></b>, <b><span class="mono">routing/chapterRoute.ts</span></b>, <b><span class="mono">chapters/registry.ts</span></b>, <b><span class="mono">domain/codeConfig.ts</span></b> — 순수하고 작고 interface로 테스트된다.</li>
+          <li><b><span class="mono">CityFacility</span></b> (42줄, props 7개) — 이 슬라이스에서 가장 deep한 module. <span class="mono">role="button"</span>, tabIndex, 접근 이름, Enter·Space, hit area를 전부 숨긴다. 두 도시가 키보드 테스트를 통과하는 이유다. adapter 둘(<span class="mono">KafkaWorld</span>, <span class="mono">AdvancedCityWorld</span>)이 실제로 쓰므로 <span class="mono">CityWorld · CityFacility · CitySprite</span> seam은 실제다. <span class="mono">CitySprite</span>는 33줄이지만 AGENTS.md의 차량 bottom-center anchor 규칙이 표현된 유일한 곳이다.</li>
+          <li><b>Chapter 1 엔진과 Chapter 2–8 rule module의 이원화</b> — 정당하다. Chapter 1은 <em>연속</em>(config 값에서 분기, Java 코드 편집기가 그 config에 닿음, 진단이 <span class="mono">setting · currentValue · recommendedValue</span>를 지님). Chapter 2–8은 <em>이산</em>(<span class="mono">choiceId</span> 둘 중 하나, 진단이 <span class="mono">recommendedChoiceId</span>를 지님). Chapter 1을 rule module로 강제하면 코드 편집기를 버려야 한다. 공유해야 할 것은 엔진이 아니라 화면 뒤의 세션이다(후보 3).</li>
+          <li><b>Chapter 1 도시(<span class="mono">KafkaWorld</span>)가 scene·projection seam을 쓰지 않는 것</b> — 지금은 정당하다. scene 계약(<span class="mono">validation.ts:213-219</span>)은 route가 main road 점 목록의 연속 조각이어야 한다고 요구하는데, Chapter 1의 승인 도로는 3차 Bézier(<span class="mono">KafkaWorld.tsx:97</span>)라 점 목록으로 표현되지 않는다. 배경은 <span class="mono">slice</span>, atlas는 <span class="mono">meet</span>. 어휘도 <span class="mono">ComponentId</span> 대 <span class="mono">CityNodeKind</span>로 다르다. 합치려면 "곡선 도로를 허용하는 scene"이라는 설계 결정이 먼저다. 그때까지 scene seam의 adapter는 하나뿐이므로 hypothetical seam이다.</li>
+          <li><b><span class="mono">e2e/chapter-smoke.spec.ts</span></b> — 실제 worker, 실제 애니메이션, 10 프레임 <span class="mono">getCTM</span> 샘플링으로 차량이 뒤로 가지 않음을 증명한다(<span class="mono">:180-196</span>). 단위 테스트가 할 수 없는 일이다. 반면 시각 baseline 37장(<span class="mono">chapter-city-visual.spec.ts</span>)은 <span class="mono">:29</span>에서 CI를 skip하므로 자동으로는 아무것도 지키지 않는다.</li>
+          <li><b>애니메이션 시간 대 logical time</b> — 위반 없음. 매핑은 네 module에 흩어져 있지만(choreography progress 리터럴 → <span class="mono">projection.ts:181-190</span> → <span class="mono">AdvancedCityWorld.tsx:510</span> → <span class="mono">:412-419</span>), 마지막 것만 표시 시간이고 <span class="mono">motionDurationMs</span>는 progress로 되돌아가지 않는다. locality는 나쁘지만 동작은 맞다.</li>
+          <li><b><span class="mono">choreography/index.ts</span></b> — 리터럴 union 위의 완전한 dispatch. 구조상 shallow지만 더 deep해질 수 없는 dispatcher는 문제가 아니다. 결점은 아무 테스트도 이것을 거치지 않는다는 것뿐이다.</li>
+        </ul>
+      </section>
+
+      <!-- ============================ SMALL FINDINGS ============================ -->
+      <section class="space-y-4">
+        <h2 class="font-serif text-2xl">카드로 만들지 않은 작은 발견</h2>
+        <p class="text-sm text-slate-600">각각 한 시간 안에 고칠 수 있고, 위 후보와 독립적이다.</p>
+        <ul class="text-sm space-y-2 text-slate-700 list-disc list-inside">
+          <li><span class="mono">CityWorld.tsx:35</span>는 <span class="mono">&lt;svg&gt;</span>에 <span class="mono">preserveAspectRatio="xMidYMid meet"</span>를 하드코딩하고, 같은 이름의 prop은 <span class="mono">:46</span>의 <span class="mono">&lt;image&gt;</span>에만 닿는다. Chapter 1이 <span class="mono">slice</span>를 넘겨도 바깥은 <span class="mono">meet</span>다. e2e <span class="mono">chapter-smoke.spec.ts:226</span>은 그래서 두 도시 모두 통과한다. 이름과 다르게 동작하는 prop은 작은 interface 거짓말이다.</li>
+          <li><span class="mono">KafkaWorld.tsx:31</span> — <span class="mono">run.status === 'failed' &amp;&amp; component === 'rail'</span>이면 <span class="mono">'blocked'</span>. 두 도시에서 React가 이벤트 스트림이 아니라 run 상태로 시설 상태를 <em>추론</em>하는 유일한 곳이다. Kafka 결과 계산은 아니지만 그 규칙이 막으려는 종류의 일이다.</li>
+          <li><span class="mono">chapterSimulation.ts:78</span>의 <span class="mono">referenceIds: readonly string[]</span>은 <span class="mono">KafkaReferenceId</span>로 닫을 수 있다. 오타가 조용히 근거 링크를 지운다.</li>
+          <li><span class="mono">client.ts:119-123</span>의 주석 세 줄은 저장소 규칙(주석 없음)과 어긋난다. 후보 4로 형태를 고치면 캐스트와 함께 사라진다.</li>
+          <li><span class="mono">package.json</span> engines는 node 24인데 이 머신에는 20, 23, 26만 있다. 테스트는 26.7.0으로 통과했다. <span class="mono">.nvmrc</span>와 실제 실행 환경이 다르다.</li>
+        </ul>
+      </section>
+
+      <!-- ============================ NUMBERS ============================ -->
+      <section class="space-y-4">
+        <h2 class="font-serif text-2xl">숫자</h2>
+        <div class="overflow-x-auto">
+          <table class="text-sm w-full border border-slate-200 bg-white">
+            <tbody class="divide-y divide-slate-200">
+              <tr><td class="px-3 py-2">단위 테스트 기준선</td><td class="px-3 py-2 mono">148 tests / 28 files 통과</td></tr>
+              <tr><td class="px-3 py-2">Chapter 2–8 experiment · choice · event template</td><td class="px-3 py-2 mono">21 · 42 · 183</td></tr>
+              <tr><td class="px-3 py-2">도메인이 선언한 id 중 <span class="mono">src/city</span>에 문자열로 재타이핑된 것</td><td class="px-3 py-2 mono">60 / 63</td></tr>
+              <tr><td class="px-3 py-2">choreography의 <span class="mono">experimentId/choiceId ===</span> 비교</td><td class="px-3 py-2 mono">123</td></tr>
+              <tr><td class="px-3 py-2">choreography의 <span class="mono">context.sequence</span> 참조 (2_3 / 4_5 / 6_8)</td><td class="px-3 py-2 mono">109 (1 / 48 / 60)</td></tr>
+              <tr><td class="px-3 py-2">"terminal"의 정의</td><td class="px-3 py-2 mono">4 (kind 2 · 순번 1 · at(-1) 1)</td></tr>
+              <tr><td class="px-3 py-2">choreography 최상위 함수 (파일 간 공유 0)</td><td class="px-3 py-2 mono">59 (상수 포함 69)</td></tr>
+              <tr><td class="px-3 py-2">자기 preview가 없는 choice</td><td class="px-3 py-2 mono">14 / 42</td></tr>
+              <tr><td class="px-3 py-2">챕터 id 집합(2–8)을 독립 선언한 곳</td><td class="px-3 py-2 mono">5</td></tr>
+              <tr><td class="px-3 py-2">Chapter 9 추가 시 손대는 곳</td><td class="px-3 py-2 mono">비테스트 파일 11 · 편집 지점 약 21 (테스트 포함 14개 파일)</td></tr>
+              <tr><td class="px-3 py-2">Chapter 4 실험 B / Chapter 6 rebalance 이벤트를 따라가며 연 파일</td><td class="px-3 py-2 mono">12 / 13</td></tr>
+              <tr><td class="px-3 py-2"><span class="mono">AdvancedCityWorld</span> props / 방출 <span class="mono">data-*</span> attribute</td><td class="px-3 py-2 mono">8 / 22 (읽히는 것 17, 안 읽히는 것 5)</td></tr>
+              <tr><td class="px-3 py-2">badge가 버려지는 챕터</td><td class="px-3 py-2 mono">2 / 7 (Chapter 6 전체, Chapter 7 일부)</td></tr>
+              <tr><td class="px-3 py-2">import 시 scene Zod 파싱 (스레드당) / 7이벤트 run 재생 시</td><td class="px-3 py-2 mono">183 × 2 스레드 / 42</td></tr>
+              <tr><td class="px-3 py-2"><span class="mono">validation.ts</span> export schema 중 외부 import 없는 것</td><td class="px-3 py-2 mono">12 / 13</td></tr>
+              <tr><td class="px-3 py-2">두 화면 CSS module에 같은 이름의 class</td><td class="px-3 py-2 mono">10</td></tr>
+              <tr><td class="px-3 py-2">시각 baseline / CI에서 skip</td><td class="px-3 py-2 mono">37 / 37</td></tr>
+              <tr><td class="px-3 py-2">테스트 파일이 없는 module</td><td class="px-3 py-2 mono">chapterSimulation · chapterSchemas · simulation · protocol · validation</td></tr>
+              <tr><td class="px-3 py-2"><span class="mono">event()/diagnosis()</span> helper 복사본</td><td class="px-3 py-2 mono">3</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <details class="text-xs text-slate-600">
+          <summary class="cursor-pointer">확인에 쓴 명령</summary>
+          <pre class="mono bg-white border border-slate-200 rounded p-3 mt-2 overflow-x-auto">git log --oneline | head -60
+grep -oE "(experimentId|choiceId) === '[a-z0-9-]+'" src/city/choreography/*.ts | wc -l
+for f in src/city/choreography/chapter{2_3,4_5,6_8}.ts; do grep -o 'context\.sequence' $f | wc -l; done
+grep -cE '^(export )?(function|const) [a-zA-Z0-9_]+' src/city/choreography/chapter{2_3,4_5,6_8}.ts
+grep -oE 'data-[a-z-]+' src/components/AdvancedCityWorld.tsx | sort -u
+for s in $(grep -oE '^export const [a-zA-Z]+Schema' src/city/validation.ts | awk '{print $3}'); do grep -rl "\b$s\b" src e2e | grep -v validation.ts | wc -l; done
+comm -12 <(grep -oE '^\.[a-zA-Z]+' src/App.module.css | sort -u) <(grep -oE '^\.[a-zA-Z]+' src/components/GuidedChapterLab.module.css | sort -u)
+grep -n "test.skip" e2e/chapter-city-visual.spec.ts
+grep -rln "matchMedia" src
+grep -rn "cityCue" src/domain/chapters/            # 0건
+grep -rn "chapterScenarioSpecs" src --include='*.ts' --include='*.tsx' | grep -v '^src/content/'   # 0건
+grep -rn "2 | 3 | 4 | 5 | 6 | 7 | 8|z.literal(2)" src --include='*.ts' --include='*.tsx'
+grep -rn "addRun\|ChapterSimulationRun" src --include='*.ts' --include='*.tsx' | grep -v '\.test\.'
+PATH=/opt/homebrew/bin:$PATH node node_modules/vitest/vitest.mjs run --reporter=dot</pre>
+        </details>
+      </section>
+
+      <!-- ============================ TOP ============================ -->
+      <section id="top-recommendation" class="deep rounded-xl p-8 space-y-3">
+        <p class="text-xs uppercase tracking-wider text-slate-300">Top recommendation</p>
+        <h2 class="font-serif text-3xl"><a href="#c1" class="hover:underline">1. 연출을 Kafka 실행 기록에서 떼어낸다</a></h2>
+        <p class="text-slate-200 text-sm leading-6">
+          의존 방향이 뒤집힌 유일한 지점이고, 최근 커밋 10개가 전부 그 주변을 고치고 있다. 이 seam을 바로잡으면 후보 2(preview는 첫 cue에서 파생), 후보 6(시각 결정을 projection에 모음), 후보 7(검증 위치)이 같은 방향으로 줄어든다.
+          후보 3은 별개의 뿌리이고 살아 있는 결함 둘(<span class="mono">chapterCompleted</span>, Chapter 1의 OS 모션 줄임 무시)을 품고 있어 순서와 무관하게 할 가치가 있다.
+          후보 6의 badge 결함(Chapter 6·7)은 사용자에게 보이는 문제라서, 후보 1을 기다리지 않고 slot 용량만 먼저 scene 계약에 넣는 작은 수정도 가능하다.
+        </p>
+      </section>
+
+    </main>
+  </body>
+</html>
