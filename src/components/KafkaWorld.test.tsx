@@ -5,6 +5,31 @@ import { DEFAULT_CONFIG, DEFAULT_MESSAGE, type SimulationRun } from '../domain/s
 import { simulateProducerSend } from '../domain/engine'
 import { KafkaWorld } from './KafkaWorld'
 
+const SAFE_LEFT = 120
+const SAFE_RIGHT = 880
+
+function translateX(element: Element | null | undefined): number {
+  const match = /translate\(\s*(-?[\d.]+)/.exec(element?.getAttribute('transform') ?? '')
+  if (!match) throw new Error('Expected a translated overlay group.')
+  return Number(match[1])
+}
+
+function groupSpan(text: string): { left: number; right: number } {
+  const label = [...document.querySelectorAll('[data-city-world] text')]
+    .find((node) => node.textContent?.includes(text))
+  const group = label?.parentElement
+  const width = Number(group?.querySelector('rect')?.getAttribute('width') ?? NaN)
+  const left = translateX(group)
+  return { left, right: left + width }
+}
+
+function pathSpan(selector: string): { left: number; right: number } {
+  const commands = document.querySelector(selector)?.getAttribute('d') ?? ''
+  const xs = [...commands.matchAll(/[MH]\s*(-?[\d.]+)/g)].map((match) => Number(match[1]))
+  if (xs.length === 0) throw new Error('Expected horizontal coordinates in the hit area path.')
+  return { left: Math.min(...xs), right: Math.max(...xs) }
+}
+
 function makeRun(serializer: 'string' | 'json'): SimulationRun {
   return simulateProducerSend({
     runId: `run-${serializer}`,
@@ -86,6 +111,38 @@ describe('KafkaWorld', () => {
     renderWorld({ run: succeededRun, cursor: 6 })
 
     expect(screen.queryByRole('button', { name: /Producer 도착 문자/ })).not.toBeInTheDocument()
+  })
+
+  it('fills the Chapter 1 panel by cropping the approved background instead of letterboxing it', () => {
+    renderWorld()
+
+    expect(document.querySelector('[data-city-world]')).toHaveAttribute(
+      'preserveAspectRatio',
+      'xMidYMid slice',
+    )
+  })
+
+  it('keeps the city label inside the horizontal safe zone that survives cropping', () => {
+    renderWorld()
+
+    const label = groupSpan('EVENT CITY · BUILDING MAP')
+
+    expect(label.left).toBeGreaterThanOrEqual(SAFE_LEFT)
+    expect(label.right).toBeLessThanOrEqual(SAFE_RIGHT)
+  })
+
+  it('keeps the arrival message and its hit area inside the horizontal safe zone', () => {
+    const succeededRun = makeRun('json')
+
+    renderWorld({ run: succeededRun, cursor: 8 })
+
+    const bubble = groupSpan('기록 완료 문자가 도착했습니다')
+    const hitArea = pathSpan('[data-city-node="ack"] > path')
+
+    expect(bubble.left).toBeGreaterThanOrEqual(SAFE_LEFT)
+    expect(bubble.right).toBeLessThanOrEqual(SAFE_RIGHT)
+    expect(hitArea.left).toBeGreaterThanOrEqual(SAFE_LEFT)
+    expect(hitArea.right).toBeLessThanOrEqual(SAFE_RIGHT)
   })
 
   it('calls inspection for Enter and Space on a facility', () => {

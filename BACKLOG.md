@@ -91,18 +91,19 @@ blocked 항목: 없음
   - 2026-09-04 tick 1 done · playwright.config.ts 포트를 ECL_PORT(기본 4173)로, --strictPort 추가, 단위 테스트 3개 · ECL_PORT=4199 e2e 51 passed / 0 failed / 48 skipped · vitest 29 files / 151 tests · typecheck·build 통과
 
 ### [B-01] CityWorld의 preserveAspectRatio prop을 svg에도 적용한다
-- meta: id=B-01 | status=todo | type=fix | size=S | deps=B-00
+- meta: id=B-01 | status=done | type=fix | size=S | deps=B-00
 - 출처: architecture-review 작은 발견, design-review 진단 2
 - 근거: src/components/CityWorld.tsx:35 (svg에 meet 하드코딩) vs :46 (prop은 image에만); e2e/chapter-smoke.spec.ts:226; src/components/KafkaWorld.tsx:83 (slice 요청)
 - 완료기준:
-  - [ ] `<svg preserveAspectRatio>`가 prop 값을 쓴다. Chapter 2–8은 `meet` 그대로
-  - [ ] Chapter 1 도시가 1280×720·1440×900·1920×1080에서 도구막대 아래 빈 띠 없이 채워진다 (capture로 확인)
-  - [ ] `KafkaWorld.test.tsx`·`AdvancedCityWorld.test.tsx`에 svg 속성 단언 추가
-  - [ ] `chapter-smoke.spec.ts:226` 단언이 Chapter 2–8에만 적용됨을 유지
-  - [ ] 시각 변경 의도: Chapter 1만. Chapter 2–8 baseline 37장은 바뀌지 않는다
-  - [ ] typecheck·test:run·build·`ECL_PORT=4199 test:e2e` 통과
+  - [x] `<svg preserveAspectRatio>`가 prop 값을 쓴다. Chapter 2–8은 `meet` 그대로
+  - [x] Chapter 1 도시가 1280×720·1440×900·1920×1080에서 도구막대 아래 빈 띠 없이 채워진다 (capture로 확인)
+  - [x] `KafkaWorld.test.tsx`·`AdvancedCityWorld.test.tsx`에 svg 속성 단언 추가
+  - [x] `chapter-smoke.spec.ts:226` 단언이 Chapter 2–8에만 적용됨을 유지
+  - [x] 시각 변경 의도: Chapter 1만. Chapter 2–8 baseline 37장은 바뀌지 않는다
+  - [x] typecheck·test:run·build·`ECL_PORT=4199 test:e2e` 통과
 - 이력:
   - 2026-09-04 생성
+  - 2026-09-04 tick 2 done · svg가 preserveAspectRatio prop을 따라 Chapter 1이 slice로 채워짐(세 viewport 빈 띠 0px) · slice가 1440×900에서 viewBox 좌우 118단위를 잘라 도시 표지·ACK 말풍선·ACK 히트 영역을 x +104 이동(안전 구간 120–880, 테스트로 고정) · vitest 29 files / 155 tests · ECL_PORT=4199 e2e 51 passed / 0 failed / 48 skipped · 캡처 36장 문제 0 · Chapter 2–8 baseline 불변 · 남은 부작용: ACK 화살표 궤적 일부가 말풍선 뒤를 지남, ACK 히트 영역이 Producer 지붕을 조금 더 덮음
 
 ### [B-05] CHOICE_PREVIEWS 누락 14개를 채우고 형제 choice 구별 테스트를 넣는다
 - meta: id=B-05 | status=todo | type=fix | size=S | deps=-
@@ -254,6 +255,17 @@ blocked 항목: 없음
   - [ ] command npm run typecheck && command npm run test:run && command npm run build 통과
 - 이력:
   - 2026-09-04 tick 1 검증 중 발견해 추가
+
+### [B-32] Chapter 1에도 시각 baseline을 둔다
+- meta: id=B-32 | status=todo | type=fix | size=S | deps=B-01,B-02
+- 출처: tick 2 구현(B-01)에서 발견
+- 근거: e2e/chapter-city-visual.spec.ts는 chapter 2–8만 캡처한다. B-01에서 svg slice가 Chapter 1 오버레이를 잘라냈지만 e2e는 잡지 못했다(chapter-smoke의 경계 검사는 viewBox 안 여부만 본다)
+- 완료기준:
+  - [ ] chapter-city-visual.spec.ts가 Chapter 1의 초기·실패·성공 상태를 1440×900(복잡 챕터 규칙과 같게 1280×720·1920×1080 포함)에서 캡처하는 baseline을 추가한다. CI skip 조건은 기존과 같다
+  - [ ] Chapter 1 오버레이(도시 표지·ACK 말풍선·시설 표지)가 화면 안에 온전히 보이는지 e2e에서 getBoundingClientRect로 검사한다
+  - [ ] typecheck·test:run·build·ECL_PORT=4199 test:e2e 통과
+- 이력:
+  - 2026-09-04 tick 2 구현 중 발견해 추가
 
 ### [B-11] App.module.css의 직접 쓴 색을 토큰으로 바꾼다
 - meta: id=B-11 | status=todo | type=design | size=M | deps=B-00

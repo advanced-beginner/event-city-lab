@@ -299,6 +299,8 @@ Chapter 1 light-city 구현에서 확인한 내용:
 
 - 2026-09-04 tick 1 (B-00): Playwright 포트를 `ECL_PORT`로 환경변수화. `ECL_PORT=4199 npm run test:e2e` 51 passed / 0 failed / 48 skipped, vitest 29 files / 151 tests, typecheck·build 통과. 상세는 `BACKLOG.md`와 `workflows/continuous-improvement.md` Tick log.
 
+- 2026-09-04 tick 2 (B-01): `CityWorld` svg가 `preserveAspectRatio` prop을 따라 Chapter 1이 `slice`로 패널을 채운다(세 viewport 빈 띠 0px). 잘림에 맞춰 Chapter 1 도시 표지·ACK 문자 오버레이를 viewBox x +104 이동. vitest 29 files / 155 tests, `ECL_PORT=4199` e2e 51 passed / 48 skipped, 캡처 36장 문제 0, Chapter 2–8 baseline 불변.
+
 ## 9. 알려진 미비점
 
 ### 배포와 운영
@@ -320,6 +322,7 @@ Chapter 1 light-city 구현에서 확인한 내용:
 
 - Visual verdict 91점의 비차단 잔여 항목으로 Chapter 3 성공 terminal의 차량이 2시 끝점보다 중간 처리 지점에 가깝게 보이는 경우가 있다. 실제 event progress를 끝점으로 왜곡하지 않고 완료 상태 표지를 보강하는 방향을 우선한다.
 - Chapter 4·6 실패 표지와 Chapter 8 terminal의 상단 상태 칩 밀도는 자동 중첩 기준을 통과하지만, 후속 콘텐츠 변경 시 도로 위 주석을 늘리지 않고 상태 칩을 요약하는 원칙을 유지한다.
+- Chapter 1 ACK 신호 화살표 궤적의 일부가 x +104 이동한 도착 문자 말풍선 뒤를 지나고, ACK 히트 영역이 Producer 지붕을 조금 더 덮는다. 보이는 카드를 누르면 ACK, 건물을 누르면 Producer가 선택된다. Chapter 1 시각 baseline 추가는 BACKLOG B-32.
 
 ### 저장과 복구
 

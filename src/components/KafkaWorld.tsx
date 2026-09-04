@@ -118,11 +118,11 @@ export function KafkaWorld({
       </g>
 
       {ackVisible && (
-        <CityFacility nodeId="ack" accessibleName={`Producer 도착 문자, ${statusText(ackState)}`} onInspect={inspect} hitAreaClassName={styles.facilityHitArea} hitAreaPath="M16 78H310V194H16Z" className={`${styles.ackSignal} ${ackFocused ? styles.focused : ''}`}>
+        <CityFacility nodeId="ack" accessibleName={`Producer 도착 문자, ${statusText(ackState)}`} onInspect={inspect} hitAreaClassName={styles.facilityHitArea} hitAreaPath="M120 78H414V194H120Z" className={`${styles.ackSignal} ${ackFocused ? styles.focused : ''}`}>
           <path d="M720 274C640 78 400 42 318 255" fill="none" stroke="#238a5b" strokeWidth="4" strokeDasharray="9 10" markerEnd="url(#signal-arrow)" />
           <circle cx="621" cy="128" r="8" fill="#e8f7ef" stroke="#238a5b" strokeWidth="3" />
           <circle cx="482" cy="86" r="8" fill="#e8f7ef" stroke="#238a5b" strokeWidth="3" />
-          <g className={styles.smsBubble} transform="translate(20 92)">
+          <g className={styles.smsBubble} transform="translate(124 92)">
             <rect width="286" height="78" rx="12" />
             <path d="m54 78-16 20 4-20" />
             <circle cx="24" cy="24" r="12" fill="#238a5b" />
@@ -134,7 +134,7 @@ export function KafkaWorld({
         </CityFacility>
       )}
 
-      <g className={styles.cityLabel} transform="translate(24 28)" aria-hidden="true">
+      <g className={styles.cityLabel} transform="translate(128 28)" aria-hidden="true">
         <rect width="198" height="46" rx="10" />
         <text x="14" y="20">EVENT CITY · BUILDING MAP</text>
         <text x="14" y="35">orders.v1 · partition 0</text>

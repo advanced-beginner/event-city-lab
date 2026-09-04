@@ -98,6 +98,15 @@ describe('AdvancedCityWorld', () => {
     expect(screen.getByRole('button', { name: /Application \/ Sink, 완료/ })).toBeInTheDocument()
   })
 
+  it('shows the whole Chapter 2-8 atlas without cropping it', () => {
+    renderWorld()
+
+    expect(document.querySelector('[data-city-world]')).toHaveAttribute(
+      'preserveAspectRatio',
+      'xMidYMid meet',
+    )
+  })
+
   it('marks the world as reduced motion when the app preference is enabled', () => {
     renderWorld({ reducedMotion: true })
 

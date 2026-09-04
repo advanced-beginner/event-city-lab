@@ -32,7 +32,7 @@ export function CityWorld({
       viewBox={viewBox}
       role="img"
       aria-labelledby={`${titleId} ${descriptionId}`}
-      preserveAspectRatio="xMidYMid meet"
+      preserveAspectRatio={preserveAspectRatio}
       data-city-world
       data-reduced-motion={reducedMotion ? 'true' : 'false'}
     >
