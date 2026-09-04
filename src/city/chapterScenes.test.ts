@@ -98,3 +98,30 @@ describe('advanced chapter city scenes', () => {
     },
   )
 })
+
+describe('experiment choice previews', () => {
+  it.each([2, 3, 4, 5, 6, 7, 8] as const)(
+    'gives Chapter %s sibling choices distinguishable previews',
+    (chapterId: AdvancedChapterId) => {
+      for (const experiment of getChapterRule(chapterId).experiments) {
+        const signatures = experiment.choices.map((choice) => {
+          const preview = getExperimentCityPreview(experiment.id, choice.id)
+          return {
+            choiceId: choice.id,
+            signature: JSON.stringify([
+              [...new Set(preview.nodeIds)].sort(),
+              [...new Set(preview.routeIds)].sort(),
+            ]),
+          }
+        })
+
+        for (let left = 0; left < signatures.length; left += 1) {
+          for (let right = left + 1; right < signatures.length; right += 1) {
+            const pair = `${experiment.id}: ${signatures[left]!.choiceId} vs ${signatures[right]!.choiceId}`
+            expect(signatures[left]!.signature, pair).not.toBe(signatures[right]!.signature)
+          }
+        }
+      }
+    },
+  )
+})

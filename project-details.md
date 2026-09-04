@@ -301,6 +301,8 @@ Chapter 1 light-city 구현에서 확인한 내용:
 
 - 2026-09-04 tick 2 (B-01): `CityWorld` svg가 `preserveAspectRatio` prop을 따라 Chapter 1이 `slice`로 패널을 채운다(세 viewport 빈 띠 0px). 잘림에 맞춰 Chapter 1 도시 표지·ACK 문자 오버레이를 viewBox x +104 이동. vitest 29 files / 155 tests, `ECL_PORT=4199` e2e 51 passed / 48 skipped, 캡처 36장 문제 0, Chapter 2–8 baseline 불변.
 
+- 2026-09-04 tick 3 (B-05): `CHOICE_PREVIEWS` 28→42로 모든 choice가 자기 preview를 가진다. 형제 choice preview 구별 테스트 추가. vitest 29 files / 162 tests, `ECL_PORT=4199` e2e 51 passed / 48 skipped, 캡처 72장 문제 0, baseline 불변.
+
 ## 9. 알려진 미비점
 
 ### 배포와 운영
@@ -323,6 +325,7 @@ Chapter 1 light-city 구현에서 확인한 내용:
 - Visual verdict 91점의 비차단 잔여 항목으로 Chapter 3 성공 terminal의 차량이 2시 끝점보다 중간 처리 지점에 가깝게 보이는 경우가 있다. 실제 event progress를 끝점으로 왜곡하지 않고 완료 상태 표지를 보강하는 방향을 우선한다.
 - Chapter 4·6 실패 표지와 Chapter 8 terminal의 상단 상태 칩 밀도는 자동 중첩 기준을 통과하지만, 후속 콘텐츠 변경 시 도로 위 주석을 늘리지 않고 상태 칩을 요약하는 원칙을 유지한다.
 - Chapter 1 ACK 신호 화살표 궤적의 일부가 x +104 이동한 도착 문자 말풍선 뒤를 지나고, ACK 히트 영역이 Producer 지붕을 조금 더 덮는다. 보이는 카드를 누르면 ACK, 건물을 누르면 Producer가 선택된다. Chapter 1 시각 baseline 추가는 BACKLOG B-32.
+- 실행 전 preview 강조는 데이터(`getExperimentCityPreview`)는 갖춰졌지만 화면에 배선되지 않았다. `AdvancedCityWorld.tsx`가 모든 route에 `previewed={false}`를 넘기고 `.previewFacility`는 무동작이라 Chapter 8 transaction boundary 외에는 보이는 preview가 없다(BACKLOG B-33). 논리 노드가 5개 물리 slot으로 접혀 형제 choice 21쌍 중 10쌍은 강조 시설 집합이 같고, route preview가 배선되어야 구별된다. idle 시설 class에 문자열 `undefined`가 들어간다(BACKLOG B-34).
 
 ### 저장과 복구
 
