@@ -297,6 +297,8 @@ Chapter 1 light-city 구현에서 확인한 내용:
 - 차단기와 control signal은 승인된 도로 좌표를 바꾸지 않는다. 제어·ACK·transaction 신호는 도로를 가로지르는 곡선을 제거하고 상단 상태 칩과 대상 시설 pulse로 축소했다. Chapter 8의 원자적 경계도 지도 전체 polygon 대신 compact banner로 표시하며, 논리 노드가 4개 이상인 시설은 단일 요약 배지를 사용한다.
 - 최종 검증은 typecheck, Vitest 28파일 148개, production build, Chromium·Firefox·WebKit × 3개 viewport의 semantic Playwright 36개를 모두 통과했다. 37개 Chromium 시각 baseline을 갱신한 뒤 대상 visual test 15개도 재실행 통과했다. 실제 브라우저 화면을 사용한 Visual Ralph식 판정은 58 → 78 → 91점으로 반복해 통과 기준 90을 넘겼다.
 
+- 2026-09-04 tick 1 (B-00): Playwright 포트를 `ECL_PORT`로 환경변수화. `ECL_PORT=4199 npm run test:e2e` 51 passed / 0 failed / 48 skipped, vitest 29 files / 151 tests, typecheck·build 통과. 상세는 `BACKLOG.md`와 `workflows/continuous-improvement.md` Tick log.
+
 ## 9. 알려진 미비점
 
 ### 배포와 운영
@@ -312,6 +314,7 @@ Chapter 1 light-city 구현에서 확인한 내용:
 - 세 viewport의 page overflow와 핵심 production asset 로딩은 Chromium, Firefox, WebKit 조합으로 자동화했다. 핵심 텍스트의 시각적 clipping 판정은 아직 수동 검토가 필요하다.
 - SVG 시설의 role/name과 Enter/Space 조작 회귀 테스트를 유지한다. 전용 WCAG scanner를 사용하는 자동 감사는 아직 없다.
 - coverage report 설정은 있으나 threshold가 없다.
+- e2e의 preview 포트는 `ECL_PORT`(기본 4173)로 옮길 수 있고 `--strictPort`로 고정된다. `playwright.config.ts`와 그 단위 테스트는 tsconfig include 밖이라 typecheck를 받지 않는다(BACKLOG B-31).
 
 ### 시각적 후속 polish
 

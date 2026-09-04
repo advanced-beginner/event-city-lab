@@ -35,12 +35,12 @@ Status: Active since 2026-09-04
 ## Setup (한 번)
 
 1. 이 문서·`BACKLOG.md`·`.claude/`·`docs/reviews/`·AGENTS.md·project-details.md 변경은 `improve/backlog` 브랜치의 첫 커밋으로 들어간다(2026-09-04, 첫 tick 직전). `main`에는 사용자가 merge할 때 들어간다.
-2. 포트 4173을 점유한 다른 프로젝트 프로세스(`node tools/local-preview.mjs`)는 사용자가 정리한다. B-00이 끝나면 e2e는 `ECL_PORT`로 포트를 옮길 수 있어 재발해도 막히지 않는다.
+2. 포트 4173을 점유한 다른 프로젝트 프로세스(`node tools/local-preview.mjs`)는 사용자가 정리한다. e2e는 `ECL_PORT`로 포트를 옮길 수 있어 점유가 재발해도 막히지 않는다.
 3. 의존성은 저장소의 `node_modules`를 그대로 쓴다. `engines`는 node 24를 선언하지만 이 머신은 26.7.0이다. CI는 24다.
 4. 첫 tick은 사용자가 보는 자리에서 `/backlog-tick B-00`으로 한 번 실행한다. 확인할 것: 브랜치가 `improve/backlog`인지, Lore 형식 커밋, BACKLOG의 B-00 `status=done`, 아래 Tick log 한 줄, `.omx/tick.lock` 없음.
 5. 그 뒤 `/loop <주기> /backlog-tick`을 지정한다. loop 중에는 작업 트리에 사용자의 미커밋 변경이 없어야 한다. 있으면 tick은 아무것도 하지 않고 멈춘다.
 
-`ECL_PORT`: B-00 이후 `playwright.config.ts`와 preview가 이 환경변수로 포트를 받는다. tick은 `ECL_PORT=4199`를 쓴다. 기본값은 4173이다.
+`ECL_PORT`: `playwright.config.ts`의 `baseURL`·`webServer.url`·`webServer.command`가 이 환경변수의 포트를 쓰고, 기본값은 4173이다. `webServer.command`는 `--strictPort`로 preview를 그 포트에 고정하므로 포트가 차 있으면 조용히 밀리지 않고 실패한다. tick은 `ECL_PORT=4199 command npm run test:e2e`로 돌린다.
 
 ## Loop (tick 절차 요약, 상세는 `.claude/skills/backlog-tick/SKILL.md`)
 
@@ -67,3 +67,4 @@ DEC-1~6은 사용자가 별도 grilling으로 정한다. 첫 대상은 DEC-4(아
 
 | 날짜 | tick | 항목 | 결과 | 커밋 | main 앞선 커밋 |
 | --- | --- | --- | --- | --- | --- |
+| 2026-09-04 | 1 | B-00 | done | (다음 tick이 채움) | 0 |

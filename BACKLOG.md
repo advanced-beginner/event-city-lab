@@ -77,17 +77,18 @@ blocked 항목: 없음
 ## 항목
 
 ### [B-00] Playwright와 preview 포트를 환경변수로 바꾼다
-- meta: id=B-00 | status=todo | type=fix | size=S | deps=-
+- meta: id=B-00 | status=done | type=fix | size=S | deps=-
 - 출처: continuous-improvement setup (Plan agent 발견 A)
 - 근거: playwright.config.ts:27,45-50 (4173 고정); node_modules/playwright-core/lib/coreBundle.js:8521 (재사용 판정 200≤status<404); 이 머신의 4173은 다른 프로젝트 프로세스가 점유
 - 완료기준:
-  - [ ] `playwright.config.ts`의 `baseURL`·`webServer.url`·`webServer.command`가 `process.env.ECL_PORT ?? '4173'`을 쓴다
-  - [ ] `webServer.command`에 `--strictPort`가 있다
-  - [ ] `workflows/continuous-improvement.md` Setup에 `ECL_PORT` 사용법 한 줄
-  - [ ] `ECL_PORT=4199 command npm run test:e2e` 통과, 통과 수를 이력에 기록
-  - [ ] `command npm run typecheck && command npm run test:run && command npm run build` 통과
+  - [x] `playwright.config.ts`의 `baseURL`·`webServer.url`·`webServer.command`가 `process.env.ECL_PORT ?? '4173'`을 쓴다
+  - [x] `webServer.command`에 `--strictPort`가 있다
+  - [x] `workflows/continuous-improvement.md` Setup에 `ECL_PORT` 사용법 한 줄
+  - [x] `ECL_PORT=4199 command npm run test:e2e` 통과, 통과 수를 이력에 기록
+  - [x] `command npm run typecheck && command npm run test:run && command npm run build` 통과
 - 이력:
   - 2026-09-04 생성
+  - 2026-09-04 tick 1 done · playwright.config.ts 포트를 ECL_PORT(기본 4173)로, --strictPort 추가, 단위 테스트 3개 · ECL_PORT=4199 e2e 51 passed / 0 failed / 48 skipped · vitest 29 files / 151 tests · typecheck·build 통과
 
 ### [B-01] CityWorld의 preserveAspectRatio prop을 svg에도 적용한다
 - meta: id=B-01 | status=todo | type=fix | size=S | deps=B-00
@@ -243,6 +244,16 @@ blocked 항목: 없음
   - [ ] typecheck·test:run·build·`ECL_PORT=4199 test:e2e` 통과
 - 이력:
   - 2026-09-04 생성
+
+### [B-31] 저장소 루트의 테스트 파일을 typecheck 범위에 넣는다
+- meta: id=B-31 | status=todo | type=fix | size=S | deps=-
+- 출처: tick 1 검증(B-00)에서 발견
+- 근거: tsconfig.app.json include는 src만, tsconfig.node.json은 vite.config.ts만이라 playwright.config.ts와 playwright.config.test.ts는 타입 검사를 받지 않는다. src 안에 두면 @types/node 부재(process)와 exactOptionalPropertyTypes 충돌로 6개 오류가 난다
+- 완료기준:
+  - [ ] playwright.config.ts와 그 단위 테스트가 typecheck 대상에 들어간다 (tsconfig.node.json include 확장 또는 별도 tsconfig). 새 의존성 없이
+  - [ ] command npm run typecheck && command npm run test:run && command npm run build 통과
+- 이력:
+  - 2026-09-04 tick 1 검증 중 발견해 추가
 
 ### [B-11] App.module.css의 직접 쓴 색을 토큰으로 바꾼다
 - meta: id=B-11 | status=todo | type=design | size=M | deps=B-00

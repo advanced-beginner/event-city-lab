@@ -12,6 +12,9 @@ const browsers = [
   { name: 'webkit', use: devices['Desktop Safari'] },
 ] as const
 
+const previewPort = process.env.ECL_PORT ?? '4173'
+const previewUrl = `http://127.0.0.1:${previewPort}/event-city-lab/`
+
 export default defineConfig({
   testDir: './e2e',
   outputDir: 'test-results',
@@ -21,7 +24,7 @@ export default defineConfig({
   workers: process.env.CI ? 1 : undefined,
   reporter: process.env.CI ? 'github' : [['list'], ['html', { open: 'never' }]],
   use: {
-    baseURL: 'http://127.0.0.1:4173/event-city-lab/',
+    baseURL: previewUrl,
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
   },
@@ -35,8 +38,8 @@ export default defineConfig({
     })),
   ),
   webServer: {
-    command: 'npm run preview -- --host 127.0.0.1 --port 4173',
-    url: 'http://127.0.0.1:4173/event-city-lab/',
+    command: `npm run preview -- --host 127.0.0.1 --port ${previewPort} --strictPort`,
+    url: previewUrl,
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
   },
