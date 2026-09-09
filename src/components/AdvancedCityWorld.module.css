@@ -1,21 +1,12 @@
-.world { display: block; width: 100%; height: 100%; min-height: 0; overflow: visible; }
+.worldFrame { display: grid; grid-template-rows: 80px minmax(0, 1fr); position: relative; width: 100%; height: 100%; min-height: 0; overflow: hidden; }
+.world { grid-row: 2; display: block; width: 100%; height: 100%; min-height: 0; overflow: hidden; }
 .backdrop { image-rendering: auto; }
 .wash { fill: #0e2b36; opacity: .12; pointer-events: none; }
-
-.transactionBoundary { color: #7656c9; opacity: .62; pointer-events: none; }
-.transactionBadge rect { fill: #f8f3fff2; stroke: currentColor; stroke-width: 3; }
-.transactionBadge circle { fill: currentColor; stroke: #fff; stroke-width: 2; }
-.transactionBadge text { fill: currentColor; font: 800 16px ui-monospace, SFMono-Regular, Menlo, monospace; }
-.transactionBadge circle + text { fill: #fff; font-size: 12px; }
-.transactionBoundary.active, .transactionBoundary.complete, .previewBoundary { opacity: .88; }
-.transactionBoundary.failed, .transactionBoundary.blocked { color: #d84a5b; opacity: .94; }
 
 .mainRoadGuide { color: #0b7e85; pointer-events: none; }
 .mainRoadGuideHalo { fill: none; stroke: #f7fffdf2; stroke-width: 18; stroke-linecap: round; stroke-linejoin: round; opacity: .82; }
 .mainRoadGuideLine { fill: none; stroke: currentColor; stroke-width: 8; stroke-linecap: round; stroke-linejoin: round; opacity: .86; }
 .mainRoadAnchor { fill: #fff; stroke: currentColor; stroke-width: 7; }
-.mainRoadEndpoint rect { fill: #123743ed; stroke: #e7fffb; stroke-width: 2; }
-.mainRoadEndpoint text { fill: #fff; font: 800 14px "Nanum Gothic", sans-serif; }
 .route { color: #15989b; opacity: .82; transition: opacity 180ms ease, color 180ms ease; }
 .routeHalo { fill: none; stroke: #fff; stroke-width: 9; stroke-linecap: round; stroke-linejoin: round; opacity: .66; }
 .routeLine { fill: none; stroke: currentColor; stroke-width: 5; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 15 13; }
@@ -44,8 +35,8 @@
 .facility.blocked .hitArea { fill: #e9a23b; fill-opacity: .025; stroke: #e9a23b99; stroke-width: 3; stroke-dasharray: 12 10; }
 .facility.focused .hitArea { fill: #20aaa8; fill-opacity: .02; stroke: #55d7d080; stroke-width: 3; }
 .facility.muted { opacity: .52; }
-.previewFacility { filter: none; }
-.previewFacility .hitArea { fill-opacity: .001; stroke: transparent; }
+.previewFacility { filter: url(#advanced-city-glow); }
+.previewFacility .hitArea { fill: #7656c9; fill-opacity: .12; stroke: #7656c9; stroke-width: 5; stroke-dasharray: 18 10; }
 
 .facilitySign { filter: url(#advanced-city-shadow); pointer-events: none; }
 .facilitySign rect { fill: #fefcf4ed; stroke: #302840; stroke-width: 3; }
@@ -54,16 +45,19 @@
 .facilitySign circle[data-state='blocked'] { fill: #e9a23b; }
 .facilitySign circle[data-state='failed'] { fill: #ef6170; }
 .facilitySign circle[data-state='complete'] { fill: #61db94; }
-.facilitySign text { fill: #302840; font-family: "Nanum Gothic", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; font-size: 17px; font-weight: 800; }
-.facilitySign text:last-child { fill: #66758a; font-size: 14px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.facilitySign text { fill: #302840; font-family: "Nanum Gothic", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; font-size: 32px; font-weight: 800; }
+.facilitySign text:nth-of-type(2) { fill: #66758a; font-size: 15px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.facilitySign .facilityStateText { fill: #302840; font: 800 32px "Nanum Gothic", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; }
 .logicalBadges rect { fill: #f8fbfbf2; stroke: #5b6879; stroke-width: 2; }
 .facilitySign .logicalBadges text { fill: #405166; font: 800 12px ui-monospace, SFMono-Regular, Menlo, monospace; }
 .logicalBadges [data-logical-state='active'] rect { fill: #dffafa; stroke: #15989b; }
 .logicalBadges [data-logical-state='complete'] rect { fill: #e5f8ed; stroke: #238a5b; }
 .logicalBadges [data-logical-state='failed'] rect,
 .logicalBadges [data-logical-state='blocked'] rect { fill: #fff0f2; stroke: #d84a5b; }
+.logicalBadges [data-logical-preview='true'] rect { fill: #f0e9ff; stroke: #7656c9; stroke-width: 3; }
 .logicalSummary rect { fill: #eef7f7f2; stroke: #5b6879; stroke-width: 2; }
 .facilitySign .logicalSummary text { fill: #405166; font: 800 12px ui-monospace, SFMono-Regular, Menlo, monospace; }
+.logicalSummary[data-logical-preview='true'] rect { fill: #f0e9ff; stroke: #7656c9; stroke-width: 3; }
 
 .carrier { filter: url(#advanced-city-shadow); transition: opacity 180ms ease; }
 .carrier image { image-rendering: pixelated; }
@@ -82,6 +76,7 @@
 .signalStatus text { fill: currentColor; font: 800 14px ui-monospace, SFMono-Regular, Menlo, monospace; }
 .signalPulse circle:first-child { fill: currentColor; opacity: .14; }
 .signalPulse circle:last-child { fill: currentColor; stroke: #fff; stroke-width: 3; }
+.signalPulse circle:first-child { animation: advanced-signal-pulse 1.2s ease-in-out infinite; transform-origin: center; }
 .successSignal { color: #238a5b; }
 .controlSignal { color: #7656c9; }
 .signal.failed, .signal.blocked { color: #d84a5b; }
@@ -92,18 +87,31 @@
 .barrier text { fill: currentColor; font: 800 15px ui-monospace, SFMono-Regular, Menlo, monospace; }
 .barrierClosed { color: #d84a5b; filter: drop-shadow(0 0 10px #d84a5b88); }
 
-.pending { filter: saturate(.82); }
-.pendingLabel rect { fill: #fff8e9; stroke: #7656c9; stroke-width: 3; }
-.pendingLabel text { fill: #664ca6; font: 800 21px "Nanum Gothic", sans-serif; }
+.pending .world { filter: saturate(.82); }
+.cityHud { grid-row: 1; grid-column: 1; align-self: start; display: flex; flex-wrap: wrap; align-content: start; gap: 4px 8px; padding: 2px 4px; pointer-events: none; }
+.hudChip { min-height: 34px; display: inline-flex; align-items: center; gap: 8px; padding: 5px 10px 5px 6px; border: 1px solid currentColor; border-radius: 8px; background: #fffffff2; color: #238a5b; box-shadow: 0 8px 22px #10253333; }
+.hudChip span { min-width: 24px; height: 24px; display: grid; place-items: center; border-radius: 6px; background: color-mix(in srgb, currentColor 14%, white); color: currentColor; font: 900 11px ui-monospace, SFMono-Regular, Menlo, monospace; }
+.hudChip strong { color: currentColor; font: 800 12px "Nanum Gothic", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; }
+.hudChip.active { color: #7656c9; }
+.hudChip.blocked, .hudChip.failed { color: #d84a5b; }
+.hudChip.complete { color: #238a5b; }
+
+[data-city-motion-active='false'] .route_active .routeLine,
+[data-city-motion-active='false'] .signalPulse circle:first-child,
+[data-city-run-status='failed'] .route_active .routeLine,
+[data-city-run-status='succeeded'] .route_active .routeLine,
+[data-city-run-status='failed'] .signalPulse circle:first-child,
+[data-city-run-status='succeeded'] .signalPulse circle:first-child { animation-play-state: paused; animation: none; }
 
 :global(.city-world-reduced-motion) .route_active .routeLine { animation: none; }
 :global(.city-world-reduced-motion) .carrier,
 :global(.city-world-reduced-motion) .facility { transition: none; }
 
 @media (prefers-reduced-motion: reduce) {
-  .route_active .routeLine, .carrier_failed { animation: none; }
+  .route_active .routeLine, .carrier_failed, .signalPulse circle:first-child { animation: none; }
   .carrier, .facility { transition: none; }
 }
 
 @keyframes advanced-route-flow { to { stroke-dashoffset: -62; } }
+@keyframes advanced-signal-pulse { 50% { transform: scale(1.3); opacity: .08; } }
 @keyframes advanced-shake { 33% { translate: -5px 0; } 66% { translate: 5px 0; } }

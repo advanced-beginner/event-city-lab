@@ -4,14 +4,14 @@
 
 이 문서는 Event City Lab의 제품 흐름, 챕터별 구현 상태, 기술적 동작, 검증 결과, 알려진 미비점과 TODO를 관리하는 단일 기록이다.
 
-- 기록 기준일: 2026-08-20
+- 기록 기준일: 2026-09-09
 - 기준 브랜치: `main`
 - Chapter 1 기준 구현 커밋: `db7e918` (`실패를 도시 배송 경험으로 이해할 수 있게 한다`)
 - App version: `0.2.0`
 - Content version: `2026.2`
 - Kafka rule basis: `4.3.1`
 - Storage schema: `2` (`v1` 자동 migration)
-- 현재 판정: Chapter 1–8의 결정론적 실험 규칙, Web Worker 실행, 공통 guided UI, 로컬 진도 저장과 hash navigation 구현 완료. 자동 검증은 통과했고 공개 배포 확인만 남았다.
+- 현재 판정: Chapter 1–8의 결정론적 실험 규칙, Web Worker 실행, 공통 guided UI, 로컬 진도 저장과 hash navigation 구현 완료. Chapter 2–8 도시의 근접 보기, 단일 재생 clock, 시설 내부 조사와 결과 표시를 개선했다. 최신 검증 범위는 §8의 2026-09-09 기록을 따른다.
 
 ## 2. 제품 목표
 
@@ -303,6 +303,16 @@ Chapter 1 light-city 구현에서 확인한 내용:
 
 - 2026-09-04 tick 3 (B-05): `CHOICE_PREVIEWS` 28→42로 모든 choice가 자기 preview를 가진다. 형제 choice preview 구별 테스트 추가. vitest 29 files / 162 tests, `ECL_PORT=4199` e2e 51 passed / 48 skipped, 캡처 72장 문제 0, baseline 불변.
 
+2026-09-09 Chapter 2–8 도시 동작·표현 개선:
+
+- 기본 화면을 승인된 직선 주도로와 챕터별 활성 시설을 포함하는 고정 근접 보기로 변경했다. `핵심 도로 / 전체 지도` 전환을 제공하고 원본 atlas `1920×1047` 크기와 camera viewBox를 분리했다. Chapter 1 구도와 자산은 유지한다.
+- 차량과 사건은 단일 RAF 재생 clock을 공유한다. 1×의 화면 이동속도 240px/s, 정차 200ms, 사건 최소 표시 500ms를 적용하며 pause/resume, 속도 변경, 즉시 seek, cursor `-1` 되감기, 한 단계와 새 실행 초기화를 제공한다. 논리 시간·도메인 이벤트·Worker 메시지·저장 schema는 변경하지 않는다.
+- 물리 건물의 모든 논리 노드에서 현재 cursor까지 관찰한 최신 사건을 조사하며 실제 매칭 노드를 선택한다. 내부 노드 선택기와 관찰 전 역할 설명을 제공한다. 미래 사건은 시설 클릭으로 열리지 않는다.
+- 실행 전 선택은 보라색 시설 outline과 관련 논리 노드 표시, 선택 조건 설명으로 연결된다. 단일 물리 도로를 중복 그리지 않는다. cue 개수의 잘못된 `N records` 표기는 `메시지 흐름 요약`으로 바꿨다.
+- 주요 시설명과 현재 상태는 근접 보기에서 12px 이상으로 표시한다. ACK·commit·transaction·수정 대기와 차단 사유는 고정 HUD로 옮기고 차량·도로·시설 좌표를 보존한다. 마지막 이동이 끝나면 반복 효과를 종료하며 실제 checkpoint와 시설 상태를 유지한다. 성공 실행에는 실패 진단 카드를 표시하지 않는다.
+- 2026-08-26 기록의 atlas 전체 보기 기본값, 거리 비율 기반 독립 애니메이션, cue 개수 기반 record 집계 표시는 이번 계약으로 대체한다. 학습 선택지와 세 실험 구성은 동일하다.
+- 최종 검증: `npm run typecheck`, Vitest 32파일 225개, production build 통과. 21개 실험·42개 선택지의 projection, 사건 불변성·되감기 회귀를 포함한다. Chromium·Firefox·WebKit × 세 viewport의 Playwright는 168 passed / 0 failed / 48 skipped(지원 범위 밖 시각 baseline 조합)다. 기존 37개 Chromium 시각 기준 이미지를 실제 화면 검토 후 갱신하고 비교 검사를 재통과했다. 복잡한 챕터 2·4·6·8의 초기·실패·수정 대기·성공·되감기 화면 60장을 추가 캡처해 검토했다. 런타임 자산의 Git 추적과 `/event-city-lab/` 경로의 asset·Worker 로딩, Chapter 1 회귀도 확인했다. 공개 배포는 수행하지 않았다.
+
 ## 9. 알려진 미비점
 
 ### 배포와 운영
@@ -322,10 +332,10 @@ Chapter 1 light-city 구현에서 확인한 내용:
 
 ### 시각적 후속 polish
 
-- Visual verdict 91점의 비차단 잔여 항목으로 Chapter 3 성공 terminal의 차량이 2시 끝점보다 중간 처리 지점에 가깝게 보이는 경우가 있다. 실제 event progress를 끝점으로 왜곡하지 않고 완료 상태 표지를 보강하는 방향을 우선한다.
+- 성공해도 차량이 중간 checkpoint 또는 출발지에 남을 수 있다. 복제·제어 관찰 실험의 정상 동작이며, terminal 결과와 이동 상태를 구분한다.
 - Chapter 4·6 실패 표지와 Chapter 8 terminal의 상단 상태 칩 밀도는 자동 중첩 기준을 통과하지만, 후속 콘텐츠 변경 시 도로 위 주석을 늘리지 않고 상태 칩을 요약하는 원칙을 유지한다.
 - Chapter 1 ACK 신호 화살표 궤적의 일부가 x +104 이동한 도착 문자 말풍선 뒤를 지나고, ACK 히트 영역이 Producer 지붕을 조금 더 덮는다. 보이는 카드를 누르면 ACK, 건물을 누르면 Producer가 선택된다. Chapter 1 시각 baseline 추가는 BACKLOG B-32.
-- 실행 전 preview 강조는 데이터(`getExperimentCityPreview`)는 갖춰졌지만 화면에 배선되지 않았다. `AdvancedCityWorld.tsx`가 모든 route에 `previewed={false}`를 넘기고 `.previewFacility`는 무동작이라 Chapter 8 transaction boundary 외에는 보이는 preview가 없다(BACKLOG B-33). 논리 노드가 5개 물리 slot으로 접혀 형제 choice 21쌍 중 10쌍은 강조 시설 집합이 같고, route preview가 배선되어야 구별된다. idle 시설 class에 문자열 `undefined`가 들어간다(BACKLOG B-34).
+- 실행 전 preview의 시설·논리 노드 강조와 선택 설명은 2026-09-09 개선에 포함했다. 같은 건물을 사용하는 선택지도 내부 노드와 설명으로 구분한다. 긴 내부 상태의 상세 내용은 시설 조사 영역에서 확인한다. 동적 상태 CSS class가 없을 때 `undefined` 문자열을 출력하던 부분도 제거했다.
 
 ### 저장과 복구
 

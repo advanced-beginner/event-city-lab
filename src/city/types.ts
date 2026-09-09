@@ -150,8 +150,9 @@ export interface CityRouteState extends CityRouteDefinition {
 
 export interface CityCarrierState extends CityCarrierChange {
   id: string
-  batchLabels: readonly string[]
-  batchSize: number
+  // Cue count describes visual sources, never the number of Kafka records.
+  cueLabels: readonly string[]
+  cueCount: number
   roadProgress: number
   sourceCarrierId: string
 }

@@ -109,15 +109,15 @@ function projectSingleVehicle(
       right.roadProgress - left.roadProgress || left.id.localeCompare(right.id)
     ))
   const visibleChange = eligibleChanges[0]
-  const batchLabels = recordChanges.map(({ change, id }) => change.label ?? id)
+  const cueLabels = recordChanges.map(({ change, id }) => change.label ?? id)
   if (visibleChange) {
-    const label = batchVehicleLabel(visibleChange.change, recordChanges.length)
+    const label = aggregateVehicleLabel(visibleChange.change, recordChanges.length)
     return {
       vehicle: {
         ...visibleChange.change,
         id: 'vehicle',
-        batchLabels,
-        batchSize: recordChanges.length,
+        cueLabels,
+        cueCount: recordChanges.length,
         roadProgress: Math.max(currentRoadProgress, visibleChange.roadProgress),
         sourceCarrierId: visibleChange.id,
         ...(label ? { label } : {}),
@@ -128,9 +128,9 @@ function projectSingleVehicle(
   const reverseStatusChange = recordChanges
     .sort((left, right) => left.id.localeCompare(right.id))[0]
   if (reverseStatusChange && current.vehicle) {
-    const label = current.vehicle.batchSize > 1
+    const label = current.vehicle.cueCount > 1
       ? current.vehicle.label
-      : batchVehicleLabel(reverseStatusChange.change, recordChanges.length)
+      : aggregateVehicleLabel(reverseStatusChange.change, recordChanges.length)
     return {
       vehicle: {
         ...current.vehicle,
@@ -151,8 +151,8 @@ function initialVehicle(scene: CitySceneDefinition): CityWorldState['carriers'] 
   return {
     vehicle: {
       id: 'vehicle',
-      batchLabels: ['record'],
-      batchSize: 1,
+      cueLabels: ['record'],
+      cueCount: 1,
       kind: 'record',
       roadProgress: 0,
       routeId: route.id,
@@ -173,9 +173,9 @@ function isForwardCarrierRoute(scene: CitySceneDefinition, routeId: string): boo
   return Boolean(fromNode && toNode && fromNode.roadAccessIndex < toNode.roadAccessIndex)
 }
 
-function batchVehicleLabel(change: NonNullable<CityCarrierChangeValue>, visibleCount: number): string | undefined {
+function aggregateVehicleLabel(change: NonNullable<CityCarrierChangeValue>, visibleCount: number): string | undefined {
   if (visibleCount <= 1) return change.label
-  return `${visibleCount} records · 순차`
+  return '메시지 흐름 요약'
 }
 
 function carrierRoadProgress(scene: CitySceneDefinition, change: CityCarrierChange): number {

@@ -3,7 +3,7 @@
 ## Source of truth
 
 - Status: Active
-- Last refreshed: 2026-08-20
+- Last refreshed: 2026-09-09
 - Product: Event City Lab
 - Scope: Chapter 1–8 — 실패 중심 Kafka 실험, 증거 조사, 수정과 재실행
 - Primary evidence: 사용자 제공 기존 화면 캡처, Chapter 1 승인 도시 배경, Chapter 2–8 승인 고해상도 도시 atlas, 본 문서에 기록된 인터뷰 합의
@@ -64,7 +64,7 @@ Visual asset 규칙:
 - 2:1 isometric, 64×32 ground tile 기준.
 - 명확한 16-bit pixel cluster와 `#302840` 계열 2–3px 외곽선.
 - 좌상단 golden light, 우하단 muted-violet contact shadow.
-- Chapter 1 배경은 기존 승인 구도를 유지한다. Chapter 2–8 atlas는 `preserveAspectRatio="xMidYMid meet"`로 전체를 표시하며 자르거나 늘이지 않는다.
+- Chapter 1 배경은 기존 승인 구도를 유지한다. Chapter 2–8은 `핵심 도로` 근접 보기를 기본으로, `전체 지도`를 선택 가능한 보기로 제공한다. 근접 보기는 주도로 전체와 사용 중인 물리 시설의 실루엣·표지를 포함한다. 배경의 원본 좌표 크기는 카메라 viewBox와 분리하고 늘이지 않는다. 실행 도중 카메라를 자동 이동하지 않는다.
 - 시설 표지의 한글·영문은 raster에 굽지 않고 실제 SVG text로 표시한다.
 - Producer·Serializer·Broker·노란 메시지 차량이 1차 시각 중심이고 일반 건물은 대비를 한 단계 낮춘다.
 - 별도 도로·건물 sprite를 배경 위에 중복 배치하지 않는다. 메시지 checkpoint와 진행 path만 배경 속 중앙 대로의 실제 차선에 맞춘 SVG overlay다.
@@ -126,19 +126,27 @@ Chapter 1과 Chapter 2–8은 공통 inline SVG renderer `CityWorld`와 키보�
 
 공통 운송 문법은 다음과 같다.
 
-- record와 retry record는 동일한 노란 Kafka 밴 한 대와 현재 상태 표지로 표시한다. 여러 record는 차량을 늘리지 않고 `N records · 순차` batch 표지로 묶는다. 실패도 같은 밴을 유지하고 오류 표지를 더한다.
+- record와 retry record는 동일한 노란 Kafka 밴 한 대와 현재 상태 표지로 표시한다. 여러 record의 흐름은 차량을 늘리지 않고 요약 표지로 묶는다. 시각화 cue 개수를 실제 record 수로 표시하지 않는다. 실패도 같은 밴을 유지하고 오류 표지를 더한다.
 - offset, replication, assignment, transaction은 추가 차량을 만들지 않고 시설 내부 배지 또는 pulse로 표시한다.
 - ACK·commit과 metadata·assignment·revocation·transaction 제어는 도로를 횡단하는 별도 경로를 만들지 않는다. 상단 상태 칩과 대상 시설 pulse로만 표시하며 성공은 녹색, 제어는 보라색, 실패는 빨간색을 사용한다.
 - 실패·abort·min ISR·LSO·설정 충돌은 빨간 차단기와 끊긴 경로로 표시한다.
 - transaction은 출력 record와 offset ticket을 같은 원자적 결과로 보여 주며 terminal event에서 commit 또는 abort를 명시한다. Chapter 8의 transaction boundary는 지도 전체 polygon이 아니라 상단 compact status banner로 표현한다.
+
+### Chapter 2–8 도시 표시
+
+- 시설 표지는 한글 역할명을 먼저, Kafka 명칭을 함께 표시한다. 현재 관련 논리 노드와 요약 상태를 제공하고 상세 목록은 조사 영역에 둔다.
+- 실행 전 선택지 preview는 관련 시설·논리 노드를 강조한다. 같은 물리 건물을 공유하는 선택지도 차이 설명으로 구분하며 결과를 미리 노출하지 않는다.
+- ACK·commit·transaction·수정 대기·차단 사유는 지도 위쪽에 항상 확보한 고정 영역에 표시한다. 상태 칩이 줄바꿈해도 SVG 지도와 겹치거나 카메라 표시 범위가 바뀌지 않는다. 차량·시설·차단기의 세계 좌표는 유지한다.
+- terminal 사건은 이동과 반복 효과를 끝내되 실제 마지막 checkpoint를 보존한다. 관찰형 실험의 차량을 억지로 도로 끝까지 이동시키거나 모든 시설을 완료로 바꾸지 않는다. 업무 실패와 학습 조건 충족은 원래 사건 의미대로 구분한다.
+- 설정 수정은 기존 사건 기록과 실패 장면을 유지한다. 되감으면 아직 발생하지 않은 오류·반환 신호·완료 문구는 보이지 않는다.
 
 ### Delivery vehicle
 
 - 메시지 이동은 노란 소형 배송 밴 한 대가 담당한다.
 - 실행 전 Producer 상차 구역에 주차한다.
 - 지붕 또는 번호판에 `order-2401`, 화물 라벨에 `OrderEvent`, 실행 중 `attempt`를 표시한다.
-- 정상 재생은 승인된 직선도로의 ordered points와 SVG motion path를 사용해 이동하고 시설마다 정차한다. 이동 시간은 실제 구간 거리 비율과 0.5×/1×/2× 재생 속도를 함께 반영해 시각 속도를 일정하게 유지한다. 타임라인 직접 선택과 시설 조사는 해당 체크포인트로 즉시 이동한다.
-- 1× 성공 실행의 화면 재생은 약 4초다.
+- 정상 재생은 승인된 직선도로의 ordered points를 보간한 SVG transform으로 이동하고 시설마다 정차한다. Chapter 2–8은 하나의 재생 clock이 사건과 차량 progress를 관리한다. 1× 기준 화면 이동속도는 240px/s, 사건별 정차 200ms, 최소 사건 표시시간 500ms다. 0.5×/1×/2×는 표시 시간만 바꾼다. 일시정지는 현재 이동 위치를 유지하고 재개 시 남은 구간을 이어간다. 타임라인 직접 선택·시설 조사·한 단계는 해당 체크포인트로 즉시 이동하며, 처음은 cursor -1이다. 새 실행은 시작 위치로 즉시 복귀하고 이전 실행에서 역주행하지 않는다.
+- Chapter 1의 1× 성공 실행은 약 4초다. Chapter 2–8의 총 재생 시간은 사건 수와 실제 화면 이동거리에 따라 달라진다.
 - reduced motion에서는 체크포인트 사이를 즉시 전환하며 깜빡임, 진동, 도로 흐름 애니메이션을 제거한다.
 
 ### Failure state
@@ -185,7 +193,7 @@ Chapter 1과 Chapter 2–8은 공통 inline SVG renderer `CityWorld`와 키보�
 - SVG에는 title, desc, 시설별 aria-label을 제공한다.
 - `prefers-reduced-motion`과 앱 설정을 모두 지원한다.
 - 상태는 색상, 아이콘, 문구, 선 스타일로 중복 표현한다.
-- 시설을 클릭하거나 Enter/Space로 선택하면 재생을 멈추고 현재 cursor까지 관찰된 해당 시설의 최신 이벤트로 이동한다. 아직 관찰된 이벤트가 없으면 미래로 건너뛰지 않는다.
+- 시설을 클릭하거나 Enter/Space로 선택하면 재생을 멈추고 현재 cursor까지 관찰된 해당 시설의 최신 이벤트로 이동한다. Chapter 2–8은 물리 시설의 모든 논리 노드에서 최신 사건을 찾으며 건물 focus ID는 고정한다. 조사 영역에서 내부 논리 노드를 따로 선택할 수 있다. 아직 관찰된 이벤트가 없으면 시설 역할을 설명하고 미래로 건너뛰지 않는다.
 - 200% 확대는 PC 레이아웃 재배치보다 내부 스크롤 허용을 우선하며 기능 손실이 없어야 한다.
 
 ## Technical contract
@@ -212,7 +220,7 @@ Chapter 1과 Chapter 2–8은 공통 inline SVG renderer `CityWorld`와 키보�
 
 각 상태를 `1280 × 720`, `1440 × 900`, `1920 × 1080`에서 확인한다. 성공 기준은 페이지 overflow 없음, 잘린 핵심 문구 없음, 패널·도시·타임라인 중첩 없음, 상태별 차이가 명확함이다. 타입 검사, 단위 테스트, production build와 GitHub Pages base artifact도 통과해야 한다.
 
-Chapter 2–8 이동 변경은 route geometry 단위 테스트로 누적 거리 보간·bend·역방향·반복 좌표를 검증하고, 브라우저 smoke에서 재생 중 carrier의 `animateMotion.path`와 활성 route의 SVG path가 동일한지 확인한다.
+Chapter 2–8 이동 변경은 route geometry 단위 테스트로 누적 거리 보간·bend·역방향·반복 좌표를 검증한다. 브라우저 smoke는 실제 carrier transform이 승인된 도로 위에서 전진하는지, 정지 후 좌표가 유지되는지, 재실행 시 초기화되는지 확인한다. 핵심 도로/전체 지도 전환 시 원본 배경 좌표는 같아야 하며, 근접 보기의 주요 시설명과 현재 상태는 화면상 최소 12px로 읽혀야 한다.
 
 ## Content and asset governance
 

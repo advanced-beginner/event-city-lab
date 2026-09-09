@@ -269,28 +269,32 @@ blocked 항목: 없음
   - 2026-09-04 tick 2 구현 중 발견해 추가
 
 ### [B-33] 실행 전 preview 강조를 화면에 실제로 배선한다
-- meta: id=B-33 | status=todo | type=fix | size=S | deps=B-05
+- meta: id=B-33 | status=done | type=fix | size=S | deps=B-05
 - 출처: tick 3 검증(B-05)에서 발견
 - 근거: src/components/AdvancedCityWorld.tsx:128이 모든 CityRoute에 previewed={false}를 넘겨 preview.routeIds가 DOM에 닿지 않는다. src/components/AdvancedCityWorld.module.css:47-48의 .previewFacility는 기본값과 같은 값을 다시 지정하는 무동작이다. 눈에 보이는 preview는 Chapter 8 .previewBoundary 하나뿐이다. 그래서 B-05로 preview 데이터를 고쳐도 initial 캡처 72장이 한 장도 바뀌지 않았다
 - 완료기준:
-  - [ ] cursor < 0이고 events가 비었을 때 preview.routeIds의 route가 previewed로 렌더되고, preview.nodeIds의 시설이 눈에 보이는 강조(색상만이 아닌 선 스타일·표지 포함, AGENTS.md)를 받는다
-  - [ ] AdvancedCityWorld.test.tsx에 preview route·facility 렌더 단언
-  - [ ] 시각 변경 의도: Chapter 2–8 initial 상태만. initial baseline 갱신, failed·succeeded baseline 불변
-  - [ ] typecheck·test:run·build·ECL_PORT=4199 test:e2e 통과
+  - [x] cursor < 0이고 events가 비었을 때 preview.routeIds의 route가 previewed로 렌더되고, preview.nodeIds의 시설이 눈에 보이는 강조(색상만이 아닌 선 스타일·표지 포함, AGENTS.md)를 받는다
+  - [x] AdvancedCityWorld.test.tsx에 preview route·facility 렌더 단언
+  - [x] 시각 변경 의도: Chapter 2–8 initial 상태만. initial baseline 갱신, failed·succeeded baseline 불변
+  - [x] typecheck·test:run·build·ECL_PORT=4199 test:e2e 통과
 - 이력:
   - 2026-09-04 tick 3 검증 중 발견해 추가
 
+  - 2026-09-09 사용자 승인 도시 개선에 통합 완료. 원래 단독 tick의 baseline 불변 조건은 승인된 근접 보기·고정 HUD 변경으로 대체했다. 최신 검증은 project-details.md §8 참고.
+
 ### [B-34] idle 시설의 class 문자열에서 undefined를 없앤다
-- meta: id=B-34 | status=todo | type=fix | size=S | deps=-
+- meta: id=B-34 | status=done | type=fix | size=S | deps=-
 - 출처: tick 3 검증(B-05)에서 발견
 - 근거: src/components/AdvancedCityWorld.tsx의 시설 className에 styles[facility.state]를 그대로 넣어 idle 상태(styles에 .idle 없음)에서 문자열 "undefined"가 렌더된다
 - 완료기준:
-  - [ ] idle 상태에서 className에 undefined가 들어가지 않는다 (없는 상태 class는 생략)
-  - [ ] AdvancedCityWorld.test.tsx에 initial 상태 className 단언
-  - [ ] 시각 변경 없음. baseline 불변
-  - [ ] typecheck·test:run·build·ECL_PORT=4199 test:e2e 통과
+  - [x] idle 상태에서 className에 undefined가 들어가지 않는다 (없는 상태 class는 생략)
+  - [x] AdvancedCityWorld.test.tsx에 initial 상태 className 단언
+  - [x] 시각 변경 없음. baseline 불변
+  - [x] typecheck·test:run·build·ECL_PORT=4199 test:e2e 통과
 - 이력:
   - 2026-09-04 tick 3 검증 중 발견해 추가
+
+  - 2026-09-09 사용자 승인 도시 개선에 통합 완료. 원래 단독 tick의 baseline 불변 조건은 승인된 근접 보기·고정 HUD 변경으로 대체했다. 최신 검증은 project-details.md §8 참고.
 
 ### [B-11] App.module.css의 직접 쓴 색을 토큰으로 바꾼다
 - meta: id=B-11 | status=todo | type=design | size=M | deps=B-00

@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 
 interface CityWorldProps {
   backgroundUrl: string
+  backgroundSize?: { width: number; height: number } | undefined
   children: ReactNode
   className?: string | undefined
   description: string
@@ -14,6 +15,7 @@ interface CityWorldProps {
 
 export function CityWorld({
   backgroundUrl,
+  backgroundSize,
   children,
   className,
   description,
@@ -41,8 +43,8 @@ export function CityWorld({
       <image
         className={imageClassName}
         href={backgroundUrl}
-        width="100%"
-        height="100%"
+        width={backgroundSize?.width ?? '100%'}
+        height={backgroundSize?.height ?? '100%'}
         preserveAspectRatio={preserveAspectRatio}
         aria-hidden="true"
       />

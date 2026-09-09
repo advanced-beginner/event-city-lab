@@ -240,10 +240,10 @@ describe('projectCityWorld', () => {
 
     expect(Object.keys(world.carriers)).toEqual(['vehicle'])
     expect(world.carriers.vehicle).toMatchObject({
-      batchLabels: ['primary', 'replica'],
-      batchSize: 2,
+      cueLabels: ['primary', 'replica'],
+      cueCount: 2,
       kind: 'record',
-      label: '2 records · 순차',
+      label: '메시지 흐름 요약',
       progress: 1,
       roadProgress: 1,
       sourceCarrierId: 'replica',

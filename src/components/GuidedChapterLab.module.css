@@ -59,13 +59,16 @@
 .engineError { color: var(--red); font-size: 9px; }
 
 .worldPanel { min-width: 0; min-height: 0; position: relative; overflow: hidden; background: linear-gradient(#dce9e6, #b9d0cb); }
-.cityViewport { position: absolute; inset: 12px 10px 86px; display: grid; place-items: center; overflow: hidden; }
+.cityViewport { position: absolute; inset: 54px 10px 86px; display: grid; place-items: center; overflow: hidden; }
 .cityViewport > svg { width: 100%; height: auto; max-height: 100%; aspect-ratio: 1920 / 1047; }
+.cityToolbar { position: absolute; z-index: 3; top: 16px; left: 16px; display: flex; gap: 4px; padding: 4px; border: 1px solid #a7c4c3; border-radius: 8px; background: #fffffff2; box-shadow: 0 8px 18px #18323833; }
+.cityToolbar button { min-height: 28px; padding: 0 10px; border: 1px solid transparent; border-radius: 6px; background: transparent; color: #526377; font-size: 10px; font-weight: 800; }
+.cityToolbar button[aria-pressed='true'] { border-color: #62bfc0; background: var(--cyan-soft); color: #126e72; }
 .worldStatus { position: absolute; left: 18px; right: 18px; bottom: 14px; min-height: 60px; display: grid; grid-template-columns: 32px 1fr; align-items: center; gap: 9px; padding: 9px 12px; border: 1px solid #b8d5d4; border-left: 4px solid var(--cyan); border-radius: 9px; background: #fffffff2; box-shadow: 0 10px 30px #10253355; }
 .worldStatus > span { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 50%; background: var(--cyan-soft); color: #087a7e; font: 800 11px var(--mono); }
 .worldStatus strong, .worldStatus small { display: block; }
-.worldStatus strong { font-size: 11px; }
-.worldStatus small { margin-top: 3px; color: #687789; font-size: 9px; line-height: 1.35; }
+.worldStatus strong { font-size: 12px; line-height: 1.25; }
+.worldStatus small { margin-top: 3px; color: #687789; font-size: 10px; line-height: 1.35; }
 .failedStatus { border-color: #e5aab4; border-left-color: var(--red); }
 .failedStatus > span { background: var(--red-soft); color: var(--red); }
 
@@ -73,6 +76,13 @@
 .evidenceHeader { flex: 0 0 auto; display: flex; justify-content: space-between; padding: 12px; border-bottom: 1px solid var(--line); }
 .evidenceHeader span { color: #7d8998; font: 9px var(--mono); }
 .evidenceHeader strong { color: #405166; font-size: 11px; }
+.inspector { flex: 0 0 auto; display: grid; gap: 5px; margin: 8px 10px 0; padding: 9px; border: 1px solid #b8d5d4; border-radius: 8px; background: #f4fbfa; }
+.inspector span { color: #18767a; font: 800 8px var(--mono); }
+.inspector strong { color: #33475c; font-size: 10px; }
+.inspector p { margin: 0; color: #617184; font-size: 9px; line-height: 1.45; }
+.logicalNodePicker { display: flex; flex-wrap: wrap; gap: 4px; }
+.logicalNodePicker button { min-height: 25px; padding: 0 7px; border: 1px solid #cbd7dc; border-radius: 6px; background: white; color: #526377; font-size: 8px; font-weight: 800; }
+.logicalNodePicker button[aria-pressed='true'] { border-color: var(--cyan); background: var(--cyan-soft); color: #126e72; }
 .logs { flex: 1 1 auto; min-height: 94px; margin: 0; padding: 8px 10px; overflow: auto; list-style: none; background: #f7f8fa; }
 .logs li { display: grid; grid-template-columns: 40px 1fr; gap: 7px; padding: 5px 2px; border-bottom: 1px dashed #dde2e7; color: #526377; font-size: 8px; line-height: 1.4; }
 .logs time { color: #8a97a5; font-family: var(--mono); }
@@ -94,7 +104,7 @@
 .references span { color: #7d8998; font: 800 8px var(--mono); }
 .references a { overflow: hidden; color: #18767a; font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
 
-.timeline { min-width: 0; display: grid; grid-template-columns: auto auto auto minmax(0, 1fr) 72px; align-items: center; gap: 6px; padding: 8px 14px; background: white; }
+.timeline { min-width: 0; display: grid; grid-template-columns: auto auto auto auto minmax(0, 1fr) 72px; align-items: center; gap: 6px; padding: 8px 14px; background: white; }
 .timeline > button { width: 52px; height: 30px; border: 1px solid var(--line-strong); border-radius: 7px; background: var(--surface-muted); color: #526276; font-size: 9px; }
 .speedControl { height: 30px; display: flex; align-items: center; gap: 4px; padding: 0 5px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface-muted); color: #6c7887; font: 8px var(--mono); }
 .speedControl select { border: 0; background: transparent; color: #435469; font: 800 9px var(--mono); }

@@ -1,9 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useStore } from 'zustand'
 
 import { ChapterNavigation } from '../chapters/ChapterNavigation'
 import type { ChapterMetadata } from '../chapters/registry'
+import type { AdvancedCityViewMode } from '../city/camera'
 import { getAdvancedChapterScene, getExperimentCityPreview } from '../city/chapterScenes'
+import type { CitySize } from '../city/types'
 import { kafkaReferences } from '../content/kafkaReferences'
 import { getChapterRule } from '../domain/chapterEngine'
 import type {
@@ -21,6 +23,14 @@ import { labStore } from '../state/labStore'
 import { loadWorkspace, saveWorkspace } from '../storage/workspaceDb'
 import { runChapterSimulation } from '../worker/client'
 import { AdvancedCityWorld } from './AdvancedCityWorld'
+import {
+  carrierProgressAtCursor,
+  createPlaybackSegment,
+  createPlaybackSnapshots,
+  inspectFacilityAtCursor,
+  interpolatePlaybackProgress,
+  retimePlaybackSegment,
+} from './guidedPlayback'
 import styles from './GuidedChapterLab.module.css'
 
 type Prediction = 'failed' | 'succeeded'
@@ -84,14 +94,29 @@ export function GuidedChapterLab({ chapter }: { chapter: ChapterMetadata }) {
   const [prediction, setPrediction] = useState<Prediction | null>(null)
   const [run, setRun] = useState<ChapterSimulationRun | null>(null)
   const [eventCursor, setEventCursor] = useState(-1)
+  const eventCursorRef = useRef(-1)
   const [isPlaying, setIsPlaying] = useState(false)
+  const isPlayingRef = useRef(false)
+  const [playbackPulse, setPlaybackPulse] = useState(0)
   const [isRunning, setIsRunning] = useState(false)
   const [engineError, setEngineError] = useState<string | null>(null)
+  const [inspectedFacilityId, setInspectedFacilityId] = useState<string | null>(null)
   const [inspectedNodeId, setInspectedNodeId] = useState<string | null>(null)
   const [showInspectedRole, setShowInspectedRole] = useState(false)
   const [saveStatus, setSaveStatus] = useState('진도 불러오는 중')
   const [speed, setSpeed] = useState<PlaybackSpeed>(1)
-  const [animateCarrierMotion, setAnimateCarrierMotion] = useState(false)
+  const [carrierProgress, setCarrierProgress] = useState(0)
+  const carrierProgressRef = useRef(0)
+  const runRequestSerial = useRef(0)
+  const playbackFrameRef = useRef<number | null>(null)
+  const activeSegmentRef = useRef<ReturnType<typeof createPlaybackSegment>>(null)
+  const activeSegmentSettingsKeyRef = useRef('')
+  const segmentStartedAtRef = useRef(0)
+  const segmentLastTimestampRef = useRef(0)
+  const segmentElapsedRef = useRef(0)
+  const [viewMode, setViewMode] = useState<AdvancedCityViewMode>('focus')
+  const [viewportSize, setViewportSize] = useState<CitySize>({ width: 1280, height: 720 })
+  const cityViewportRef = useRef<HTMLDivElement | null>(null)
   const [appReducedMotion, setAppReducedMotion] = useState(readReducedMotionSetting)
   const [osReducedMotion, setOsReducedMotion] = useState(readOsReducedMotionPreference)
   const reducedMotion = appReducedMotion || osReducedMotion
@@ -101,30 +126,72 @@ export function GuidedChapterLab({ chapter }: { chapter: ChapterMetadata }) {
   const chapterComplete = completedCount === rule.experiments.length
   const attemptKey = `${chapterId}:${experiment.id}`
   const attempts = workspaceState.learningProgress.attempts[attemptKey] ?? 0
-  const terminal = Boolean(run && eventCursor >= run.events.length - 1)
+  const terminalEventSelected = Boolean(run && eventCursor >= run.events.length - 1)
+  const terminalSettled = Boolean(terminalEventSelected && !activeSegmentRef.current && !isPlaying)
   const visibleEvents = run ? run.events.slice(0, eventCursor + 1) : []
   const activeEvent = run?.events[eventCursor] ?? null
   const references = kafkaReferences.filter((reference) => experiment.referenceIds.includes(reference.id))
   const scene = getAdvancedChapterScene(chapterId)
   const scenePreview = getExperimentCityPreview(experiment.id, choiceId)
+  const selectedChoice = experiment.choices.find((choice) => choice.id === choiceId)
+  const playbackSnapshots = useMemo(
+    () => run ? createPlaybackSnapshots(scene, run.events) : createPlaybackSnapshots(scene, []),
+    [run, scene],
+  )
+  const projectedWorld = playbackSnapshots.find((snapshot) => snapshot.cursor === eventCursor)?.world
   const inspectedNode = scene.nodes.find((node) => node.id === inspectedNodeId) ?? null
+  const inspectedFacilityNodes = useMemo(() => {
+    if (!inspectedFacilityId) return []
+    const facility = scene.physicalFacilities.find((candidate) => candidate.id === inspectedFacilityId)
+    if (!facility) return []
+    return scene.nodes.filter((node) => node.roadAccessIndex === facility.roadAccessIndex)
+  }, [inspectedFacilityId, scene])
   const pendingRerun = Boolean(run && choiceId !== run.choiceId)
 
+  const setCarrierProgressValue = (progress: number) => {
+    carrierProgressRef.current = progress
+    setCarrierProgress(progress)
+  }
+
+  const clearPlaybackSegment = () => {
+    activeSegmentRef.current = null
+    activeSegmentSettingsKeyRef.current = ''
+    segmentElapsedRef.current = 0
+    if (playbackFrameRef.current !== null) window.cancelAnimationFrame(playbackFrameRef.current)
+    playbackFrameRef.current = null
+  }
+
+  const seekToCursor = (cursor: number) => {
+    clearPlaybackSegment()
+    setIsPlaying(false)
+    eventCursorRef.current = cursor
+    setEventCursor(cursor)
+    setCarrierProgressValue(carrierProgressAtCursor(scene, run?.events ?? [], cursor, playbackSnapshots))
+  }
+
   useEffect(() => {
+    runRequestSerial.current += 1
     const firstExperiment = rule.experiments[0]
     if (!firstExperiment) return
     setExperimentIndex(0)
     setChoiceId(firstFailureChoiceId(firstExperiment.choices, firstExperiment.recommendedChoiceId))
     setPrediction(null)
     setRun(null)
+    clearPlaybackSegment()
+    eventCursorRef.current = -1
     setEventCursor(-1)
+    setCarrierProgressValue(0)
     setIsPlaying(false)
-    setAnimateCarrierMotion(false)
     setIsRunning(false)
     setEngineError(null)
+    setInspectedFacilityId(null)
     setInspectedNodeId(null)
     setShowInspectedRole(false)
   }, [chapterId, rule])
+
+  useEffect(() => () => {
+    runRequestSerial.current += 1
+  }, [])
 
   useEffect(() => {
     if (workspaceState.hydrated) {
@@ -148,20 +215,116 @@ export function GuidedChapterLab({ chapter }: { chapter: ChapterMetadata }) {
   }, [workspaceState.hydrated])
 
   useEffect(() => {
+    isPlayingRef.current = isPlaying
     if (!isPlaying || !run) return
-    if (eventCursor >= run.events.length - 1) {
+
+    const settingsKey = `${speed}:${viewMode}:${viewportSize.width}:${viewportSize.height}:${reducedMotion}`
+    let segment = activeSegmentRef.current
+    if (!segment) {
+      segment = createPlaybackSegment({
+        currentProgress: carrierProgressRef.current,
+        cursor: eventCursorRef.current,
+        events: run.events,
+        scene,
+        speed,
+        snapshots: playbackSnapshots,
+        viewMode,
+        viewportSize,
+      })
+      if (!segment) {
+        isPlayingRef.current = false
+        setIsPlaying(false)
+        return
+      }
+      activeSegmentRef.current = segment
+      activeSegmentSettingsKeyRef.current = settingsKey
+      segmentElapsedRef.current = 0
+      eventCursorRef.current = segment.toCursor
+      setEventCursor(segment.toCursor)
+    } else if (activeSegmentSettingsKeyRef.current !== settingsKey) {
+      const retimedSegment = retimePlaybackSegment({
+        currentProgress: carrierProgressRef.current,
+        elapsedMs: segmentElapsedRef.current,
+        events: run.events,
+        previousSegment: segment,
+        scene,
+        speed,
+        snapshots: playbackSnapshots,
+        viewMode,
+        viewportSize,
+      })
+      if (!retimedSegment) {
+        isPlayingRef.current = false
+        setIsPlaying(false)
+        return
+      }
+      segment = retimedSegment
+      activeSegmentRef.current = retimedSegment
+      activeSegmentSettingsKeyRef.current = settingsKey
+      segmentElapsedRef.current = 0
+    }
+
+    if (!segment) {
+      isPlayingRef.current = false
       setIsPlaying(false)
       return
     }
-    const timeout = window.setTimeout(
-      () => {
-        setAnimateCarrierMotion(true)
-        setEventCursor((cursor) => cursor + 1)
-      },
-      reducedMotion ? 80 : 500 / speed,
-    )
-    return () => window.clearTimeout(timeout)
-  }, [eventCursor, isPlaying, reducedMotion, run, speed])
+
+    let startedAt: number | null = null
+    const tick = (timestamp = window.performance.now()) => {
+      if (startedAt === null) {
+        startedAt = timestamp
+        segmentStartedAtRef.current = timestamp
+      }
+      segmentLastTimestampRef.current = timestamp
+      const elapsedMs = segmentElapsedRef.current + timestamp - startedAt
+      setCarrierProgressValue(interpolatePlaybackProgress(segment, elapsedMs, reducedMotion))
+      if (elapsedMs >= segment.totalDurationMs) {
+        setCarrierProgressValue(segment.toProgress)
+        activeSegmentRef.current = null
+        activeSegmentSettingsKeyRef.current = ''
+        segmentElapsedRef.current = 0
+        if (segment.toCursor >= run.events.length - 1) {
+          isPlayingRef.current = false
+          setIsPlaying(false)
+        } else {
+          setPlaybackPulse((value) => value + 1)
+        }
+        return
+      }
+      playbackFrameRef.current = window.requestAnimationFrame(tick)
+    }
+
+    playbackFrameRef.current = window.requestAnimationFrame(tick)
+    return () => {
+      if (playbackFrameRef.current !== null) window.cancelAnimationFrame(playbackFrameRef.current)
+      playbackFrameRef.current = null
+      if (activeSegmentRef.current) {
+        segmentElapsedRef.current += Math.max(0, segmentLastTimestampRef.current - segmentStartedAtRef.current)
+      }
+    }
+  }, [isPlaying, playbackPulse, playbackSnapshots, reducedMotion, run, scene, speed, viewMode, viewportSize])
+
+  useEffect(() => () => {
+    if (playbackFrameRef.current !== null) window.cancelAnimationFrame(playbackFrameRef.current)
+  }, [])
+
+  useEffect(() => {
+    const element = cityViewportRef.current
+    if (!element) return
+    const measure = () => {
+      const world = element.querySelector('svg')
+      setViewportSize({
+        width: world?.clientWidth || element.clientWidth || 1280,
+        height: world?.clientHeight || element.clientHeight || 720,
+      })
+    }
+    measure()
+    if (typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(measure)
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [])
 
   useEffect(() => {
     try {
@@ -182,22 +345,38 @@ export function GuidedChapterLab({ chapter }: { chapter: ChapterMetadata }) {
   const selectExperiment = (nextIndex: number) => {
     const next = rule.experiments[nextIndex]
     if (!next) return
+    runRequestSerial.current += 1
     setExperimentIndex(nextIndex)
     setChoiceId(firstFailureChoiceId(next.choices, next.recommendedChoiceId))
     setPrediction(null)
     setRun(null)
+    clearPlaybackSegment()
+    eventCursorRef.current = -1
     setEventCursor(-1)
+    setCarrierProgressValue(0)
+    isPlayingRef.current = false
     setIsPlaying(false)
-    setAnimateCarrierMotion(false)
+    setIsRunning(false)
     setEngineError(null)
+    setInspectedFacilityId(null)
     setInspectedNodeId(null)
     setShowInspectedRole(false)
   }
 
   const execute = async () => {
     if (!choiceId || !prediction || isRunning) return
+    const requestSerial = runRequestSerial.current + 1
+    runRequestSerial.current = requestSerial
     setIsRunning(true)
     setEngineError(null)
+    setRun(null)
+    clearPlaybackSegment()
+    eventCursorRef.current = -1
+    setEventCursor(-1)
+    setCarrierProgressValue(0)
+    setInspectedFacilityId(null)
+    setInspectedNodeId(null)
+    setShowInspectedRole(false)
     try {
       const nextRun = await runChapterSimulation({
         runId: `chapter-${chapterId}-${experiment.id}-${crypto.randomUUID()}`,
@@ -206,43 +385,72 @@ export function GuidedChapterLab({ chapter }: { chapter: ChapterMetadata }) {
         experimentId: experiment.id,
         choiceId,
       })
+      if (runRequestSerial.current !== requestSerial) return
       setRun(nextRun)
+      const nextSnapshots = createPlaybackSnapshots(scene, nextRun.events)
       setInspectedNodeId(null)
+      setInspectedFacilityId(null)
       setShowInspectedRole(false)
-      setEventCursor(0)
-      setAnimateCarrierMotion(true)
+      eventCursorRef.current = -1
+      setEventCursor(-1)
+      setCarrierProgressValue(carrierProgressAtCursor(scene, nextRun.events, -1, nextSnapshots))
       setIsPlaying(nextRun.events.length > 1)
       labStore.getState().recordExperimentAttempt(chapterId, experiment.id, nextRun.status === 'succeeded')
       setSaveStatus('저장 중…')
       await saveWorkspace(makeSnapshot())
       setSaveStatus('이 기기에 저장됨')
     } catch (error) {
+      if (runRequestSerial.current !== requestSerial) return
       setEngineError(error instanceof Error ? error.message : '시뮬레이션을 실행하지 못했습니다.')
     } finally {
-      setIsRunning(false)
+      if (runRequestSerial.current === requestSerial) setIsRunning(false)
     }
   }
 
-  const inspectFacility = (nodeId: string) => {
-    setInspectedNodeId(nodeId)
+  const inspectFacility = (facilityOrNodeId: string) => {
+    isPlayingRef.current = false
     setIsPlaying(false)
-    setAnimateCarrierMotion(false)
+    const inspection = inspectFacilityAtCursor({
+      cursor: eventCursor,
+      events: run?.events ?? [],
+      facilityOrNodeId,
+      scene,
+    })
+    setInspectedFacilityId(inspection.facilityId)
+    setInspectedNodeId(inspection.latestNodeId ?? inspection.nodeIds[0] ?? facilityOrNodeId)
     if (!run || eventCursor < 0) {
       setShowInspectedRole(true)
       return
     }
-    const latestObservedIndex = run.events
-      .slice(0, eventCursor + 1)
-      .findLastIndex((event) => (
-        event.cityCue.focusNodeIds.includes(nodeId)
-        || Object.hasOwn(event.cityCue.nodeChanges ?? {}, nodeId)
-      ))
-    if (latestObservedIndex < 0) {
+    if (inspection.latestEventIndex < 0) {
       setShowInspectedRole(true)
       return
     }
     setShowInspectedRole(false)
-    setEventCursor(latestObservedIndex)
+    seekToCursor(inspection.latestEventIndex)
+  }
+
+  const selectInspectedNode = (nodeId: string) => {
+    setInspectedNodeId(nodeId)
+    isPlayingRef.current = false
+    setIsPlaying(false)
+    if (!run || eventCursor < 0) {
+      setShowInspectedRole(true)
+      return
+    }
+    const inspection = inspectFacilityAtCursor({
+      cursor: eventCursor,
+      events: run.events,
+      facilityOrNodeId: nodeId,
+      logicalNodeId: nodeId,
+      scene,
+    })
+    if (inspection.latestEventIndex < 0) {
+      setShowInspectedRole(true)
+      return
+    }
+    setShowInspectedRole(false)
+    seekToCursor(inspection.latestEventIndex)
   }
 
   return (
@@ -325,12 +533,20 @@ export function GuidedChapterLab({ chapter }: { chapter: ChapterMetadata }) {
         </aside>
 
         <section className={styles.worldPanel} aria-label="Kafka 도시 시뮬레이션">
-          <div className={styles.cityViewport}>
+          <div className={styles.cityToolbar} role="group" aria-label="도시 보기">
+            <button type="button" aria-pressed={viewMode === 'focus'} onClick={() => setViewMode('focus')}>핵심 도로</button>
+            <button type="button" aria-pressed={viewMode === 'overview'} onClick={() => setViewMode('overview')}>전체 지도</button>
+          </div>
+          <div className={styles.cityViewport} ref={cityViewportRef}>
             <AdvancedCityWorld
               scene={scene}
               events={run?.events ?? []}
-              motionDurationMs={animateCarrierMotion ? Math.max(120, Math.round((500 / speed) * 0.84)) : 0}
               cursor={eventCursor}
+              carrierProgress={carrierProgress}
+              isPlaying={isPlaying}
+              {...(run && terminalSettled ? { runStatus: run.status } : {})}
+              viewportSize={viewportSize}
+              viewMode={viewMode}
               reducedMotion={reducedMotion}
               pendingRerun={pendingRerun}
               preview={scenePreview}
@@ -341,15 +557,36 @@ export function GuidedChapterLab({ chapter }: { chapter: ChapterMetadata }) {
             <span>{activeEvent ? eventCursor + 1 : '·'}</span>
             <div>
               <strong>{pendingRerun ? '설정은 바뀌었지만 이 실행은 그대로입니다.' : showInspectedRole ? inspectedNode?.ariaLabel ?? inspectedNode?.label : activeEvent?.title ?? inspectedNode?.ariaLabel ?? inspectedNode?.label ?? '설정과 결과를 예측한 뒤 도시를 실행하세요.'}</strong>
-              <small>{pendingRerun ? '권장 설정을 적용하려면 같은 조건으로 도시를 다시 실행하세요.' : showInspectedRole ? inspectedNode?.description : activeEvent?.detail ?? inspectedNode?.description ?? experiment.successCriteria}</small>
+              <small>{pendingRerun ? '권장 설정을 적용하려면 같은 조건으로 도시를 다시 실행하세요.' : showInspectedRole ? inspectedNode?.description : activeEvent?.detail ?? inspectedNode?.description ?? selectedChoice?.description ?? experiment.successCriteria}</small>
             </div>
           </div>
         </section>
 
         <aside className={styles.evidencePanel} aria-label="실행 증거">
           <div className={styles.evidenceHeader}>
-            <span>실행 증거</span><strong>{run ? (run.status === 'failed' ? '실패 관찰' : '조건 충족') : '실행 전'}</strong>
+            <span>실행 증거</span><strong>{run ? (terminalSettled ? (run.status === 'failed' ? '실패 관찰' : '조건 충족') : '재생 중') : '실행 전'}</strong>
           </div>
+          {inspectedNode && (
+            <div className={styles.inspector}>
+              <span>시설 조사</span>
+              <strong>{inspectedNode.ariaLabel ?? inspectedNode.label}</strong>
+              <p>{showInspectedRole ? inspectedNode.description : activeEvent?.detail ?? inspectedNode.description}</p>
+              {inspectedFacilityNodes.length > 1 && (
+                <div className={styles.logicalNodePicker} role="group" aria-label="건물 내부 논리 노드">
+                  {inspectedFacilityNodes.map((node) => (
+                    <button
+                      key={node.id}
+                      type="button"
+                      aria-pressed={node.id === inspectedNodeId}
+                      onClick={() => selectInspectedNode(node.id)}
+                    >
+                      {projectedWorld?.nodes[node.id]?.label ?? node.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
           <ol className={styles.logs}>
             {visibleEvents.length === 0
               ? <li className={styles.empty}>아직 이벤트가 없습니다.</li>
@@ -360,7 +597,7 @@ export function GuidedChapterLab({ chapter }: { chapter: ChapterMetadata }) {
                 ))}
           </ol>
 
-          {terminal && run?.diagnosis && (
+          {terminalSettled && run?.status === 'failed' && run.diagnosis && (
             <div className={styles.diagnosis}>
               <strong>{run.diagnosis.symptom}</strong>
               <p>{run.diagnosis.rootCause}</p>
@@ -372,7 +609,7 @@ export function GuidedChapterLab({ chapter }: { chapter: ChapterMetadata }) {
             </div>
           )}
 
-          {terminal && run?.status === 'succeeded' && (
+          {terminalSettled && run?.status === 'succeeded' && (
             <div className={styles.success}>
               <strong>실험 통과</strong><p>{run.summary}</p>
               {experimentIndex < rule.experiments.length - 1 && (
@@ -389,8 +626,16 @@ export function GuidedChapterLab({ chapter }: { chapter: ChapterMetadata }) {
       </section>
 
       <section className={styles.timeline} aria-label="이벤트 타임라인">
-        <button type="button" disabled={!run} onClick={() => { setAnimateCarrierMotion(false); setEventCursor(0); setIsPlaying(false) }}>처음</button>
-        <button type="button" disabled={!run} onClick={() => setIsPlaying((value) => !value)}>{isPlaying ? '일시정지' : '재생'}</button>
+        <button type="button" disabled={!run} onClick={() => seekToCursor(-1)}>처음</button>
+        <button
+          type="button"
+          disabled={!run}
+          onClick={() => setIsPlaying((value) => {
+            isPlayingRef.current = !value
+            return !value
+          })}
+        >{isPlaying ? '일시정지' : '재생'}</button>
+        <button type="button" disabled={!run || eventCursor >= (run.events.length - 1)} onClick={() => seekToCursor(eventCursor + 1)}>한 단계</button>
         <label className={styles.speedControl}>
           <span>속도</span>
           <select value={speed} onChange={(event) => setSpeed(Number(event.target.value) as PlaybackSpeed)}>
@@ -405,7 +650,7 @@ export function GuidedChapterLab({ chapter }: { chapter: ChapterMetadata }) {
               key={event.id}
               type="button"
               className={index === eventCursor ? styles.activeEvent : index < eventCursor ? styles.seenEvent : undefined}
-              onClick={() => { setAnimateCarrierMotion(false); setEventCursor(index); setIsPlaying(false) }}
+              onClick={() => seekToCursor(index)}
               title={event.title}
             ><span>{index + 1}</span><small>{event.title}</small></button>
           )) ?? <p>실행 후 사건 순서를 되감아 조사할 수 있습니다.</p>}
