@@ -57,19 +57,17 @@ PC 전용 초기 모델이며 지원 범위는 100% 브라우저 확대 기준 `
 
 ### Direction
 
-밝은 golden hour의 실제 도시를 축소한 isometric logistics district다. 도시·도로·장식 건물·공원은 사용자 승인 단일 배경 이미지가 완성된 장면으로 제공한다. 중앙의 큰 건물 세 개를 왼쪽부터 Producer, Serializer, Broker로 매핑하고 클릭 영역, 접근 가능한 이름, 상태 램프·오류·ACK처럼 의미가 바뀌는 정보만 SVG 오버레이로 유지한다.
+밝은 미니어처 워크스페이스(`#f5f4ef`) 위에 고대비 딥 슬레이트 단면 받침대(Cutaway Base)와 모듈형 Isometric 우편 물류 건물·도로망을 올린 **Pure Isometric Vector Diorama**다. Chapter 1부터 Chapter 8까지 외부 비트맵 배경에 의존하지 않고 동일한 2:1 등각 그리드(`src/city/isometric.ts`)와 `IsometricDioramaStage` 렌더러로 일관된 Look & Feel을 제공한다.
 
-Visual asset 규칙:
+Visual & Geometry 규칙:
 
-- 2:1 isometric, 64×32 ground tile 기준.
-- 명확한 16-bit pixel cluster와 `#302840` 계열 2–3px 외곽선.
-- 좌상단 golden light, 우하단 muted-violet contact shadow.
-- Chapter 1 배경은 기존 승인 구도를 유지한다. Chapter 2–8은 `핵심 도로` 근접 보기를 기본으로, `전체 지도`를 선택 가능한 보기로 제공한다. 근접 보기는 주도로 전체와 사용 중인 물리 시설의 실루엣·표지를 포함한다. 배경의 원본 좌표 크기는 카메라 viewBox와 분리하고 늘이지 않는다. 실행 도중 카메라를 자동 이동하지 않는다.
-- 시설 표지의 한글·영문은 raster에 굽지 않고 실제 SVG text로 표시한다.
-- Producer·Serializer·Broker·노란 메시지 차량이 1차 시각 중심이고 일반 건물은 대비를 한 단계 낮춘다.
-- 별도 도로·건물 sprite를 배경 위에 중복 배치하지 않는다. 메시지 checkpoint와 진행 path만 배경 속 중앙 대로의 실제 차선에 맞춘 SVG overlay다.
-- 세 Kafka 시설의 상호작용 영역은 배경의 건물 실루엣과 일치해야 하며 인접 도로나 다른 건물을 포함하지 않는다.
-- 이동 차량만 투명 PNG sprite를 사용한다. 후면이 좌하단, 전면이 우상단인 방향별 파일을 사용하고 runtime 회전으로 등각 투영 방향을 보정하지 않는다.
+- 2:1 isometric grid (`tileHalfW=58, tileHalfH=29`) 및 `1600×900` 표준 viewBox.
+- 3-Point Shading: 모든 입체 블록은 윗면(100%), 좌측면(82%), 우측면(64%) 명도 차이와 미세 베벨 하이라이트, 바닥 접촉 그림자를 적용한다.
+- Diorama Cutaway Base: 딥 슬레이트 상판(`#263349`~`#162032`)과 2단 지층 단면 벽체로 입체 받침대를 구성한다.
+- 챕터별 모듈형 스테이지: Chapter 1–8은 각각 필요한 Kafka 거점(Producer, Serializer, Broker/Partitions, Followers, Consumer/Coordinator, Retry Loop, DLT Vault, Offset Store, TX Coordinator)을 최적의 Waypoint Graph로 배치한다.
+- 모션 그래픽: 챕터 진입 시 Staggered Z-axis Extrusion(`cubic-bezier(0.22, 1, 0.36, 1)`), 호버/포커스 시 Z축 부유(Levitation), 상단 컨트롤 바의 `핵심 도로 / 전체 지도` 및 `조립 뷰 / 분해 뷰(Exploded View)` 토글을 지원한다(`prefers-reduced-motion` 시 모션 제거).
+- 모든 시설 표지의 한글·영문과 화물 배지는 실제 SVG `<text>`로 선명하게 렌더링한다.
+- 우편 배송 차량(`IsometricPostalVan`)은 진행 방향(`ne`, `se`, `sw`, `nw`)에 맞춰 3D 등각 폴리곤으로 직접 생성하며, 외부 PNG 스프라이트를 사용하지 않는다.
 
 ### Color tokens
 
@@ -116,21 +114,14 @@ Visual asset 규칙:
 
 ### City composition
 
-Standard view에는 승인된 도시 배경 전체와 중앙 Kafka 핵심 건물 3개가 보인다. 장식 건물·공원·나무·도로는 배경 자체에 포함되며 별도 runtime sprite 수량을 관리하지 않는다.
+Chapter 1부터 Chapter 8까지 모든 챕터는 공통 inline SVG 디오라마 렌더러 `IsometricDioramaStage`와 키보드 조작 가능한 `CityFacility`, 그리고 통합 워크스페이스 CSS(`LabWorkspace.module.css`)를 공유한다.
 
-Chapter 1과 Chapter 2–8은 공통 inline SVG renderer `CityWorld`와 키보드 조작 가능한 `CityFacility`를 공유한다. Chapter 2–8은 `event-city-atlas.webp` 한 장과 `CitySceneDefinition`을 사용한다. scene은 배경과 분리된 viewBox, 실제 건물 silhouette polygon, 시설 표지 위치, 주도로 path와 checkpoint만 소유한다. Chapter 2–8의 선택 가능한 물리 시설은 사용자가 승인한 atlas 중앙의 남서–북동 직선도로에 접한 5개 role slot만 사용한다: Source/Producer, Kafka Ingress, Kafka Cluster, Consumer/Processor, Application/Sink. 한 챕터에서는 필요한 3~5개 slot만 표시하며 partition, replica, consumer member, retry topic, offset store 같은 논리 노드는 해당 물리 시설 내부 배지로 묶는다.
+각 챕터의 `CitySceneDefinition`은 2D Isometric Grid 좌표에 배치된 물리 건물(`physicalFacilities`), 논리 노드(`nodes`), 그리고 시작 노드의 출구에서 교차점을 거쳐 도착 노드의 입구까지 0px 오차로 이어지는 유향 도로(`routes`)를 정의한다. scene validator(`src/city/validation.ts`)는 모든 경로의 양 끝점이 해당 `fromNode`/`toNode` 좌표와 일치하는지, 모든 체크포인트가 경로 폴리라인 위에 놓이는지 검증한다.
 
-모든 Chapter 2–8 운송 route는 `downtown-main-arterial`의 연속 부분 구간이다. 공통 주도로 전체는 초기·재생·완료 상태에 관계없이 항상 한 줄로 표시하고, 현재 처리 구간만 그 위에 상태선으로 겹친다. 각 물리 시설은 주도로 anchor dot과 connector로 연결한다. 도메인 이벤트는 기존 route/checkpoint ID를 유지하고, scene validator가 시설의 road access index, route의 ordered points, checkpoint progress가 공통 간선도로 계약과 일치하는지 검증한다. 역할 간 직접 직선을 새로 만들거나 atlas의 보조 도로로 우회하지 않는다.
-
-중앙 사각형 component map은 사용하지 않는다. Worker가 생성한 각 이벤트의 구조화된 `cityCue`가 focus node, node/route 상태, carrier checkpoint, 반환 신호와 barrier를 지정하고, 순수 projection reducer가 현재 cursor의 도시 상태를 계산한다. 로그 문자열과 상세 문구를 파싱해 애니메이션을 추론하지 않는다. 배경 교체 시 scene 좌표만 다시 측정하며 Kafka 이벤트 의미는 유지한다.
-
-공통 운송 문법은 다음과 같다.
-
-- record와 retry record는 동일한 노란 Kafka 밴 한 대와 현재 상태 표지로 표시한다. 여러 record의 흐름은 차량을 늘리지 않고 요약 표지로 묶는다. 시각화 cue 개수를 실제 record 수로 표시하지 않는다. 실패도 같은 밴을 유지하고 오류 표지를 더한다.
-- offset, replication, assignment, transaction은 추가 차량을 만들지 않고 시설 내부 배지 또는 pulse로 표시한다.
-- ACK·commit과 metadata·assignment·revocation·transaction 제어는 도로를 횡단하는 별도 경로를 만들지 않는다. 상단 상태 칩과 대상 시설 pulse로만 표시하며 성공은 녹색, 제어는 보라색, 실패는 빨간색을 사용한다.
-- 실패·abort·min ISR·LSO·설정 충돌은 빨간 차단기와 끊긴 경로로 표시한다.
-- transaction은 출력 record와 offset ticket을 같은 원자적 결과로 보여 주며 terminal event에서 commit 또는 abort를 명시한다. Chapter 8의 transaction boundary는 지도 전체 polygon이 아니라 상단 compact status banner로 표현한다.
+- **A → B → C 연속 주행 및 회차:** `src/city/projection.ts`와 `guidedPlayback.ts`는 단조 증가 직선 제약을 사용하지 않고, 이벤트 시퀀스의 실제 `routeId`와 연결 그래프 경로(`resolveTransitionPolyline`)를 따라 차량을 주행시킨다. Chapter 7의 `application → retry-1m → retry-10m → application` 회차 루프나 DLT 격리 분기도 실제 도로를 따라 자연스럽게 주행한다.
+- **파티션 및 복제 다중 분기:** Chapter 2의 key 미지정 분산(`p0/p1/p2`)이나 Chapter 3/4의 복제(`Leader → Follower 1/2`)처럼 다중 `carrierChanges`가 발생하면, 갈라지는 분기 차선마다 개별 우편 차량(`vehicle`, `branch-1`, `branch-2`)을 투영해 분산 흐름을 직접 보여준다.
+- **광섬유 제어 신호 및 차단기:** ACK, Commit, Assignment, Transaction 등 제어/회신 신호는 도로 위 광섬유 라인의 `stroke-dashoffset` 펄스로 표현한다. 실패·ISR 부족·LSO 경계에서는 도로 위에 물리 차단봉(`IsometricBarrier`)이 닫힌다.
+- **분해 뷰(Exploded View):** 상단 토글로 건물 기단·본체·지붕을 Z축으로 분리해 내부 논리 코어와 슬롯 구조를 관찰할 수 있다.
 
 ### Chapter 2–8 도시 표시
 
@@ -201,7 +192,7 @@ Chapter 1과 Chapter 2–8은 공통 inline SVG renderer `CityWorld`와 키보�
 - React 19, TypeScript strict, Vite 8, CSS Modules, inline SVG.
 - 순수 TypeScript 엔진과 Web Worker가 Kafka 결과와 이벤트 기록을 계산한다. React UI는 결과를 재계산하지 않는다.
 - `ChapterEventTemplate.cityCue`의 모든 node·route·checkpoint 참조는 scene validator와 Zod Worker schema를 통과해야 한다. 좌표는 scene에만 있고 엔진 이벤트에는 이동 의미와 식별자만 있다.
-- Chapter 2–8 `CitySceneDefinition`은 공통 `mainRoad`, 시설별 `roadAccessIndex`, route별 ordered `points`, checkpoint별 누적 거리 `progress`를 소유한다. 모든 route는 main road의 정방향 또는 역방향 연속 slice여야 한다.
+- `CitySceneDefinition`은 2D Isometric Grid 좌표와 시설(`physicalFacilities`), 논리 노드(`nodes`), 유향 연결 도로(`routes`), 체크포인트(`checkpoints`)를 소유하며 모든 경로는 `fromNode`와 `toNode`를 정확히 연결한다.
 - Zustand vanilla store는 workspace와 UI 상태를 관리한다.
 - IndexedDB `event-city-lab-v1`에 진행을 저장하고 작은 환경 설정은 `ecl:*` localStorage 키를 사용한다.
 - 외부 JSON과 저장 데이터는 Zod 4의 비권장되지 않은 API로 검증한다.
@@ -227,9 +218,7 @@ Chapter 2–8 이동 변경은 route geometry 단위 테스트로 누적 거리 
 - 코드: MIT.
 - 직접 작성한 학습 콘텐츠와 SVG: CC BY 4.0.
 - 제품명과 로고는 위 라이선스에서 제외한다.
-- 외부 참고 자료는 출처와 참고 목적을 생성 기록에 남기며 원본 파일을 재배포하지 않는다.
-- 승인된 도시 WebP와 움직이는 Kafka 차량 PNG만 runtime에서 import한다.
-- Kafka 시설은 배경 중앙 건물 세 개를 의미적으로 매핑하며, 상태 효과와 실제 텍스트는 프로젝트 고유 SVG다.
+- 모든 도시 디오라마 아트워크와 차량·시설 그래픽은 외부 비트맵 이미지 없이 프로젝트 자체 순수 SVG 코드로 생성한다.
 
 ## Open questions
 

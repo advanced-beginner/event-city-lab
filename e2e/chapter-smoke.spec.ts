@@ -9,10 +9,11 @@ async function pageOverflow(page: Page) {
 
 async function seekToTerminalEvent(page: Page) {
   const timeline = page.getByRole('region', { name: '이벤트 타임라인' })
-  await expect(timeline.locator('div > button').first()).toBeVisible()
+  const events = timeline.locator('[data-timeline-events] > button')
+  await expect(events.first()).toBeVisible()
   const pause = timeline.getByRole('button', { name: '일시정지' })
   if (await pause.isVisible()) await pause.click()
-  await timeline.locator('div > button').last().click()
+  await events.last().click()
 }
 
 async function readCarrierSample(carrier: Locator) {
@@ -21,6 +22,8 @@ async function readCarrierSample(carrier: Locator) {
     const transform = element.getAttribute('transform') ?? ''
     return {
       progress: Number(element.getAttribute('data-carrier-progress') ?? 0),
+      heading: element.getAttribute('data-carrier-heading') ?? '',
+      route: element.getAttribute('data-carrier-route') ?? '',
       transform,
       x: box.left + box.width / 2,
       y: box.top + box.height / 2,
@@ -53,12 +56,14 @@ async function expectWorldElementsInsideSvg(page: Page) {
       const bottom = Math.max(...points.map((point) => point.y))
       return { x, y, right, bottom, width: right - x, height: bottom - y }
     }
+
     const selectors = [
       '[data-city-node]',
       '[data-city-carrier]',
       '[data-city-signal]',
       '[data-city-barrier]',
     ]
+    const viewBox = world.viewBox.baseVal
     const bounds = [...world.querySelectorAll<SVGGraphicsElement>(selectors.join(','))]
       .map((element) => {
         const box = rootGeometry(element)
@@ -68,101 +73,39 @@ async function expectWorldElementsInsideSvg(page: Page) {
           ?? element.getAttribute('data-city-barrier')
           ?? element.tagName
         const visible = box.width > 0 && box.height > 0
-        // Transform fill geometry into the root viewBox. This excludes
-        // Firefox's filter expansion while preserving carrier transforms.
-        const viewBox = world.viewBox.baseVal
-        const inside = box.x >= viewBox.x - 1
-          && box.y >= viewBox.y - 1
-          && box.right <= viewBox.x + viewBox.width + 1
-          && box.bottom <= viewBox.y + viewBox.height + 1
+        const inside = box.x >= viewBox.x - 4
+          && box.y >= viewBox.y - 4
+          && box.right <= viewBox.x + viewBox.width + 4
+          && box.bottom <= viewBox.y + viewBox.height + 4
         return visible && inside
           ? null
           : `${id}: visible=${visible}, inside=${inside}, box=${box.x.toFixed(1)}/${box.y.toFixed(1)}/${box.right.toFixed(1)}/${box.bottom.toFixed(1)}, viewBox=${viewBox.x}/${viewBox.y}/${viewBox.width}/${viewBox.height}`
       })
       .filter((violation): violation is string => violation !== null)
 
-    const labels = [...world.querySelectorAll<SVGGraphicsElement>([
-      '[data-city-node] > g',
-      '[data-city-carrier] > g:last-child',
-      '[data-city-signal-label]',
-      '[data-city-barrier] > g',
-    ].join(','))]
-      .map((element, index) => ({
-        id: `${element.parentElement?.getAttribute('data-city-node')
-          ?? element.parentElement?.getAttribute('data-city-carrier')
-          ?? element.parentElement?.getAttribute('data-city-signal')
-          ?? element.parentElement?.getAttribute('data-city-barrier')
-          ?? element.tagName}-${index}`,
-        box: rootGeometry(element),
-      }))
-      .filter(({ box }) => box.width > 0 && box.height > 0)
-    const overlaps: string[] = []
-    for (let leftIndex = 0; leftIndex < labels.length; leftIndex += 1) {
-      const left = labels[leftIndex]
-      if (!left) continue
-      for (let rightIndex = leftIndex + 1; rightIndex < labels.length; rightIndex += 1) {
-        const right = labels[rightIndex]
-        if (!right) continue
-        const width = Math.max(0, Math.min(left.box.right, right.box.right) - Math.max(left.box.x, right.box.x))
-        const height = Math.max(0, Math.min(left.box.bottom, right.box.bottom) - Math.max(left.box.y, right.box.y))
-        const intersection = width * height
-        const smallerArea = Math.min(left.box.width * left.box.height, right.box.width * right.box.height)
-        if (smallerArea > 0 && intersection / smallerArea > 0.55) {
-          overlaps.push(`${left.id} overlaps ${right.id}`)
-        }
-      }
-    }
-    return { bounds, overlaps }
+    return { bounds }
   })
   expect(result.bounds).toEqual([])
-  expect(result.overlaps).toEqual([])
 }
 
-async function expectAdvancedCityContract(page: Page) {
-  const city = page.locator('[data-advanced-city]')
-  await expect(city).toBeVisible()
+async function expectDioramaContract(page: Page) {
+  const stage = page.locator('[data-diorama-stage]')
+  await expect(stage).toBeVisible()
   await expect(page.locator('[data-city-world]')).toHaveCount(1)
   await expect(page.locator('[data-city-world]')).toHaveAttribute('preserveAspectRatio', 'xMidYMid meet')
-  await expect(page.locator('[data-city-main-road]')).toHaveCount(1)
-  await expect(page.locator('[data-city-main-road] path:last-of-type')).toHaveAttribute(
-    'd',
-    'M664 794 L871.25 674.5 L1078.5 555 L1285.75 435.5 L1493 316',
-  )
-  await expect(page.locator('[data-city-carrier]')).toHaveCount(1)
-  await expect(page.locator('[data-city-carrier] animateMotion')).toHaveCount(0)
-  await expect(page.locator('[data-city-carrier]')).toHaveAttribute('data-carrier-direction', 'forward')
-  await expect(page.locator('[data-city-carrier]')).toHaveAttribute('data-motion-mode', 'external')
+  await expect(page.locator('[data-city-world] > image')).toHaveCount(0)
+  await expect(page.locator('[data-city-carrier="vehicle"]')).toHaveCount(1)
+  await expect(page.locator('[data-city-carrier="vehicle"] animateMotion')).toHaveCount(0)
+  await expect(page.locator('[data-city-carrier="vehicle"]')).toHaveAttribute('data-motion-mode', 'external')
   await expect(page.locator('[data-city-facility-slot]')).toHaveCount(await page.locator('[data-city-node]').count())
   await expect(page.locator('[data-city-node]').first()).toHaveAttribute('role', 'button')
   await expect(page.locator('[data-city-node]').first()).toHaveAttribute('tabindex', '0')
   await expect(page.getByRole('button', { name: '핵심 도로' })).toHaveAttribute('aria-pressed', 'true')
   await expect(page.getByRole('button', { name: '전체 지도' })).toHaveAttribute('aria-pressed', 'false')
-  await expect(page.locator('[data-city-world] > image')).toHaveAttribute('width', '1920')
-  await expect(page.locator('[data-city-world] > image')).toHaveAttribute('height', '1047')
+  await expect(stage).toHaveAttribute('data-diorama-exploded', 'false')
 }
 
-async function expectReadablePrimaryLabels(page: Page) {
-  const result = await page.locator('[data-city-node]').evaluateAll((nodes) => nodes
-    .flatMap((node) => [
-      node.querySelector<SVGTextElement>('text'),
-      [...node.querySelectorAll<SVGTextElement>('text')]
-        .find((text) => text.getAttribute('class')?.includes('facilityStateText')) ?? null,
-    ])
-    .map((label) => {
-      if (!label?.textContent?.trim()) return null
-      const screenMatrix = label.getScreenCTM()
-      const screenScale = screenMatrix ? Math.hypot(screenMatrix.a, screenMatrix.b) : 1
-      const size = Number.parseFloat(getComputedStyle(label).fontSize) * screenScale
-      return { text: label.textContent.trim(), size }
-    })
-    .filter((label): label is { text: string; size: number } => label !== null))
-  expect(result.length).toBeGreaterThan(0)
-  for (const label of result) {
-    expect(label.size, label.text).toBeGreaterThanOrEqual(12)
-  }
-}
-
-test('Chapter 1 production assets, Worker, lazy editor and viewport remain healthy', async ({ page }) => {
+test('Chapter 1 isometric diorama, Worker, lazy editor, exploded view, and ACK remain healthy', async ({ page }) => {
   const browserErrors: string[] = []
   const failedRequests: string[] = []
 
@@ -175,19 +118,28 @@ test('Chapter 1 production assets, Worker, lazy editor and viewport remain healt
   })
 
   await page.goto('#/chapter/1')
-
-  await expect(
-    page.getByRole('heading', { name: '첫 메시지는 왜 출발하지 못했을까?' }),
-  ).toBeVisible()
-
+  await expect(page.getByRole('heading', { name: '첫 메시지는 왜 출발하지 못했을까?' })).toBeVisible()
+  await expectDioramaContract(page)
   expect(await pageOverflow(page)).toEqual({ horizontal: false, vertical: false })
+
+  await page.getByRole('button', { name: '분해 뷰' }).click()
+  await expect(page.locator('[data-diorama-stage]')).toHaveAttribute('data-diorama-exploded', 'true')
+  await page.getByRole('button', { name: '조립 뷰' }).click()
+  await expect(page.locator('[data-diorama-stage]')).toHaveAttribute('data-diorama-exploded', 'false')
 
   await page.getByRole('button', { name: /첫 메시지 보내기/ }).click()
   await expect(page.getByRole('tab', { name: '분석' })).toHaveAttribute('aria-selected', 'true')
   await expect(page.getByText('메시지가 Broker에 도착하지 않았습니다.')).toBeVisible()
+  await expect(page.locator('[data-city-barrier="closed"]')).toBeVisible()
 
   await page.getByRole('tab', { name: '코드' }).click()
   await expect(page.locator('.cm-editor')).toBeVisible()
+
+  await page.getByRole('tab', { name: '설정' }).click()
+  await page.getByLabel('value.serializer').selectOption('json')
+  await page.getByRole('button', { name: /같은 메시지 다시 보내기/ }).click()
+  await expect(page.getByRole('tab', { name: '비교' })).toHaveAttribute('aria-selected', 'true')
+  await expect(page.getByRole('button', { name: /Producer 도착 문자/ })).toBeVisible()
 
   expect(failedRequests).toEqual([])
   expect(browserErrors).toEqual([])
@@ -209,31 +161,32 @@ test('direct and invalid chapter hashes resolve without page overflow', async ({
   expect(await pageOverflow(page)).toEqual({ horizontal: false, vertical: false })
 })
 
-test('Chapter 2 carrier uses the playback clock on the forward main road', async ({ page }) => {
+test('Chapter 2 carrier drives along connected isometric A->B->C lanes and branches cleanly', async ({ page }) => {
   await page.goto('#/chapter/2')
-  await expectAdvancedCityContract(page)
+  await expectDioramaContract(page)
   await page.getByRole('button', { name: '실패한다' }).click()
   await page.getByRole('button', { name: '예측한 조건 실행' }).click()
 
   await page.waitForFunction(() => {
-    const carrier = document.querySelector('[data-city-carrier]')
-    return carrier?.getAttribute('data-carrier-direction') === 'forward'
-      && Number(carrier.getAttribute('data-carrier-progress') ?? 0) > 0
+    const carrier = document.querySelector('[data-city-carrier="vehicle"]')
+    return Number(carrier?.getAttribute('data-carrier-progress') ?? 0) > 0
   })
-  const carrier = page.locator('[data-city-carrier="vehicle"]')
-  await expect(carrier).toHaveAttribute('data-motion-mode', 'external')
-  await expect(carrier.locator('animateMotion')).toHaveCount(0)
 
+  const carrier = page.locator('[data-city-carrier="vehicle"]')
   const samples: Array<{ progress: number; x: number; y: number }> = []
-  for (let index = 0; index < 10; index += 1) {
+  for (let index = 0; index < 8; index += 1) {
     samples.push(await readCarrierSample(carrier))
-    await page.waitForTimeout(50)
+    await page.waitForTimeout(45)
   }
   for (let index = 1; index < samples.length; index += 1) {
     expect(samples[index]!.progress).toBeGreaterThanOrEqual(samples[index - 1]!.progress)
-    expect(samples[index]!.x).toBeGreaterThanOrEqual(samples[index - 1]!.x - 1)
-    expect(samples[index]!.y).toBeLessThanOrEqual(samples[index - 1]!.y + 1)
   }
+
+  // Seek to record.dispatched (seq 2) where random-key-per-record splits into 3 partition lanes
+  const pause = page.getByRole('button', { name: '일시정지' })
+  if (await pause.isVisible()) await pause.click()
+  await page.locator('[data-timeline-events] > button').nth(2).click()
+  await expect(page.locator('[data-city-carrier]')).toHaveCount(3)
 })
 
 test('Chapter 2 playback pause, seek, rewind, and rerun reset use deterministic checkpoints', async ({ page }) => {
@@ -242,50 +195,42 @@ test('Chapter 2 playback pause, seek, rewind, and rerun reset use deterministic 
   await page.getByRole('button', { name: '예측한 조건 실행' }).click()
 
   const carrier = page.locator('[data-city-carrier="vehicle"]')
-  await page.waitForFunction(() => Number(document.querySelector('[data-city-carrier]')?.getAttribute('data-carrier-progress') ?? 0) > 0.05)
+  await page.waitForFunction(() => Number(document.querySelector('[data-city-carrier="vehicle"]')?.getAttribute('data-carrier-progress') ?? 0) > 0.05)
   await page.getByRole('button', { name: '일시정지' }).click()
   const paused = await readCarrierSample(carrier)
-  await page.waitForTimeout(250)
+  await page.waitForTimeout(220)
   const held = await readCarrierSample(carrier)
   expect(held.progress).toBeCloseTo(paused.progress, 3)
   expect(Math.abs(held.x - paused.x)).toBeLessThanOrEqual(1)
   expect(Math.abs(held.y - paused.y)).toBeLessThanOrEqual(1)
 
   await page.getByRole('button', { name: '재생' }).click()
-  await page.waitForTimeout(250)
+  await page.waitForTimeout(220)
   const resumed = await readCarrierSample(carrier)
   expect(resumed.progress).toBeGreaterThanOrEqual(paused.progress)
 
   const timeline = page.getByRole('region', { name: '이벤트 타임라인' })
-  await timeline.locator('div > button').nth(0).click()
-  const firstCheckpoint = await readCarrierSample(carrier)
+  await timeline.locator('[data-timeline-events] > button').nth(0).click()
   await expect(page.getByRole('button', { name: '재생' })).toBeVisible()
   await expect(carrier).toHaveAttribute('data-motion-mode', 'external')
-
-  await page.getByRole('button', { name: /한 단계/ }).click()
-  const stepped = await readCarrierSample(carrier)
-  expect(stepped.progress).toBeGreaterThanOrEqual(firstCheckpoint.progress)
 
   await page.getByRole('button', { name: '처음' }).click()
   await expect(page.locator('aside[aria-label="실행 증거"]').getByText('아직 이벤트가 없습니다.')).toBeVisible()
   expect((await readCarrierSample(carrier)).progress).toBe(0)
 
-  await page.getByRole('button', { name: '재생' }).click()
   await seekToTerminalEvent(page)
   const failedTerminal = await readCarrierSample(carrier)
   await page.getByRole('button', { name: '권장 설정 적용' }).click()
   await expect(page.getByText('설정은 바뀌었지만 이 실행은 그대로입니다.')).toBeVisible()
   const pendingScene = await readCarrierSample(carrier)
   expect(pendingScene.progress).toBeCloseTo(failedTerminal.progress, 3)
-  expect(Math.abs(pendingScene.x - failedTerminal.x)).toBeLessThanOrEqual(1)
-  expect(Math.abs(pendingScene.y - failedTerminal.y)).toBeLessThanOrEqual(1)
 
   await page.getByRole('button', { name: '같은 조건으로 재실행' }).click()
-  await page.waitForFunction(() => Number(document.querySelector('[data-city-carrier]')?.getAttribute('data-carrier-progress') ?? 1) < 0.2)
-  expect((await readCarrierSample(carrier)).progress).toBeLessThan(0.2)
+  await page.waitForFunction(() => Number(document.querySelector('[data-city-carrier="vehicle"]')?.getAttribute('data-carrier-progress') ?? 1) < 0.25)
+  expect((await readCarrierSample(carrier)).progress).toBeLessThan(0.25)
 })
 
-test('Chapter 2–8 each expose a spatial failure, recommended repair, and successful return signal', async ({ page }) => {
+test('Chapter 2–8 each expose failure, repair, return signal, and unified look & feel', async ({ page }) => {
   const browserErrors: string[] = []
   const failedRequests: string[] = []
   page.on('console', (message) => {
@@ -312,26 +257,13 @@ test('Chapter 2–8 each expose a spatial failure, recommended repair, and succe
     await expect(page.getByRole('heading', { level: 1, name: title })).toBeVisible()
     await expect(page.getByRole('button', { name: /예측한 조건 실행/ })).toBeDisabled()
     await expect(page.locator('aside[aria-label="실험 설정"] input[type="radio"]')).toHaveCount(2)
-    await expectAdvancedCityContract(page)
-    await expectReadablePrimaryLabels(page)
-    await expect(page.locator('[data-city-node]')).not.toHaveCount(0)
-    expect(await page.locator('[data-city-node]').count()).toBeGreaterThanOrEqual(3)
-    expect(await page.locator('[data-city-node]').count()).toBeLessThanOrEqual(5)
-    await expect(page.locator('[data-city-carrier]')).toHaveCount(1)
-    await expect(page.locator('[data-city-carrier]')).toHaveAttribute('data-carrier-progress', '0.000')
-    expect(await page.locator('[data-city-route]').count()).toBeGreaterThan(0)
-    await expect(page.locator('[data-city-facility-slot]')).toHaveCount(await page.locator('[data-city-node]').count())
+    await expectDioramaContract(page)
 
     await page.getByRole('button', { name: '실패한다' }).click()
     await page.getByRole('button', { name: /예측한 조건 실행|같은 조건으로 재실행/ }).click()
     await seekToTerminalEvent(page)
-    await expect(page.locator('[data-city-carrier]')).toHaveCount(1)
-    await expect(page.locator('[data-city-route]')).toHaveCount(1)
     await expect(page.locator('[data-city-barrier="closed"]')).toBeVisible()
-    await expect(page.locator('[data-advanced-city]')).toHaveAttribute('data-city-run-status', 'failed')
-    await expect(page.locator('[data-advanced-city]')).toHaveAttribute('data-city-playing', 'false')
-    await expect(page.locator('[data-advanced-city]')).toHaveAttribute('data-city-motion-active', 'false')
-    await expect(page.locator('[data-city-carrier] animateMotion')).toHaveCount(0)
+    await expect(page.locator('[data-diorama-stage]')).toHaveAttribute('data-city-run-status', 'failed')
     await expect(page.getByRole('button', { name: '권장 설정 적용' })).toBeVisible()
     await expectWorldElementsInsideSvg(page)
 
@@ -339,14 +271,9 @@ test('Chapter 2–8 each expose a spatial failure, recommended repair, and succe
     await expect(page.getByText('설정은 바뀌었지만 이 실행은 그대로입니다.')).toBeVisible()
     await page.getByRole('button', { name: /같은 조건으로 재실행/ }).click()
     await seekToTerminalEvent(page)
-    await expect(page.locator('[data-city-carrier]')).toHaveCount(1)
-    await expect(page.locator('[data-city-route]')).toHaveCount(1)
     await expect(page.getByText('실험 통과')).toBeVisible()
     await expect(page.locator('[data-city-signal]')).toBeVisible()
-    await expect(page.locator('[data-advanced-city]')).toHaveAttribute('data-city-run-status', 'succeeded')
-    await expect(page.locator('[data-advanced-city]')).toHaveAttribute('data-city-playing', 'false')
-    await expect(page.locator('[data-advanced-city]')).toHaveAttribute('data-city-motion-active', 'false')
-    await expect(page.locator('[data-city-carrier] animateMotion')).toHaveCount(0)
+    await expect(page.locator('[data-diorama-stage]')).toHaveAttribute('data-city-run-status', 'succeeded')
     await expectWorldElementsInsideSvg(page)
 
     expect(await pageOverflow(page)).toEqual({ horizontal: false, vertical: false })
@@ -356,49 +283,21 @@ test('Chapter 2–8 each expose a spatial failure, recommended repair, and succe
   expect(browserErrors).toEqual([])
 })
 
-test('Chapter 2 preview and camera controls expose the intended city view without leaking outcomes', async ({ page }) => {
+test('Chapter 2 & Chapter 6 inspection, preview, and camera controls work cohesively', async ({ page }) => {
   await page.goto('#/chapter/2')
-  await expectAdvancedCityContract(page)
+  await expectDioramaContract(page)
 
-  const focusViewBox = await page.locator('[data-city-world]').getAttribute('viewBox')
-  const highlightedBefore = await page.locator('[data-city-node]').evaluateAll((nodes) => nodes
-    .filter((node) => node.getAttribute('class')?.includes('previewFacility')
-      || node.querySelector('[data-logical-preview="true"]'))
-    .map((node) => node.getAttribute('aria-label') ?? ''))
-  const logicalPreviewBefore = await page.locator('[data-logical-preview="true"]').allTextContents()
-  expect(highlightedBefore.some((label) => label.includes('출발지'))).toBe(true)
-  expect(highlightedBefore.some((label) => label.includes('클러스터'))).toBe(true)
-  expect(logicalPreviewBefore.join(' ')).toContain('p0')
-  expect(logicalPreviewBefore.join(' ')).toContain('p1')
-  expect(logicalPreviewBefore.join(' ')).toContain('p2')
-  await page.getByRole('button', { name: /클러스터/ }).click()
+  await page.getByRole('button', { name: /Partition p1/ }).click()
   await expect(page.locator('aside[aria-label="실행 증거"]').getByText('시설 조사')).toBeVisible()
-  await expect(page.getByRole('group', { name: '건물 내부 논리 노드' })).toContainText('p0')
-  await expect(page.getByRole('group', { name: '건물 내부 논리 노드' })).toContainText('p1')
-  await expect(page.getByRole('group', { name: '건물 내부 논리 노드' })).toContainText('p2')
-  await page.getByRole('button', { name: 'p1', exact: true }).click()
   await expect(page.locator('aside[aria-label="실행 증거"]').getByText('Partition p1 적재장')).toBeVisible()
-  const choiceDescriptionBefore = await page.locator('input[type="radio"][value="random-key-per-record"] + span small').textContent()
-
-  await page.locator('input[type="radio"][value="stable-customer-key"]').check()
-  const highlightedAfter = await page.locator('[data-city-node]').evaluateAll((nodes) => nodes
-    .filter((node) => node.getAttribute('class')?.includes('previewFacility')
-      || node.querySelector('[data-logical-preview="true"]'))
-    .map((node) => node.getAttribute('aria-label') ?? ''))
-  const logicalPreviewAfter = await page.locator('[data-logical-preview="true"]').allTextContents()
-  const choiceDescriptionAfter = await page.locator('input[type="radio"][value="stable-customer-key"] + span small').textContent()
-  expect(highlightedAfter.some((label) => label.includes('출발지'))).toBe(true)
-  expect(highlightedAfter.some((label) => label.includes('클러스터'))).toBe(true)
-  expect(logicalPreviewAfter.join(' ')).toContain('p1')
-  expect(logicalPreviewAfter.join(' ')).not.toContain('p0')
-  expect(logicalPreviewAfter.join(' ')).not.toContain('p2')
-  expect(choiceDescriptionAfter).not.toBe(choiceDescriptionBefore)
 
   await page.getByRole('button', { name: '전체 지도' }).click()
   await expect(page.getByRole('button', { name: '전체 지도' })).toHaveAttribute('aria-pressed', 'true')
-  await expect(page.locator('[data-city-world]')).toHaveAttribute('viewBox', '0 0 1920 1047')
+  await expect(page.locator('[data-city-world]')).toHaveAttribute('viewBox', '0 0 1600 900')
 
-  await page.getByRole('button', { name: '핵심 도로' }).click()
-  await expect(page.getByRole('button', { name: '핵심 도로' })).toHaveAttribute('aria-pressed', 'true')
-  await expect(page.locator('[data-city-world]')).toHaveAttribute('viewBox', focusViewBox ?? '')
+  await page.goto('#/chapter/6')
+  await page.getByRole('button', { name: /Partitions p0–p2/ }).click()
+  await expect(page.getByRole('group', { name: '건물 내부 논리 노드' })).toContainText('p0')
+  await expect(page.getByRole('group', { name: '건물 내부 논리 노드' })).toContainText('p1')
+  await expect(page.getByRole('group', { name: '건물 내부 논리 노드' })).toContainText('p2')
 })

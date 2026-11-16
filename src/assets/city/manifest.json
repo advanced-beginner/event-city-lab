@@ -1,36 +1,9 @@
 {
-  "version": 3,
-  "updatedAt": "2026-08-20",
-  "background": {
-    "id": "event-city-main",
-    "file": "background/event-city-main.webp",
-    "source": "user-provided Gemini-generated image",
-    "sourceFile": "Gemini_Generated_Image_ixg878ixg878ixg8.png",
-    "nativeSize": [1600, 975],
-    "fit": "cover",
-    "postProcessing": ["center-crop", "resize", "webp-quality-88"],
-    "interactiveBuildings": [
-      { "building": 1, "component": "producer", "label": "출발센터", "position": "center-left dark tower" },
-      { "building": 2, "component": "serializer", "label": "검사소", "position": "center glass Urban Plaza" },
-      { "building": 3, "component": "broker", "label": "기록센터", "position": "center-right blue and cream Zenith Apartments" }
-    ]
-  },
-  "advancedChapterBackground": {
-    "id": "event-city-atlas",
-    "file": "background/event-city-atlas.webp",
-    "source": "user-provided Gemini-generated image",
-    "sourceFile": "Gemini_Generated_Image_ovrs7covrs7covrs.png",
-    "nativeSize": [1920, 1047],
-    "fit": "contain",
-    "postProcessing": ["resize-width-1920", "webp-quality-78"],
-    "runtime": true,
-    "usage": "Chapter 2–8 shared city atlas with 11 roadside facility slots and routes constrained to the downtown-main-arterial SVG spine"
-  },
-  "assets": [
-    { "id": "vehicle-coral-car", "file": "sprites/vehicle-coral-car.png", "category": "vehicle", "nativeSize": [165, 135], "anchor": [0.5, 1], "runtime": false },
-    { "id": "vehicle-kafka-van", "file": "sprites/vehicle-kafka-van.png", "category": "vehicle", "nativeSize": [192, 171], "anchor": [0.5, 1], "runtime": false },
-    { "id": "vehicle-kafka-van-east", "file": "sprites/vehicle-kafka-van-east.png", "category": "vehicle", "orientation": "east", "derivedFrom": "vehicle-kafka-van", "nativeSize": [192, 171], "anchor": [0.5, 1], "runtime": false },
-    { "id": "vehicle-kafka-van-northeast", "file": "sprites/vehicle-kafka-van-northeast.png", "category": "vehicle", "orientation": "northeast", "derivedFrom": "vehicle-kafka-van-east", "nativeSize": [192, 171], "anchor": [0.5, 1], "runtime": true },
-    { "id": "vehicle-teal-car", "file": "sprites/vehicle-teal-car.png", "category": "vehicle", "nativeSize": [166, 136], "anchor": [0.5, 1], "runtime": false }
-  ]
+  "version": 4,
+  "updatedAt": "2026-11-16",
+  "renderer": "pure-isometric-svg-diorama",
+  "viewport": [1600, 900],
+  "projection": "2:1 isometric grid (tileHalfW=58, tileHalfH=29) with 3-point lighting (top 100%, left 82%, right 64%)",
+  "assets": [],
+  "notes": "All legacy raster backgrounds and PNG vehicle sprites were removed in favor of deterministic inline SVG Isometric Diorama scenes across Chapters 1-8."
 }

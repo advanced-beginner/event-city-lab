@@ -2,85 +2,76 @@ import { describe, expect, it } from 'vitest'
 
 import { getChapterRule } from '../domain/chapterEngine'
 import type { AdvancedChapterId } from '../domain/chapterSimulation'
-import { getAdvancedChapterScene, getExperimentCityPreview } from './chapterScenes'
+import {
+  getAdvancedChapterScene,
+  getChapterOneScene,
+  getChapterScene,
+  getExperimentCityPreview,
+} from './chapterScenes'
 import { projectCityWorld } from './projection'
 import { isPointOnPolyline } from './routeGeometry'
 import { validateCityScene } from './validation'
 
-describe('advanced chapter city scenes', () => {
+describe('isometric diorama chapter scenes (Chapters 1-8)', () => {
+  it('validates Chapter 1 diorama scene with exact A -> B -> C connectivity', () => {
+    const scene = getChapterOneScene()
+    expect(() => validateCityScene(scene)).not.toThrow()
+    expect(scene.viewport).toEqual({ width: 1600, height: 900 })
+    expect(scene.nodes.map((node) => node.id)).toEqual(['producer', 'serializer', 'broker'])
+    expect(scene.routes.map((route) => route.id)).toEqual([
+      'producer-serializer',
+      'serializer-broker',
+      'broker-producer-ack',
+    ])
+
+    const serializer = scene.nodes.find((n) => n.id === 'serializer')!
+    expect(scene.routes[0]!.points.at(-1)).toEqual(serializer.position)
+    expect(scene.routes[1]!.points[0]).toEqual(serializer.position)
+  })
+
+  it.each([1, 2, 3, 4, 5, 6, 7, 8] as const)(
+    'validates Chapter %s diorama scene geometry, facility spacing, and waypoint connectivity',
+    (chapterId) => {
+      const scene = getChapterScene(chapterId)
+      const nodeById = new Map(scene.nodes.map((node) => [node.id, node]))
+
+      expect(() => validateCityScene(scene)).not.toThrow()
+      expect(scene.viewport).toEqual({ width: 1600, height: 900 })
+      expect(scene.routes.find((route) => route.id === scene.initialVehicleRouteId)).toMatchObject({
+        kind: 'data',
+      })
+      expect(Object.keys(projectCityWorld(scene, [], -1).carriers)).toEqual(['vehicle'])
+
+      for (const route of scene.routes) {
+        const fromNode = nodeById.get(route.fromNodeId)!
+        const toNode = nodeById.get(route.toNodeId)!
+        expect(route.points.length, route.id).toBeGreaterThanOrEqual(2)
+        expect(route.points[0], route.id).toEqual(fromNode.position)
+        expect(route.points.at(-1), route.id).toEqual(toNode.position)
+        expect(route.checkpoints[0]?.position, route.id).toEqual(route.points[0])
+        expect(route.checkpoints.at(-1)?.position, route.id).toEqual(route.points.at(-1))
+        expect(isPointOnPolyline(route.points, route.checkpoints[1]!.position, 0.05), route.id).toBe(true)
+      }
+
+      // Ensure no two physical facility centers overlap in grid space
+      for (let i = 0; i < scene.physicalFacilities.length; i += 1) {
+        for (let j = i + 1; j < scene.physicalFacilities.length; j += 1) {
+          const left = scene.physicalFacilities[i]!
+          const right = scene.physicalFacilities[j]!
+          const gridDistance = Math.hypot(left.grid.u - right.grid.u, left.grid.v - right.grid.v)
+          expect(gridDistance, `${left.id} vs ${right.id}`).toBeGreaterThanOrEqual(1.8)
+        }
+      }
+    },
+  )
+
   it.each([2, 3, 4, 5, 6, 7, 8] as const)(
     'keeps Chapter %s experiment previews inside the scene contract',
     (chapterId: AdvancedChapterId) => {
       const scene = getAdvancedChapterScene(chapterId)
       const nodeIds = new Set(scene.nodes.map((node) => node.id))
       const routeIds = new Set(scene.routes.map((route) => route.id))
-      const roadPointKeys = new Set(scene.mainRoad.points.map((point) => `${point.x}:${point.y}`))
 
-      expect(() => validateCityScene(scene)).not.toThrow()
-      expect(scene.mainRoad.id).toBe('downtown-main-arterial')
-      expect(scene.mainRoad.points).toEqual([
-        { x: 664, y: 794 },
-        { x: 871.25, y: 674.5 },
-        { x: 1078.5, y: 555 },
-        { x: 1285.75, y: 435.5 },
-        { x: 1493, y: 316 },
-      ])
-      expect(scene.physicalFacilities.map((facility) => ({
-        hitAreaPath: facility.hitAreaPath,
-        label: facility.label,
-        position: facility.position,
-        roadAccessIndex: facility.roadAccessIndex,
-      }))).toEqual([
-        {
-          hitAreaPath: 'M535,690L668,650L745,704L712,790L610,826L535,770Z',
-          label: 'Source / Producer',
-          position: { x: 625, y: 714 },
-          roadAccessIndex: 0,
-        },
-        {
-          hitAreaPath: 'M690,430L815,390L925,490L902,625L790,670L690,590Z',
-          label: 'Kafka Ingress',
-          position: { x: 805, y: 510 },
-          roadAccessIndex: 1,
-        },
-        {
-          hitAreaPath: 'M885,305L1030,275L1115,360L1088,512L990,560L885,485Z',
-          label: 'Kafka Cluster',
-          position: { x: 997, y: 405 },
-          roadAccessIndex: 2,
-        },
-        {
-          hitAreaPath: 'M1160,472L1320,430L1435,515L1400,645L1270,690L1160,600Z',
-          label: 'Consumer / Processor',
-          position: { x: 1292, y: 548 },
-          roadAccessIndex: 3,
-        },
-        {
-          hitAreaPath: 'M1408,228L1575,195L1665,285L1630,405L1510,450L1408,360Z',
-          label: 'Application / Sink',
-          position: { x: 1530, y: 285 },
-          roadAccessIndex: 4,
-        },
-      ])
-      expect(scene.routes.find((route) => route.id === scene.initialVehicleRouteId)).toMatchObject({
-        kind: 'data',
-      })
-      expect(new Set(scene.nodes.map((node) => node.roadAccessIndex)).size).toBeLessThanOrEqual(5)
-      expect(new Set(scene.nodes.map((node) => node.roadAccessIndex)).size).toBeGreaterThanOrEqual(3)
-      expect(scene.mainRoad.points.every((point) => isPointOnPolyline([
-        scene.mainRoad.points[0]!,
-        scene.mainRoad.points.at(-1)!,
-      ], point, 0.01))).toBe(true)
-      expect(Object.keys(projectCityWorld(scene, [], -1).carriers)).toEqual(['vehicle'])
-      expect(scene.routes.every((route) => route.path.includes(' L') && !route.path.includes(' Q'))).toBe(true)
-      expect(scene.routes.every((route) => route.points.length >= 2)).toBe(true)
-      for (const route of scene.routes) {
-        const points = route.points
-        expect(route.checkpoints[0]?.position, route.id).toEqual(points[0])
-        expect(route.checkpoints.at(-1)?.position, route.id).toEqual(points.at(-1))
-        expect(isPointOnPolyline(points, route.checkpoints[1]!.position, 0.01), route.id).toBe(true)
-        expect(points.every((point) => roadPointKeys.has(`${point.x}:${point.y}`)), route.id).toBe(true)
-      }
       if (chapterId === 8) {
         expect(scene.boundaries?.map((boundary) => boundary.id)).toEqual(['consume-transform-produce-tx'])
       }

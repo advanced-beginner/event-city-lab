@@ -16,6 +16,8 @@ const mocks = vi.hoisted(() => ({
 vi.mock('../storage/workspaceDb', () => ({
   loadWorkspace: mocks.loadWorkspace,
   saveWorkspace: mocks.saveWorkspace,
+  parseWorkspaceJson: vi.fn(),
+  serializeWorkspace: vi.fn().mockReturnValue('{}'),
 }))
 
 vi.mock('../worker/client', () => ({
@@ -55,13 +57,13 @@ describe('GuidedChapterLab', () => {
   it('shows a facility role for Enter and Space without moving an empty timeline', () => {
     render(<GuidedChapterLab chapter={getChapter(2)} />)
 
-    const producer = screen.getByRole('button', { name: /출발지 \(Source \/ Producer\), 대기/ })
+    const producer = screen.getByRole('button', { name: /Producer 출발센터, 대기/ })
     fireEvent.keyDown(producer, { key: 'Enter' })
-    expect(screen.getAllByText('Kafka record를 만들고 전송하는 출발 시설입니다.')[0]).toBeVisible()
+    expect(screen.getAllByText('Kafka record를 만들고 직렬화해 전송하는 출발 시설입니다.')[0]).toBeVisible()
     expect(screen.getByRole('region', { name: '이벤트 타임라인' })).toHaveTextContent('0ms')
 
     fireEvent.keyDown(producer, { key: ' ' })
-    expect(screen.getAllByText('Kafka record를 만들고 전송하는 출발 시설입니다.')[0]).toBeVisible()
+    expect(screen.getAllByText('Kafka record를 만들고 직렬화해 전송하는 출발 시설입니다.')[0]).toBeVisible()
     expect(screen.getByRole('region', { name: '이벤트 타임라인' })).toHaveTextContent('0ms')
   })
 

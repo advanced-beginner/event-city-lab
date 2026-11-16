@@ -20,9 +20,9 @@ import {
   type WorkspaceSnapshot,
 } from '../domain/simulation'
 import { labStore } from '../state/labStore'
-import { loadWorkspace, saveWorkspace } from '../storage/workspaceDb'
+import { loadWorkspace, parseWorkspaceJson, saveWorkspace, serializeWorkspace } from '../storage/workspaceDb'
+import styles from '../styles/LabWorkspace.module.css'
 import { runChapterSimulation } from '../worker/client'
-import { AdvancedCityWorld } from './AdvancedCityWorld'
 import {
   carrierProgressAtCursor,
   createPlaybackSegment,
@@ -30,11 +30,12 @@ import {
   inspectFacilityAtCursor,
   interpolatePlaybackProgress,
   retimePlaybackSegment,
+  type PlaybackSpeed,
 } from './guidedPlayback'
-import styles from './GuidedChapterLab.module.css'
+import { IsometricDioramaStage } from './IsometricDioramaStage'
 
 type Prediction = 'failed' | 'succeeded'
-type PlaybackSpeed = 0.5 | 1 | 2
+type EvidenceTab = 'logs' | 'analysis' | 'comparison'
 
 function makeSnapshot(): WorkspaceSnapshot {
   const state = labStore.getState()
@@ -93,6 +94,7 @@ export function GuidedChapterLab({ chapter }: { chapter: ChapterMetadata }) {
   )
   const [prediction, setPrediction] = useState<Prediction | null>(null)
   const [run, setRun] = useState<ChapterSimulationRun | null>(null)
+  const [previousRun, setPreviousRun] = useState<ChapterSimulationRun | null>(null)
   const [eventCursor, setEventCursor] = useState(-1)
   const eventCursorRef = useRef(-1)
   const [isPlaying, setIsPlaying] = useState(false)
@@ -100,6 +102,7 @@ export function GuidedChapterLab({ chapter }: { chapter: ChapterMetadata }) {
   const [playbackPulse, setPlaybackPulse] = useState(0)
   const [isRunning, setIsRunning] = useState(false)
   const [engineError, setEngineError] = useState<string | null>(null)
+  const [evidenceTab, setEvidenceTab] = useState<EvidenceTab>('logs')
   const [inspectedFacilityId, setInspectedFacilityId] = useState<string | null>(null)
   const [inspectedNodeId, setInspectedNodeId] = useState<string | null>(null)
   const [showInspectedRole, setShowInspectedRole] = useState(false)
@@ -108,6 +111,7 @@ export function GuidedChapterLab({ chapter }: { chapter: ChapterMetadata }) {
   const [carrierProgress, setCarrierProgress] = useState(0)
   const carrierProgressRef = useRef(0)
   const runRequestSerial = useRef(0)
+  const autoSwitchedRunId = useRef<string | null>(null)
   const playbackFrameRef = useRef<number | null>(null)
   const activeSegmentRef = useRef<ReturnType<typeof createPlaybackSegment>>(null)
   const activeSegmentSettingsKeyRef = useRef('')
@@ -115,8 +119,10 @@ export function GuidedChapterLab({ chapter }: { chapter: ChapterMetadata }) {
   const segmentLastTimestampRef = useRef(0)
   const segmentElapsedRef = useRef(0)
   const [viewMode, setViewMode] = useState<AdvancedCityViewMode>('focus')
+  const [exploded, setExploded] = useState(false)
   const [viewportSize, setViewportSize] = useState<CitySize>({ width: 1280, height: 720 })
   const cityViewportRef = useRef<HTMLDivElement | null>(null)
+  const importRef = useRef<HTMLInputElement>(null)
   const [appReducedMotion, setAppReducedMotion] = useState(readReducedMotionSetting)
   const [osReducedMotion, setOsReducedMotion] = useState(readOsReducedMotionPreference)
   const reducedMotion = appReducedMotion || osReducedMotion
@@ -135,16 +141,14 @@ export function GuidedChapterLab({ chapter }: { chapter: ChapterMetadata }) {
   const scenePreview = getExperimentCityPreview(experiment.id, choiceId)
   const selectedChoice = experiment.choices.find((choice) => choice.id === choiceId)
   const playbackSnapshots = useMemo(
-    () => run ? createPlaybackSnapshots(scene, run.events) : createPlaybackSnapshots(scene, []),
+    () => (run ? createPlaybackSnapshots(scene, run.events) : createPlaybackSnapshots(scene, [])),
     [run, scene],
   )
   const projectedWorld = playbackSnapshots.find((snapshot) => snapshot.cursor === eventCursor)?.world
   const inspectedNode = scene.nodes.find((node) => node.id === inspectedNodeId) ?? null
   const inspectedFacilityNodes = useMemo(() => {
     if (!inspectedFacilityId) return []
-    const facility = scene.physicalFacilities.find((candidate) => candidate.id === inspectedFacilityId)
-    if (!facility) return []
-    return scene.nodes.filter((node) => node.roadAccessIndex === facility.roadAccessIndex)
+    return scene.nodes.filter((node) => node.facilityId === inspectedFacilityId)
   }, [inspectedFacilityId, scene])
   const pendingRerun = Boolean(run && choiceId !== run.choiceId)
 
@@ -167,6 +171,7 @@ export function GuidedChapterLab({ chapter }: { chapter: ChapterMetadata }) {
     eventCursorRef.current = cursor
     setEventCursor(cursor)
     setCarrierProgressValue(carrierProgressAtCursor(scene, run?.events ?? [], cursor, playbackSnapshots))
+    if (cursor < 0) setEvidenceTab('logs')
   }
 
   useEffect(() => {
@@ -177,6 +182,9 @@ export function GuidedChapterLab({ chapter }: { chapter: ChapterMetadata }) {
     setChoiceId(firstFailureChoiceId(firstExperiment.choices, firstExperiment.recommendedChoiceId))
     setPrediction(null)
     setRun(null)
+    setPreviousRun(null)
+    setEvidenceTab('logs')
+    autoSwitchedRunId.current = null
     clearPlaybackSegment()
     eventCursorRef.current = -1
     setEventCursor(-1)
@@ -213,6 +221,12 @@ export function GuidedChapterLab({ chapter }: { chapter: ChapterMetadata }) {
       })
     return () => { cancelled = true }
   }, [workspaceState.hydrated])
+
+  useEffect(() => {
+    if (!run || !terminalSettled || autoSwitchedRunId.current === run.runId) return
+    autoSwitchedRunId.current = run.runId
+    setEvidenceTab(run.status === 'failed' ? 'analysis' : 'comparison')
+  }, [run, terminalSettled])
 
   useEffect(() => {
     isPlayingRef.current = isPlaying
@@ -330,7 +344,7 @@ export function GuidedChapterLab({ chapter }: { chapter: ChapterMetadata }) {
     try {
       window.localStorage.setItem('ecl:reduced-motion', String(appReducedMotion))
     } catch {
-      // The OS preference still applies when local storage is unavailable.
+      // Best-effort storage persistence.
     }
   }, [appReducedMotion])
 
@@ -350,6 +364,9 @@ export function GuidedChapterLab({ chapter }: { chapter: ChapterMetadata }) {
     setChoiceId(firstFailureChoiceId(next.choices, next.recommendedChoiceId))
     setPrediction(null)
     setRun(null)
+    setPreviousRun(null)
+    setEvidenceTab('logs')
+    autoSwitchedRunId.current = null
     clearPlaybackSegment()
     eventCursorRef.current = -1
     setEventCursor(-1)
@@ -369,6 +386,9 @@ export function GuidedChapterLab({ chapter }: { chapter: ChapterMetadata }) {
     runRequestSerial.current = requestSerial
     setIsRunning(true)
     setEngineError(null)
+    setEvidenceTab('logs')
+    autoSwitchedRunId.current = null
+    if (run) setPreviousRun(run)
     setRun(null)
     clearPlaybackSegment()
     eventCursorRef.current = -1
@@ -453,17 +473,43 @@ export function GuidedChapterLab({ chapter }: { chapter: ChapterMetadata }) {
     seekToCursor(inspection.latestEventIndex)
   }
 
+  const handleExport = () => {
+    const blob = new Blob([serializeWorkspace(makeSnapshot())], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = 'event-city-lab-workspace.json'
+    anchor.click()
+    URL.revokeObjectURL(url)
+  }
+
+  const handleImport = async (file: File | undefined) => {
+    if (!file) return
+    try {
+      const snapshot = parseWorkspaceJson(await file.text())
+      labStore.getState().replaceWorkspace(snapshot)
+      setSaveStatus('가져오기 완료')
+    } catch {
+      setSaveStatus('가져오기 실패')
+    }
+  }
+
   return (
     <main className={styles.shell}>
-      <header className={styles.header}>
-        <div className={styles.brand}>
-          <span className={styles.logo} aria-hidden="true">E</span>
-          <div><p>EVENT CITY · CHAPTER {chapter.numberLabel}</p><h1>{chapter.title}</h1></div>
+      <header className={styles.topbar}>
+        <div className={styles.brandBlock}>
+          <div className={styles.logoMark} aria-hidden="true">
+            <svg viewBox="0 0 48 48"><path d="m5 17 19-10 19 10-19 10z" /><path d="M5 17v15l19 10V27z" /><path d="M24 27v15l19-10V17z" /></svg>
+          </div>
+          <div>
+            <p className={styles.kicker}>EVENT CITY · CHAPTER {chapter.numberLabel}</p>
+            <h1>{chapter.title}</h1>
+          </div>
         </div>
         <div className={styles.headerMeta}>
           <ChapterNavigation activeChapterId={chapter.id} />
           <span className={styles.progressBadge}>{completedCount} / {rule.experiments.length} 완료</span>
-          <span className={styles.saveState}>{saveStatus}</span>
+          <span className={styles.saveState}><span aria-hidden="true">●</span> {saveStatus}</span>
           <button
             type="button"
             className={styles.motionButton}
@@ -473,87 +519,103 @@ export function GuidedChapterLab({ chapter }: { chapter: ChapterMetadata }) {
           >
             {osReducedMotion ? '모션 줄임 · OS' : appReducedMotion ? '모션 줄임 켬' : '모션 줄임'}
           </button>
+          <button className={styles.textButton} type="button" onClick={handleExport}>내보내기</button>
+          <button className={styles.textButton} type="button" onClick={() => importRef.current?.click()}>가져오기</button>
+          <input ref={importRef} className={styles.hiddenInput} type="file" accept="application/json" onChange={(event) => void handleImport(event.target.files?.[0])} />
         </div>
       </header>
 
-      <section className={styles.mission}>
-        <div><span>{String(experimentIndex + 1).padStart(2, '0')}</span><strong>{experiment.title}</strong></div>
+      <section className={styles.missionStrip}>
+        <div className={styles.missionTitle}>
+          <span className={styles.sectionIndex}>{String(experimentIndex + 1).padStart(2, '0')}</span>
+          <strong>{experiment.title}</strong>
+        </div>
         <p>{experiment.mission}</p>
-        <output className={chapterComplete ? styles.complete : undefined}>
+        <output className={`${styles.scoreBadge} ${chapterComplete ? styles.scoreBadgeComplete : ''}`}>
           평가 {Math.round((completedCount / rule.experiments.length) * 100)}%
         </output>
       </section>
 
       <section className={styles.workspace}>
         <aside className={styles.controlPanel} aria-label="실험 설정">
-          <h2>세 가지 실험</h2>
-          <div className={styles.experimentList}>
-            {rule.experiments.map((candidate, index) => (
-              <button
-                key={candidate.id}
-                type="button"
-                className={index === experimentIndex ? styles.activeExperiment : undefined}
-                onClick={() => selectExperiment(index)}
-              >
-                <span>{completedIds.includes(candidate.id) ? '✓' : index + 1}</span>
-                <strong>{candidate.title}</strong>
-              </button>
-            ))}
+          <div className={styles.panelHeader}>
+            <div><p className={styles.kicker}>LAB EXPERIMENTS</p><h2>세 가지 실험</h2></div>
+            <span className={chapterComplete ? styles.readyBadge : styles.missionBadge}>{completedCount}/{rule.experiments.length}</span>
           </div>
 
-          <div className={styles.prompt}>
-            <span>먼저 예측하세요</span>
-            <p>{experiment.predictionPrompt}</p>
-            <div>
-              <button type="button" aria-pressed={prediction === 'failed'} onClick={() => setPrediction('failed')}>실패한다</button>
-              <button type="button" aria-pressed={prediction === 'succeeded'} onClick={() => setPrediction('succeeded')}>성공한다</button>
+          <div className={styles.scrollArea}>
+            <div className={styles.experimentList}>
+              {rule.experiments.map((candidate, index) => (
+                <button
+                  key={candidate.id}
+                  type="button"
+                  className={index === experimentIndex ? styles.activeExperiment : undefined}
+                  onClick={() => selectExperiment(index)}
+                >
+                  <span>{completedIds.includes(candidate.id) ? '✓' : index + 1}</span>
+                  <strong>{candidate.title}</strong>
+                </button>
+              ))}
             </div>
+
+            <div className={styles.prompt}>
+              <span>먼저 예측하세요</span>
+              <p>{experiment.predictionPrompt}</p>
+              <div>
+                <button type="button" aria-pressed={prediction === 'failed'} onClick={() => setPrediction('failed')}>실패한다</button>
+                <button type="button" aria-pressed={prediction === 'succeeded'} onClick={() => setPrediction('succeeded')}>성공한다</button>
+              </div>
+            </div>
+
+            <fieldset className={styles.choices}>
+              <legend>실행 설정</legend>
+              {experiment.choices.map((choice) => (
+                <label key={choice.id}>
+                  <input
+                    type="radio"
+                    name={`${chapterId}-${experiment.id}-choice`}
+                    value={choice.id}
+                    checked={choiceId === choice.id}
+                    onChange={() => setChoiceId(choice.id)}
+                  />
+                  <span><strong>{choice.label}</strong><small>{choice.description}</small></span>
+                </label>
+              ))}
+            </fieldset>
           </div>
 
-          <fieldset className={styles.choices}>
-            <legend>실행 설정</legend>
-            {experiment.choices.map((choice) => (
-              <label key={choice.id}>
-                <input
-                  type="radio"
-                  name={`${chapterId}-${experiment.id}-choice`}
-                  value={choice.id}
-                  checked={choiceId === choice.id}
-                  onChange={() => setChoiceId(choice.id)}
-                />
-                <span><strong>{choice.label}</strong><small>{choice.description}</small></span>
-              </label>
-            ))}
-          </fieldset>
+          {pendingRerun && (
+            <div className={styles.pendingBadge}>
+              <span>↻</span>
+              <div><strong>수정 대기</strong><small>같은 조건으로 다시 실행해 비교하세요.</small></div>
+            </div>
+          )}
 
-          <button className={styles.runButton} type="button" disabled={!prediction || isRunning} onClick={execute}>
+          <button className={styles.primaryRunButton} type="button" disabled={!prediction || isRunning} onClick={execute}>
             {isRunning ? '도시 실행 중…' : attempts > 0 ? '같은 조건으로 재실행' : '예측한 조건 실행'}
           </button>
-          {engineError && <p className={styles.engineError} role="alert">{engineError}</p>}
+          {engineError && <p className={styles.fieldError} role="alert">{engineError}</p>}
         </aside>
 
-        <section className={styles.worldPanel} aria-label="Kafka 도시 시뮬레이션">
-          <div className={styles.cityToolbar} role="group" aria-label="도시 보기">
-            <button type="button" aria-pressed={viewMode === 'focus'} onClick={() => setViewMode('focus')}>핵심 도로</button>
-            <button type="button" aria-pressed={viewMode === 'overview'} onClick={() => setViewMode('overview')}>전체 지도</button>
-          </div>
-          <div className={styles.cityViewport} ref={cityViewportRef}>
-            <AdvancedCityWorld
-              scene={scene}
-              events={run?.events ?? []}
-              cursor={eventCursor}
-              carrierProgress={carrierProgress}
-              isPlaying={isPlaying}
-              {...(run && terminalSettled ? { runStatus: run.status } : {})}
-              viewportSize={viewportSize}
-              viewMode={viewMode}
-              reducedMotion={reducedMotion}
-              pendingRerun={pendingRerun}
-              preview={scenePreview}
-              onInspect={inspectFacility}
-            />
-          </div>
-          <div className={`${styles.worldStatus} ${activeEvent?.state === 'failed' ? styles.failedStatus : ''}`}>
+        <section className={styles.worldPanel} aria-label="Kafka 도시 시뮬레이션" ref={cityViewportRef}>
+          <IsometricDioramaStage
+            scene={scene}
+            events={run?.events ?? []}
+            cursor={eventCursor}
+            carrierProgress={carrierProgress}
+            isPlaying={isPlaying}
+            {...(run && terminalSettled ? { runStatus: run.status } : {})}
+            viewportSize={viewportSize}
+            viewMode={viewMode}
+            exploded={exploded}
+            reducedMotion={reducedMotion}
+            pendingRerun={pendingRerun}
+            preview={scenePreview}
+            onViewModeChange={setViewMode}
+            onToggleExploded={() => setExploded((value) => !value)}
+            onInspect={inspectFacility}
+          />
+          <div className={`${styles.worldStatus} ${activeEvent?.state === 'failed' ? styles.worldStatusFailed : ''}`}>
             <span>{activeEvent ? eventCursor + 1 : '·'}</span>
             <div>
               <strong>{pendingRerun ? '설정은 바뀌었지만 이 실행은 그대로입니다.' : showInspectedRole ? inspectedNode?.ariaLabel ?? inspectedNode?.label : activeEvent?.title ?? inspectedNode?.ariaLabel ?? inspectedNode?.label ?? '설정과 결과를 예측한 뒤 도시를 실행하세요.'}</strong>
@@ -563,9 +625,16 @@ export function GuidedChapterLab({ chapter }: { chapter: ChapterMetadata }) {
         </section>
 
         <aside className={styles.evidencePanel} aria-label="실행 증거">
-          <div className={styles.evidenceHeader}>
-            <span>실행 증거</span><strong>{run ? (terminalSettled ? (run.status === 'failed' ? '실패 관찰' : '조건 충족') : '재생 중') : '실행 전'}</strong>
+          <div className={styles.currentEvent}>
+            <div>
+              <p className={styles.kicker}>CURRENT EVENT</p>
+              <span>{run ? (terminalSettled ? (run.status === 'failed' ? '실패 관찰' : '조건 충족') : `${eventCursor + 1} / ${run.events.length}`) : '실행 전'}</span>
+            </div>
+            <h2>{activeEvent?.title ?? '실행 전'}</h2>
+            <p>{activeEvent?.detail ?? '설정과 결과를 예측하고 실행하면 단계별 증거가 여기에 기록됩니다.'}</p>
+            <time>{activeEvent?.atMs ?? 0} ms</time>
           </div>
+
           {inspectedNode && (
             <div className={styles.inspector}>
               <span>시설 조사</span>
@@ -587,55 +656,118 @@ export function GuidedChapterLab({ chapter }: { chapter: ChapterMetadata }) {
               )}
             </div>
           )}
-          <ol className={styles.logs}>
-            {visibleEvents.length === 0
-              ? <li className={styles.empty}>아직 이벤트가 없습니다.</li>
-              : visibleEvents.map((event) => (
-                  <li key={event.id} className={event.state === 'failed' ? styles.failedLog : undefined}>
-                    <time>{event.atMs}ms</time><code>{event.log}</code>
-                  </li>
-                ))}
-          </ol>
 
-          {terminalSettled && run?.status === 'failed' && run.diagnosis && (
-            <div className={styles.diagnosis}>
-              <strong>{run.diagnosis.symptom}</strong>
-              <p>{run.diagnosis.rootCause}</p>
-              <ul>{run.diagnosis.evidence.map((item) => <li key={item}>{item}</li>)}</ul>
-              <button type="button" onClick={() => setChoiceId(run.diagnosis?.recommendedChoiceId ?? choiceId)}>
-                권장 설정 적용
-              </button>
-              <small>{run.diagnosis.tradeOff}</small>
-            </div>
-          )}
+          <div className={styles.tabs} role="tablist" aria-label="로그, 분석, 비교">
+            <button role="tab" aria-selected={evidenceTab === 'logs'} className={evidenceTab === 'logs' ? styles.tabActive : ''} onClick={() => setEvidenceTab('logs')}>로그</button>
+            <button role="tab" aria-selected={evidenceTab === 'analysis'} className={evidenceTab === 'analysis' ? styles.tabActive : ''} onClick={() => setEvidenceTab('analysis')}>분석</button>
+            <button role="tab" aria-selected={evidenceTab === 'comparison'} className={evidenceTab === 'comparison' ? styles.tabActive : ''} onClick={() => setEvidenceTab('comparison')}>비교</button>
+          </div>
 
-          {terminalSettled && run?.status === 'succeeded' && (
-            <div className={styles.success}>
-              <strong>실험 통과</strong><p>{run.summary}</p>
-              {experimentIndex < rule.experiments.length - 1 && (
-                <button type="button" onClick={() => selectExperiment(experimentIndex + 1)}>다음 실험</button>
-              )}
-            </div>
-          )}
+          <div className={styles.evidenceBody}>
+            {evidenceTab === 'logs' && (
+              <>
+                <ol className={styles.logList}>
+                  {visibleEvents.length === 0
+                    ? <li className={styles.emptyState}>아직 이벤트가 없습니다.</li>
+                    : visibleEvents.map((event) => (
+                        <li key={event.id} className={event.state === 'failed' ? styles.logError : undefined}>
+                          <time>{event.atMs}ms</time><code>{event.log}</code>
+                        </li>
+                      ))}
+                </ol>
+                <div className={styles.references}>
+                  <span>Kafka {KAFKA_RULE_VERSION} 근거</span>
+                  {references.map((reference) => <a key={reference.id} href={reference.url} target="_blank" rel="noreferrer">{reference.title}</a>)}
+                </div>
+              </>
+            )}
 
-          <div className={styles.references}>
-            <span>Kafka {KAFKA_RULE_VERSION} 근거</span>
-            {references.map((reference) => <a key={reference.id} href={reference.url} target="_blank" rel="noreferrer">{reference.title}</a>)}
+            {evidenceTab === 'analysis' && (
+              <div>
+                {terminalSettled && run?.status === 'failed' && run.diagnosis ? (
+                  <div className={styles.diagnosisCard}>
+                    <strong>{run.diagnosis.symptom}</strong>
+                    <p>{run.diagnosis.rootCause}</p>
+                    <ul>{run.diagnosis.evidence.map((item) => <li key={item}>{item}</li>)}</ul>
+                    <button type="button" onClick={() => setChoiceId(run.diagnosis?.recommendedChoiceId ?? choiceId)}>
+                      권장 설정 적용
+                    </button>
+                    <small>{run.diagnosis.tradeOff}</small>
+                  </div>
+                ) : run?.status === 'succeeded' && terminalSettled ? (
+                  <div className={styles.successCard}>
+                    <strong>실험 통과</strong>
+                    <p>{run.summary}</p>
+                    {experimentIndex < rule.experiments.length - 1 && (
+                      <button type="button" onClick={() => selectExperiment(experimentIndex + 1)}>다음 실험</button>
+                    )}
+                  </div>
+                ) : (
+                  <p className={styles.emptyState}>실행이 완료되면 원인 분석과 권장 설정이 여기에 표시됩니다.</p>
+                )}
+                <div className={styles.references}>
+                  <span>Kafka {KAFKA_RULE_VERSION} 근거</span>
+                  {references.map((reference) => <a key={reference.id} href={reference.url} target="_blank" rel="noreferrer">{reference.title}</a>)}
+                </div>
+              </div>
+            )}
+
+            {evidenceTab === 'comparison' && (
+              <div>
+                {terminalSettled && run?.status === 'succeeded' && (
+                  <div className={styles.successCard}>
+                    <strong>실험 통과</strong>
+                    <p>{run.summary}</p>
+                    {experimentIndex < rule.experiments.length - 1 && (
+                      <button type="button" onClick={() => selectExperiment(experimentIndex + 1)}>다음 실험</button>
+                    )}
+                  </div>
+                )}
+
+                {previousRun && run ? (
+                  <div className={styles.runComparison}>
+                    {[previousRun, run].map((item, idx) => (
+                      <article key={item.runId} className={item.status === 'failed' ? styles.runFailed : styles.runSuccess}>
+                        <div><span>RUN {idx + 1}</span><strong>{item.status === 'failed' ? '실패' : '성공'}</strong></div>
+                        <code>{experiment.choices.find((c) => c.id === item.choiceId)?.label ?? item.choiceId}</code>
+                        <small>{item.summary}</small>
+                      </article>
+                    ))}
+                    {previousRun.diagnosis && (
+                      <div className={styles.diffSummary}>
+                        <span>TRADE-OFF</span>
+                        <strong>{experiment.title}</strong>
+                        <p>{previousRun.diagnosis.tradeOff}</p>
+                      </div>
+                    )}
+                  </div>
+                ) : !terminalSettled || run?.status !== 'succeeded' ? (
+                  <p className={styles.emptyState}>실패와 성공 실행을 모두 진행하면 두 결과를 나란히 비교합니다.</p>
+                ) : null}
+
+                <div className={styles.references}>
+                  <span>Kafka {KAFKA_RULE_VERSION} 근거</span>
+                  {references.map((reference) => <a key={reference.id} href={reference.url} target="_blank" rel="noreferrer">{reference.title}</a>)}
+                </div>
+              </div>
+            )}
           </div>
         </aside>
       </section>
 
-      <section className={styles.timeline} aria-label="이벤트 타임라인">
-        <button type="button" disabled={!run} onClick={() => seekToCursor(-1)}>처음</button>
-        <button
-          type="button"
-          disabled={!run}
-          onClick={() => setIsPlaying((value) => {
-            isPlayingRef.current = !value
-            return !value
-          })}
-        >{isPlaying ? '일시정지' : '재생'}</button>
-        <button type="button" disabled={!run || eventCursor >= (run.events.length - 1)} onClick={() => seekToCursor(eventCursor + 1)}>한 단계</button>
+      <section className={styles.playbackBar} aria-label="이벤트 타임라인">
+        <div className={styles.playbackButtons}>
+          <button type="button" disabled={!run} onClick={() => seekToCursor(-1)}>처음</button>
+          <button
+            type="button"
+            disabled={!run}
+            onClick={() => setIsPlaying((value) => {
+              isPlayingRef.current = !value
+              return !value
+            })}
+          >{isPlaying ? '일시정지' : '재생'}</button>
+          <button type="button" disabled={!run || eventCursor >= (run.events.length - 1)} onClick={() => seekToCursor(eventCursor + 1)}>한 단계</button>
+        </div>
         <label className={styles.speedControl}>
           <span>속도</span>
           <select value={speed} onChange={(event) => setSpeed(Number(event.target.value) as PlaybackSpeed)}>
@@ -644,18 +776,21 @@ export function GuidedChapterLab({ chapter }: { chapter: ChapterMetadata }) {
             <option value={2}>2×</option>
           </select>
         </label>
-        <div>
+        <div className={styles.timeline} data-timeline-events="true">
           {run?.events.map((event, index) => (
             <button
               key={event.id}
               type="button"
-              className={index === eventCursor ? styles.activeEvent : index < eventCursor ? styles.seenEvent : undefined}
+              className={`${styles.eventNode} ${index < eventCursor ? styles.eventSeen : ''} ${index === eventCursor ? styles.eventActive : ''} ${event.state === 'failed' ? styles.eventFailed : ''}`}
               onClick={() => seekToCursor(index)}
               title={event.title}
             ><span>{index + 1}</span><small>{event.title}</small></button>
           )) ?? <p>실행 후 사건 순서를 되감아 조사할 수 있습니다.</p>}
         </div>
-        <output>{activeEvent?.atMs ?? 0}ms</output>
+        <div className={styles.clock}>
+          <span>LOGICAL TIME</span>
+          <output>{activeEvent?.atMs ?? 0}ms</output>
+        </div>
       </section>
 
       <footer className={styles.footer}>

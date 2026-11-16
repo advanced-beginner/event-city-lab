@@ -4,14 +4,14 @@
 
 이 문서는 Event City Lab의 제품 흐름, 챕터별 구현 상태, 기술적 동작, 검증 결과, 알려진 미비점과 TODO를 관리하는 단일 기록이다.
 
-- 기록 기준일: 2026-09-09
+- 기록 기준일: 2026-11-16
 - 기준 브랜치: `main`
 - Chapter 1 기준 구현 커밋: `db7e918` (`실패를 도시 배송 경험으로 이해할 수 있게 한다`)
 - App version: `0.2.0`
 - Content version: `2026.2`
 - Kafka rule basis: `4.3.1`
 - Storage schema: `2` (`v1` 자동 migration)
-- 현재 판정: Chapter 1–8의 결정론적 실험 규칙, Web Worker 실행, 공통 guided UI, 로컬 진도 저장과 hash navigation 구현 완료. Chapter 2–8 도시의 근접 보기, 단일 재생 clock, 시설 내부 조사와 결과 표시를 개선했다. 최신 검증 범위는 §8의 2026-09-09 기록을 따른다.
+- 현재 판정: Chapter 1–8 전체의 도시 렌더링과 경로 엔진을 외부 비트맵 없는 순수 2:1 Isometric SVG 디오라마(`IsometricDioramaStage`)와 연결 Waypoint Graph 주행 엔진으로 Zero-base 재구축 완료. Chapter 1과 Chapter 2–8의 워크스페이스 셸 Look & Feel(`LabWorkspace.module.css`)을 단일 시스템으로 통합했다. 최신 검증 범위는 §8의 2026-11-16 기록을 따른다.
 
 ## 2. 제품 목표
 
@@ -183,10 +183,10 @@ flowchart LR
 - `src/worker/`: engine을 UI thread 밖에서 실행하고 request/response를 검증.
 - `src/state/labStore.ts`: config, runs, cursor, playback, hints, code bridge 상태.
 - `src/storage/workspaceDb.ts`: IndexedDB 자동 저장과 JSON 직렬화·역직렬화.
-- `src/App.tsx`, `src/components/GuidedChapterLab.tsx`: hydration, autosave, 실험 선택, playback, 진단과 수정 연결.
-- `src/components/KafkaWorld.tsx`: event state를 pixel 시설·차량, 상태 램프·오류 표지·도착 문자로 투영.
-- `src/components/CitySprite.tsx`: 메시지 차량 PNG의 크기·bottom-center anchor·SVG `<image>` 렌더링을 일관되게 관리.
-- `src/assets/city/`: 승인된 runtime 도시 배경, 보존 차량 sprite, palette와 manifest 보관.
+- `src/App.tsx`, `src/components/GuidedChapterLab.tsx`, `src/styles/LabWorkspace.module.css`: Chapter 1–8 통합 워크스페이스 셸, hydration, autosave, 실험 선택, RAF playback, 진단과 비교 UI.
+- `src/city/isometric.ts`, `src/city/chapterScenes.ts`, `src/city/projection.ts`, `src/city/validation.ts`: 2:1 Isometric 그리드 기하, Cutaway Base, 8개 챕터 Waypoint Graph 씬, 다중 분기·회차 투영 reducer.
+- `src/components/IsometricDioramaStage.tsx`: Chapter 1–8 공통 순수 벡터 Isometric 디오라마, 4방향 입체 우편 차량, 조립/분해 뷰 토글, 광섬유 신호와 물리 차단기 렌더링.
+- `src/assets/city/`: 순수 벡터 디오라마 규격과 3-포인트 라이팅 컬러 팔레트 보관(`manifest.json`, `palette.json`).
 
 ### 저장 규칙
 
@@ -312,6 +312,15 @@ Chapter 1 light-city 구현에서 확인한 내용:
 - 주요 시설명과 현재 상태는 근접 보기에서 12px 이상으로 표시한다. ACK·commit·transaction·수정 대기와 차단 사유는 고정 HUD로 옮기고 차량·도로·시설 좌표를 보존한다. 마지막 이동이 끝나면 반복 효과를 종료하며 실제 checkpoint와 시설 상태를 유지한다. 성공 실행에는 실패 진단 카드를 표시하지 않는다.
 - 2026-08-26 기록의 atlas 전체 보기 기본값, 거리 비율 기반 독립 애니메이션, cue 개수 기반 record 집계 표시는 이번 계약으로 대체한다. 학습 선택지와 세 실험 구성은 동일하다.
 - 최종 검증: `npm run typecheck`, Vitest 32파일 225개, production build 통과. 21개 실험·42개 선택지의 projection, 사건 불변성·되감기 회귀를 포함한다. Chromium·Firefox·WebKit × 세 viewport의 Playwright는 168 passed / 0 failed / 48 skipped(지원 범위 밖 시각 baseline 조합)다. 기존 37개 Chromium 시각 기준 이미지를 실제 화면 검토 후 갱신하고 비교 검사를 재통과했다. 복잡한 챕터 2·4·6·8의 초기·실패·수정 대기·성공·되감기 화면 60장을 추가 캡처해 검토했다. 런타임 자산의 Git 추적과 `/event-city-lab/` 경로의 asset·Worker 로딩, Chapter 1 회귀도 확인했다. 공개 배포는 수행하지 않았다.
+
+2026-11-16 Zero-Base Isometric Diorama & Waypoint Graph 재구축:
+
+- 기존 외부 비트맵 배경(`event-city-main.webp`, `event-city-atlas.webp`), 차량 PNG 스프라이트(`vehicle-kafka-van-*.png`), 분리 렌더러(`KafkaWorld`, `AdvancedCityWorld`, `CitySprite`)와 5개 직선 슬롯(`roadAccessIndex: 0~4` · 단조 증가 `roadProgress`) 제약을 전면 폐기했다.
+- `src/city/isometric.ts`를 신설해 `1600×900` 표준 viewBox 위에서 2:1 등각 그리드(`isoPoint`), 3-포인트 라이팅(Top 100% / Left 82% / Right 64%), Diorama Cutaway Base, 4방향(`ne`/`se`/`sw`/`nw`) 순수 SVG 입체 우편 배송 밴(`createIsoPostalVan`)을 수학적으로 생성한다.
+- `src/city/chapterScenes.ts`와 `validation.ts`를 Chapter 1–8 공통 Waypoint Graph 계약으로 개편해, 모든 도로의 시작·끝점이 건물 입출구 좌표와 0px 오차로 연결되도록 했다.
+- `src/city/projection.ts`와 `guidedPlayback.ts`에서 단조 증가 직선 제약을 제거하고 Chapter 1 cue 어댑터(`createChapterOneCuedEvents`), A→B→C 연속 주행, 파티션/복제 다중 분기 차량 동시 투영(`vehicle` + `branch-*`), Retry 회차 루프·DLT 분기(`resolveTransitionPolyline`)를 구현했다.
+- `src/components/IsometricDioramaStage.tsx`와 `src/styles/LabWorkspace.module.css`로 Chapter 1–8의 중앙 디오라마와 3열 워크스페이스·3탭 증거 패널(`로그 / 분석 / 비교`)·타임라인 UI를 단일 Look & Feel로 통합하고 `조립 뷰 / 분해 뷰(Exploded View)`, Staggered Z-axis extrusion, 호버 부유(Levitation) 모션을 추가했다.
+- 최종 검증(2026-11-16): `npm run typecheck`, `npm run test:run`(Vitest 31파일 212개), `npm run build` 통과 및 Chromium `1280×720`, `1440×900`, `1920×1080` Playwright E2E 42개 테스트 전수 통과를 확인했다(Firefox·WebKit 크로스 브라우저는 본 턴에서 미실행).
 
 ## 9. 알려진 미비점
 

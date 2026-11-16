@@ -1,11 +1,22 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useStore } from 'zustand'
 
-import styles from './App.module.css'
+import type { AdvancedCityViewMode } from './city/camera'
+import { getChapterOneScene } from './city/chapterScenes'
+import { createChapterOneCuedEvents } from './city/projection'
+import type { CitySize } from './city/types'
 import { ChapterNavigation } from './chapters/ChapterNavigation'
 import { getChapter, type ChapterMetadata } from './chapters/registry'
 import { GuidedChapterLab } from './components/GuidedChapterLab'
-import { KafkaWorld } from './components/KafkaWorld'
+import {
+  carrierProgressAtCursor,
+  createPlaybackSegment,
+  createPlaybackSnapshots,
+  interpolatePlaybackProgress,
+  retimePlaybackSegment,
+  type PlaybackSpeed,
+} from './components/guidedPlayback'
+import { IsometricDioramaStage } from './components/IsometricDioramaStage'
 import {
   APP_VERSION,
   CONTENT_VERSION,
@@ -15,8 +26,8 @@ import {
   type SimulationEvent,
   type WorkspaceSnapshot,
 } from './domain/simulation'
-import { labStore } from './state/labStore'
 import { useChapterRoute } from './routing/chapterRoute'
+import { labStore } from './state/labStore'
 import {
   loadWorkspace,
   parseWorkspaceJson,
@@ -24,6 +35,7 @@ import {
   serializeWorkspace,
   type WorkspaceRecoveryFailureReason,
 } from './storage/workspaceDb'
+import styles from './styles/LabWorkspace.module.css'
 import { runSimulation } from './worker/client'
 
 const JavaConfigEditor = lazy(async () => {
@@ -33,7 +45,6 @@ const JavaConfigEditor = lazy(async () => {
 
 type LeftTab = 'settings' | 'code'
 type EvidenceTab = 'logs' | 'analysis' | 'comparison'
-type PlaybackSpeed = 0.5 | 1 | 2
 
 function readReducedMotionPreference(): boolean {
   try {
@@ -127,8 +138,24 @@ function ChapterOneLab({ chapter }: { chapter: ChapterMetadata }) {
   const [evidenceTab, setEvidenceTab] = useState<EvidenceTab>('logs')
   const [speed, setSpeed] = useState<PlaybackSpeed>(1)
   const [reducedMotion, setReducedMotion] = useState(readReducedMotionPreference)
+  const [viewMode, setViewMode] = useState<AdvancedCityViewMode>('focus')
+  const [exploded, setExploded] = useState(false)
+  const [viewportSize, setViewportSize] = useState<CitySize>({ width: 1280, height: 720 })
+  const [carrierProgress, setCarrierProgress] = useState(0)
+  const [playbackPulse, setPlaybackPulse] = useState(0)
+
   const importRef = useRef<HTMLInputElement>(null)
   const autoSwitchedRunId = useRef<string | null>(null)
+  const cityViewportRef = useRef<HTMLDivElement | null>(null)
+  const carrierProgressRef = useRef(0)
+  const playbackFrameRef = useRef<number | null>(null)
+  const activeSegmentRef = useRef<ReturnType<typeof createPlaybackSegment>>(null)
+  const activeSegmentSettingsKeyRef = useRef('')
+  const segmentStartedAtRef = useRef(0)
+  const segmentLastTimestampRef = useRef(0)
+  const segmentElapsedRef = useRef(0)
+
+  const scene = useMemo(() => getChapterOneScene(), [])
 
   const activeRun = useMemo(
     () => state.runs.find((run) => run.runId === state.activeRunId) ?? null,
@@ -141,6 +168,36 @@ function ChapterOneLab({ chapter }: { chapter: ChapterMetadata }) {
   const isPendingRerun = Boolean(
     activeRun?.status === 'failed' && activeRun.config.serializer !== state.config.serializer,
   )
+
+  const cuedEvents = useMemo(
+    () => createChapterOneCuedEvents(activeRun, isPendingRerun),
+    [activeRun, isPendingRerun],
+  )
+  const playbackSnapshots = useMemo(
+    () => createPlaybackSnapshots(scene, cuedEvents),
+    [cuedEvents, scene],
+  )
+
+  const ackVisible = Boolean(
+    activeRun
+    && state.eventCursor >= 0
+    && activeRun.events
+      .slice(0, state.eventCursor + 1)
+      .some((event) => event.component === 'ack' && (event.state === 'active' || event.state === 'complete')),
+  )
+
+  const setCarrierProgressValue = (progress: number) => {
+    carrierProgressRef.current = progress
+    setCarrierProgress(progress)
+  }
+
+  const clearPlaybackSegment = () => {
+    activeSegmentRef.current = null
+    activeSegmentSettingsKeyRef.current = ''
+    segmentElapsedRef.current = 0
+    if (playbackFrameRef.current !== null) window.cancelAnimationFrame(playbackFrameRef.current)
+    playbackFrameRef.current = null
+  }
 
   const makeSnapshot = (): WorkspaceSnapshot => ({
     storageSchemaVersion: STORAGE_SCHEMA_VERSION,
@@ -184,17 +241,118 @@ function ChapterOneLab({ chapter }: { chapter: ChapterMetadata }) {
   }, [state.config, state.hintLevel, state.hydrated, state.learningProgress, state.message, state.runs, storageBlocked])
 
   useEffect(() => {
+    const element = cityViewportRef.current
+    if (!element) return
+    const measure = () => {
+      const world = element.querySelector('svg')
+      setViewportSize({
+        width: world?.clientWidth || element.clientWidth || 1280,
+        height: world?.clientHeight || element.clientHeight || 720,
+      })
+    }
+    measure()
+    if (typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(measure)
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [])
+
+  // Sync carrierProgress cleanly when paused / stepped / seeked externally
+  useEffect(() => {
+    if (state.isPlaying) return
+    clearPlaybackSegment()
+    setCarrierProgressValue(carrierProgressAtCursor(scene, cuedEvents, state.eventCursor, playbackSnapshots))
+  }, [cuedEvents, playbackSnapshots, scene, state.eventCursor, state.isPlaying])
+
+  // Unified RAF playback clock for smooth A -> B -> C van motion
+  useEffect(() => {
     if (!state.isPlaying || !activeRun) return
-    if (state.eventCursor >= activeRun.events.length - 1) {
+
+    const settingsKey = `${speed}:${viewMode}:${viewportSize.width}:${viewportSize.height}:${reducedMotion}`
+    let segment = activeSegmentRef.current
+    if (!segment) {
+      segment = createPlaybackSegment({
+        currentProgress: carrierProgressRef.current,
+        cursor: state.eventCursor,
+        events: cuedEvents,
+        scene,
+        speed,
+        snapshots: playbackSnapshots,
+        viewMode,
+        viewportSize,
+      })
+      if (!segment) {
+        labStore.getState().setIsPlaying(false)
+        return
+      }
+      activeSegmentRef.current = segment
+      activeSegmentSettingsKeyRef.current = settingsKey
+      segmentElapsedRef.current = 0
+      labStore.getState().setEventCursor(segment.toCursor)
+    } else if (activeSegmentSettingsKeyRef.current !== settingsKey) {
+      const retimedSegment = retimePlaybackSegment({
+        currentProgress: carrierProgressRef.current,
+        elapsedMs: segmentElapsedRef.current,
+        events: cuedEvents,
+        previousSegment: segment,
+        scene,
+        speed,
+        snapshots: playbackSnapshots,
+        viewMode,
+        viewportSize,
+      })
+      if (!retimedSegment) {
+        labStore.getState().setIsPlaying(false)
+        return
+      }
+      segment = retimedSegment
+      activeSegmentRef.current = retimedSegment
+      activeSegmentSettingsKeyRef.current = settingsKey
+      segmentElapsedRef.current = 0
+    }
+
+    if (!segment) {
       labStore.getState().setIsPlaying(false)
       return
     }
-    const timeout = window.setTimeout(
-      () => labStore.getState().setEventCursor(state.eventCursor + 1),
-      reducedMotion ? 120 : 500 / speed,
-    )
-    return () => window.clearTimeout(timeout)
-  }, [activeRun, reducedMotion, speed, state.eventCursor, state.isPlaying])
+
+    let startedAt: number | null = null
+    const tick = (timestamp = window.performance.now()) => {
+      if (startedAt === null) {
+        startedAt = timestamp
+        segmentStartedAtRef.current = timestamp
+      }
+      segmentLastTimestampRef.current = timestamp
+      const elapsedMs = segmentElapsedRef.current + timestamp - startedAt
+      setCarrierProgressValue(interpolatePlaybackProgress(segment, elapsedMs, reducedMotion))
+      if (elapsedMs >= segment.totalDurationMs) {
+        setCarrierProgressValue(segment.toProgress)
+        activeSegmentRef.current = null
+        activeSegmentSettingsKeyRef.current = ''
+        segmentElapsedRef.current = 0
+        if (segment.toCursor >= activeRun.events.length - 1) {
+          labStore.getState().setIsPlaying(false)
+        } else {
+          setPlaybackPulse((value) => value + 1)
+        }
+        return
+      }
+      playbackFrameRef.current = window.requestAnimationFrame(tick)
+    }
+
+    playbackFrameRef.current = window.requestAnimationFrame(tick)
+    return () => {
+      if (playbackFrameRef.current !== null) window.cancelAnimationFrame(playbackFrameRef.current)
+      playbackFrameRef.current = null
+      if (activeSegmentRef.current) {
+        segmentElapsedRef.current += Math.max(0, segmentLastTimestampRef.current - segmentStartedAtRef.current)
+      }
+    }
+  }, [activeRun, cuedEvents, playbackPulse, playbackSnapshots, reducedMotion, scene, speed, state.isPlaying, viewMode, viewportSize])
+
+  useEffect(() => () => {
+    if (playbackFrameRef.current !== null) window.cancelAnimationFrame(playbackFrameRef.current)
+  }, [])
 
   useEffect(() => {
     if (!activeRun || !isTerminal || autoSwitchedRunId.current === activeRun.runId) return
@@ -204,6 +362,8 @@ function ChapterOneLab({ chapter }: { chapter: ChapterMetadata }) {
 
   const handleRun = async () => {
     setIsRunning(true)
+    clearPlaybackSegment()
+    setCarrierProgressValue(0)
     state.setIsPlaying(false)
     setEvidenceTab('logs')
     try {
@@ -235,10 +395,12 @@ function ChapterOneLab({ chapter }: { chapter: ChapterMetadata }) {
     return () => window.removeEventListener('keydown', handleShortcut)
   })
 
-  const handleInspect = (component: ComponentId) => {
+  const handleInspect = (nodeId: string) => {
+    const component = nodeId as ComponentId
     if (component === 'serializer') state.setFocusedSetting('serializer')
     else if (component === 'ack') state.setFocusedSetting('acks')
     else state.setFocusedSetting(null)
+    clearPlaybackSegment()
     state.setIsPlaying(false)
     if (!activeRun || state.eventCursor < 0) return
     const latestIndex = activeRun.events
@@ -251,11 +413,13 @@ function ChapterOneLab({ chapter }: { chapter: ChapterMetadata }) {
 
   const step = () => {
     if (!activeRun) return
+    clearPlaybackSegment()
     state.setIsPlaying(false)
     state.setEventCursor(Math.min(activeRun.events.length - 1, state.eventCursor + 1))
   }
 
   const rewind = () => {
+    clearPlaybackSegment()
     state.setIsPlaying(false)
     state.setEventCursor(-1)
   }
@@ -288,12 +452,12 @@ function ChapterOneLab({ chapter }: { chapter: ChapterMetadata }) {
     try {
       window.localStorage.setItem('ecl:reduced-motion', String(next))
     } catch {
-      // Ignore storage access failures; the preference is best-effort only.
+      // Best-effort storage persistence.
     }
   }
 
   return (
-    <main className={styles.appShell}>
+    <main className={styles.shell}>
       <header className={styles.topbar}>
         <div className={styles.brandBlock}>
           <div className={styles.logoMark} aria-hidden="true">
@@ -308,15 +472,15 @@ function ChapterOneLab({ chapter }: { chapter: ChapterMetadata }) {
           <ChapterNavigation activeChapterId={chapter.id} />
           <span className={styles.missionBadge}>PRODUCER BOOTCAMP</span>
           <span className={styles.saveState}><span aria-hidden="true">●</span> {saveStatus}</span>
-          <button className={styles.textButton} type="button" onClick={toggleReducedMotion} aria-pressed={reducedMotion}>모션 {reducedMotion ? '줄임' : '표준'}</button>
+          <button className={styles.motionButton} type="button" onClick={toggleReducedMotion} aria-pressed={reducedMotion}>모션 {reducedMotion ? '줄임' : '표준'}</button>
           <button className={styles.textButton} type="button" onClick={handleExport}>내보내기</button>
           <button className={styles.textButton} type="button" onClick={() => importRef.current?.click()}>가져오기</button>
           <input ref={importRef} className={styles.hiddenInput} type="file" accept="application/json" onChange={(event) => void handleImport(event.target.files?.[0])} />
         </div>
       </header>
 
-      <section className={styles.briefing} aria-labelledby="briefing-title">
-        <div className={styles.briefingTitle}>
+      <section className={styles.missionStrip} aria-labelledby="briefing-title">
+        <div className={styles.missionTitle}>
           <span className={styles.sectionIndex}>01</span>
           <div><p className={styles.kicker}>BRIEFING</p><h2 id="briefing-title">주문 이벤트를 <code>orders.v1</code>으로 보내세요.</h2></div>
         </div>
@@ -324,7 +488,7 @@ function ChapterOneLab({ chapter }: { chapter: ChapterMetadata }) {
         <div className={styles.goalStrip}><span>목표</span><strong>Broker append + ACK</strong><span>seed</span><strong>#2401</strong></div>
       </section>
 
-      <div className={styles.workspace}>
+      <section className={styles.workspace}>
         <aside className={styles.controlPanel} aria-label="메시지와 Producer 설정">
           <div className={styles.panelHeader}>
             <div><p className={styles.kicker}>LOADOUT</p><h2>메시지 & 설정</h2></div>
@@ -377,30 +541,38 @@ function ChapterOneLab({ chapter }: { chapter: ChapterMetadata }) {
           </div>
 
           {isPendingRerun && <div className={styles.pendingBadge}><span>↻</span><div><strong>수정 대기</strong><small>재실행해야 새 설정이 적용됩니다.</small></div></div>}
-          <button className={styles.sendButton} type="button" onClick={() => void handleRun()} disabled={isRunning}>
+          <button className={styles.primaryRunButton} type="button" onClick={() => void handleRun()} disabled={isRunning}>
             <Icon name="send" /><span>{isRunning ? '엔진 계산 중…' : state.runs.length ? '같은 메시지 다시 보내기' : '첫 메시지 보내기'}</span><kbd>R</kbd>
           </button>
           {state.engineError && <p className={styles.fieldError} role="alert">{state.engineError}</p>}
         </aside>
 
-        <section className={styles.worldPanel} aria-label="Kafka 메시지 물류 도시">
-          <div className={styles.worldToolbar}>
-            <div><span className={styles.liveDot} /><strong>EVENT CITY · PARTITION 0</strong><span>leader broker-1</span></div>
-            <div><span><i className={styles.legendViolet} />설정 영향</span><span><i className={styles.legendRed} />실패</span><span><i className={styles.legendGreen} />완료</span></div>
-          </div>
-          <KafkaWorld
-            run={activeRun}
-            activeEvent={activeEvent}
+        <section className={styles.worldPanel} aria-label="Kafka 메시지 물류 도시" ref={cityViewportRef}>
+          <IsometricDioramaStage
+            scene={scene}
+            events={cuedEvents}
             cursor={state.eventCursor}
             attempt={Math.max(1, activeRunIndex + 1)}
+            {...(state.isPlaying ? { carrierProgress } : {})}
+            isPlaying={state.isPlaying}
+            {...(activeRun && isTerminal && !state.isPlaying ? { runStatus: activeRun.status } : {})}
             reducedMotion={reducedMotion}
             focusedSetting={state.focusedSetting}
             pendingRerun={isPendingRerun}
+            exploded={exploded}
+            viewMode={viewMode}
+            viewportSize={viewportSize}
+            showChapterOneAckBubble={ackVisible}
+            onToggleExploded={() => setExploded((value) => !value)}
+            onViewModeChange={setViewMode}
             onInspect={handleInspect}
           />
           <div className={`${styles.worldStatus} ${activeEvent?.state === 'failed' ? styles.worldStatusFailed : ''}`}>
             <span>{activeEvent?.state === 'failed' ? '!' : activeEvent ? '●' : '○'}</span>
-            <div><strong>{isPendingRerun ? '설정은 바뀌었지만 이 실행은 그대로입니다.' : activeEvent?.title ?? '첫 배송을 기다리는 중'}</strong><small>{isPendingRerun ? '같은 메시지를 다시 보내 변경 결과를 비교하세요.' : activeEvent?.detail ?? '노란 배송 차량이 Producer 출발센터에 주차되어 있습니다.'}</small></div>
+            <div>
+              <strong>{isPendingRerun ? '설정은 바뀌었지만 이 실행은 그대로입니다.' : activeEvent?.title ?? '첫 배송을 기다리는 중'}</strong>
+              <small>{isPendingRerun ? '같은 메시지를 다시 보내 변경 결과를 비교하세요.' : activeEvent?.detail ?? '노란 우편 배송 차량이 Producer 출발센터에 주차되어 있습니다.'}</small>
+            </div>
           </div>
         </section>
 
@@ -429,7 +601,7 @@ function ChapterOneLab({ chapter }: { chapter: ChapterMetadata }) {
             )}
 
             {evidenceTab === 'analysis' && (
-              <div className={styles.analysisBody}>
+              <div>
                 {activeRun?.diagnosis ? (
                   <>
                     <div className={styles.analysisHeadline}><span>!</span><div><strong>{activeRun.diagnosis.symptom}</strong><p>{activeRun.summary}</p></div></div>
@@ -443,7 +615,7 @@ function ChapterOneLab({ chapter }: { chapter: ChapterMetadata }) {
                     <div className={styles.hints}>{HINTS.slice(0, state.hintLevel).map((hint, index) => <p key={hint}><span>{index + 1}</span>{hint}</p>)}</div>
                   </>
                 ) : activeRun?.status === 'succeeded' ? (
-                  <div className={styles.successAnalysis}><strong>✓ 경로 복구 완료</strong><p>{activeRun.summary}</p><p><b>Trade-off:</b> JSON은 구조를 보존하지만 payload 크기와 스키마 관리 비용을 추가합니다.</p></div>
+                  <div className={styles.successCard}><strong>✓ 경로 복구 완료</strong><p>{activeRun.summary}</p><p><b>Trade-off:</b> JSON은 구조를 보존하지만 payload 크기와 스키마 관리 비용을 추가합니다.</p></div>
                 ) : <p className={styles.emptyState}>실패가 발생하면 증상과 설정의 인과 관계를 분석합니다.</p>}
               </div>
             )}
@@ -464,7 +636,7 @@ function ChapterOneLab({ chapter }: { chapter: ChapterMetadata }) {
             )}
           </div>
         </aside>
-      </div>
+      </section>
 
       <section className={styles.playbackBar} aria-label="실행 타임라인">
         <div className={styles.playbackButtons}>
@@ -475,9 +647,9 @@ function ChapterOneLab({ chapter }: { chapter: ChapterMetadata }) {
         <div className={styles.speedControl} aria-label="재생 속도">
           {([0.5, 1, 2] as PlaybackSpeed[]).map((value) => <button type="button" key={value} className={speed === value ? styles.speedActive : ''} onClick={() => setSpeed(value)}>{value}×</button>)}
         </div>
-        <div className={styles.timeline}>
+        <div className={styles.timeline} data-timeline-events="true">
           {(activeRun?.events ?? []).map((event) => (
-            <button type="button" key={event.id} className={`${styles.eventNode} ${event.sequence <= state.eventCursor ? styles.eventSeen : ''} ${event.sequence === state.eventCursor ? styles.eventActive : ''} ${event.state === 'failed' ? styles.eventFailed : ''}`} onClick={() => { state.setIsPlaying(false); state.setEventCursor(event.sequence) }} aria-label={`${event.sequence + 1}. ${event.title}`}>
+            <button type="button" key={event.id} className={`${styles.eventNode} ${event.sequence <= state.eventCursor ? styles.eventSeen : ''} ${event.sequence === state.eventCursor ? styles.eventActive : ''} ${event.state === 'failed' ? styles.eventFailed : ''}`} onClick={() => { clearPlaybackSegment(); state.setIsPlaying(false); state.setEventCursor(event.sequence) }} aria-label={`${event.sequence + 1}. ${event.title}`}>
               <span>{event.sequence + 1}</span><small>{EVENT_LABELS[event.kind]}</small>
             </button>
           ))}

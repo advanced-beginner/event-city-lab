@@ -1,8 +1,6 @@
 import { getAdvancedCityCamera, type AdvancedCityViewMode } from '../city/camera'
-import { projectCityWorld } from '../city/projection'
-import { polylineLength } from '../city/routeGeometry'
-import type { CitySceneDefinition, CitySize, CityWorldState } from '../city/types'
-import type { ChapterSimulationEvent } from '../domain/chapterSimulation'
+import { buildCarrierTransitions, projectCityWorld } from '../city/projection'
+import type { CityCuedEvent, CitySceneDefinition, CitySize, CityWorldState } from '../city/types'
 
 export type PlaybackSpeed = 0.5 | 1 | 2
 
@@ -36,14 +34,14 @@ export const MIN_EVENT_DISPLAY_MS = 500
 
 export function createPlaybackSnapshots(
   scene: CitySceneDefinition,
-  events: readonly ChapterSimulationEvent[],
+  events: readonly CityCuedEvent[],
 ): readonly PlaybackSnapshot[] {
   return Array.from({ length: events.length + 1 }, (_, index) => {
     const cursor = index - 1
     const world = projectCityWorld(scene, events, cursor)
     return {
       cursor,
-      carrierProgress: world.carriers.vehicle?.roadProgress ?? 0,
+      carrierProgress: world.carriers.vehicle?.journeyProgress ?? 0,
       world,
     }
   })
@@ -51,14 +49,14 @@ export function createPlaybackSnapshots(
 
 export function carrierProgressAtCursor(
   scene: CitySceneDefinition,
-  events: readonly ChapterSimulationEvent[],
+  events: readonly CityCuedEvent[],
   cursor: number,
   snapshots?: readonly PlaybackSnapshot[],
 ): number {
   const snapshot = snapshots?.find((candidate) => candidate.cursor === cursor)
   if (snapshot) return snapshot.carrierProgress
   const world = projectCityWorld(scene, events, cursor)
-  return world.carriers.vehicle?.roadProgress ?? 0
+  return world.carriers.vehicle?.journeyProgress ?? 0
 }
 
 export function createPlaybackSegment({
@@ -73,7 +71,7 @@ export function createPlaybackSegment({
 }: {
   readonly currentProgress: number
   readonly cursor: number
-  readonly events: readonly ChapterSimulationEvent[]
+  readonly events: readonly CityCuedEvent[]
   readonly scene: CitySceneDefinition
   readonly speed: PlaybackSpeed
   readonly snapshots?: readonly PlaybackSnapshot[]
@@ -107,7 +105,7 @@ export function createPlaybackSegmentBetween({
   viewportSize,
 }: {
   readonly currentProgress: number
-  readonly events: readonly ChapterSimulationEvent[]
+  readonly events: readonly CityCuedEvent[]
   readonly fromCursor: number
   readonly scene: CitySceneDefinition
   readonly speed: PlaybackSpeed
@@ -119,8 +117,20 @@ export function createPlaybackSegmentBetween({
   if (toCursor < 0 || toCursor >= events.length) return null
   const fromProgress = clampProgress(currentProgress)
   const toProgress = carrierProgressAtCursor(scene, events, toCursor, snapshots)
-  const mainRoadLength = polylineLength(scene.mainRoad.points)
-  const distancePx = Math.abs(toProgress - fromProgress) * mainRoadLength * cameraScreenScale(scene, viewMode, viewportSize)
+
+  const fromWorld = snapshots?.find((s) => s.cursor === fromCursor)?.world
+    ?? projectCityWorld(scene, events, fromCursor)
+  const toWorld = snapshots?.find((s) => s.cursor === toCursor)?.world
+    ?? projectCityWorld(scene, events, toCursor)
+  const transitions = buildCarrierTransitions(scene, fromWorld, toWorld)
+  const maxWorldLength = transitions.reduce((maxLen, item) => Math.max(maxLen, item.length), 0)
+
+  const anchorFrom = carrierProgressAtCursor(scene, events, fromCursor, snapshots)
+  const remainingFraction = toProgress > anchorFrom
+    ? clampProgress((toProgress - fromProgress) / (toProgress - anchorFrom))
+    : 1
+
+  const distancePx = maxWorldLength * remainingFraction * cameraScreenScale(scene, viewMode, viewportSize)
   const scaledMoveMs = (distancePx / CARRIER_SPEED_PX_PER_SECOND) * 1000 / speed
   const dwellMs = EVENT_DWELL_MS / speed
   const minimumMs = MIN_EVENT_DISPLAY_MS / speed
@@ -150,7 +160,7 @@ export function retimePlaybackSegment({
 }: {
   readonly currentProgress: number
   readonly elapsedMs: number
-  readonly events: readonly ChapterSimulationEvent[]
+  readonly events: readonly CityCuedEvent[]
   readonly previousSegment: PlaybackSegment
   readonly scene: CitySceneDefinition
   readonly speed: PlaybackSpeed
@@ -200,8 +210,8 @@ export function cameraScreenScale(
   viewMode: AdvancedCityViewMode = 'focus',
   viewportSize?: CitySize,
 ): number {
-  const usedRoadAccessIndexes = new Set(scene.nodes.map((node) => node.roadAccessIndex))
-  const usedFacilities = scene.physicalFacilities.filter((facility) => usedRoadAccessIndexes.has(facility.roadAccessIndex))
+  const usedFacilityIds = new Set(scene.nodes.map((node) => node.facilityId))
+  const usedFacilities = scene.physicalFacilities.filter((facility) => usedFacilityIds.has(facility.id))
   const camera = getAdvancedCityCamera(scene, usedFacilities, viewMode, viewportSize)
   const widthScale = viewportSize?.width ? viewportSize.width / camera.viewBoxRect.width : 1
   const heightScale = viewportSize?.height ? viewportSize.height / camera.viewBoxRect.height : widthScale
@@ -227,7 +237,7 @@ export function inspectFacilityAtCursor({
   scene,
 }: {
   readonly cursor: number
-  readonly events: readonly ChapterSimulationEvent[]
+  readonly events: readonly CityCuedEvent[]
   readonly facilityOrNodeId: string
   readonly logicalNodeId?: string
   readonly scene: CitySceneDefinition
@@ -249,24 +259,21 @@ export function nodeIdsForFacility(
 ): readonly string[] {
   const physicalFacility = scene.physicalFacilities.find((facility) => facility.id === facilityOrNodeId)
   const sourceNode = scene.nodes.find((node) => node.id === facilityOrNodeId)
-  const roadAccessIndex = physicalFacility?.roadAccessIndex ?? sourceNode?.roadAccessIndex
-  if (roadAccessIndex === undefined) return []
+  const facilityId = physicalFacility?.id ?? sourceNode?.facilityId
+  if (!facilityId) return []
   return scene.nodes
-    .filter((node) => node.roadAccessIndex === roadAccessIndex)
+    .filter((node) => node.facilityId === facilityId)
     .map((node) => node.id)
 }
 
 export function facilityIdFor(scene: CitySceneDefinition, facilityOrNodeId: string): string {
   if (scene.physicalFacilities.some((facility) => facility.id === facilityOrNodeId)) return facilityOrNodeId
   const sourceNode = scene.nodes.find((node) => node.id === facilityOrNodeId)
-  const physicalFacility = scene.physicalFacilities.find(
-    (facility) => facility.roadAccessIndex === sourceNode?.roadAccessIndex,
-  )
-  return physicalFacility?.id ?? facilityOrNodeId
+  return sourceNode?.facilityId ?? facilityOrNodeId
 }
 
 function latestObservedEvent(
-  events: readonly ChapterSimulationEvent[],
+  events: readonly CityCuedEvent[],
   cursor: number,
   nodeIds: readonly string[],
 ): { readonly index: number; readonly nodeId: string | null } {

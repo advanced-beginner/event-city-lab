@@ -1,4 +1,11 @@
+import { createIsoPrism, DIORAMA_VIEWPORT, isoPoint } from './isometric'
+import { interpolatePolyline } from './routeGeometry'
 import type {
+  CityBuildingArchetype,
+  CityBuildingFootprint,
+  CityCheckpointDefinition,
+  CityGridBounds,
+  CityGridCoord,
   CityNodeDefinition,
   CityNodeKind,
   CityPhysicalFacilityDefinition,
@@ -7,172 +14,335 @@ import type {
   CityRouteKind,
   CitySceneDefinition,
 } from './types'
-import { interpolatePolyline } from './routeGeometry'
 
-type AdvancedChapterId = 2 | 3 | 4 | 5 | 6 | 7 | 8
-
-interface AtlasAnchor {
-  kind: CityNodeKind
-  label: string
-  description: string
-  hitAreaPath: string
-  labelPosition: CityPoint
-  roadAccessIndex: number
-  shortLabel?: string
-}
-
-interface RoadsideBuilding {
-  id: string
-  hitAreaPath: string
-  labelPosition: CityPoint
-  roadAccessIndex: number
-  slotLabel: string
-}
+export type DioramaChapterId = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8
+export type AdvancedChapterId = 2 | 3 | 4 | 5 | 6 | 7 | 8
 
 export interface CityScenePreview {
   nodeIds: readonly string[]
   routeIds: readonly string[]
 }
 
-// Approved against the 1672×941 browser capture: (670,550) → (1050,330).
-// Intermediate points are deliberately collinear and define five physical slots.
-export const ADVANCED_CITY_MAIN_ROAD_POINTS = points(
-  [664, 794], [871.25, 674.5], [1078.5, 555], [1285.75, 435.5], [1493, 316],
-)
-
-const ROADSIDE_BUILDINGS = [
-  roadsideBuilding('slot-source', 'Source / Producer', '535,690 668,650 745,704 712,790 610,826 535,770', [625, 714], 0),
-  roadsideBuilding('slot-ingress', 'Kafka Ingress', '690,430 815,390 925,490 902,625 790,670 690,590', [805, 510], 1),
-  roadsideBuilding('slot-cluster', 'Kafka Cluster', '885,305 1030,275 1115,360 1088,512 990,560 885,485', [997, 405], 2),
-  roadsideBuilding('slot-consumer', 'Consumer / Processor', '1160,472 1320,430 1435,515 1400,645 1270,690 1160,600', [1292, 548], 3),
-  roadsideBuilding('slot-application', 'Application / Sink', '1408,228 1575,195 1665,285 1630,405 1510,450 1408,360', [1530, 285], 4),
-] as const satisfies readonly RoadsideBuilding[]
-
-const PHYSICAL_FACILITIES: readonly CityPhysicalFacilityDefinition[] = ROADSIDE_BUILDINGS.map((building) => ({
-  id: building.id,
-  label: building.slotLabel,
-  hitAreaPath: building.hitAreaPath,
-  position: building.labelPosition,
-  roadAccessIndex: building.roadAccessIndex,
-}))
-
-const ANCHORS = {
-  producer: anchor('producer', 'Producer 출발센터', 'Kafka record를 만들고 전송하는 출발 시설입니다.', 0, 'Producer'),
-  application: anchor('application', 'Application 처리공장', '업무 규칙과 변환, 재시도 정책을 실행합니다.', 4, 'Application'),
-  'broker-leader': anchor('broker', 'Broker Leader 기록센터', '현재 partition leader가 record를 append하는 기록센터입니다.', 1, 'Leader'),
-  'broker-follower-1': anchor('replica', 'Broker Follower 1', 'Leader 기록을 복제하는 follower replica입니다.', 2, 'Follower 1'),
-  'broker-follower-2': anchor('replica', 'Broker Follower 2', 'Leader 기록을 복제하는 follower replica입니다.', 2, 'Follower 2'),
-  'partition-p0': anchor('partition', 'Partition p0 적재장', 'p0의 독립적인 append 순서와 offset을 보관합니다.', 2, 'p0'),
-  'partition-p1': anchor('partition', 'Partition p1 적재장', 'p1의 독립적인 append 순서와 offset을 보관합니다.', 2, 'p1'),
-  'partition-p2': anchor('partition', 'Partition p2 적재장', 'p2의 독립적인 append 순서와 offset을 보관합니다.', 2, 'p2'),
-  'consumer-c1': anchor('consumer', 'Consumer c1 수령센터', '할당받은 partition에서 record를 poll합니다.', 3, 'c1'),
-  'consumer-c2': anchor('consumer', 'Consumer c2 수령센터', '할당받은 partition에서 record를 poll합니다.', 3, 'c2'),
-  'consumer-c3': anchor('consumer', 'Consumer c3 수령센터', '할당받은 partition에서 record를 poll합니다.', 3, 'c3'),
-  'consumer-c4': anchor('consumer', 'Consumer c4 대기 차고', 'partition을 배정받지 못하면 IDLE 상태로 대기합니다.', 3, 'c4 · IDLE'),
-  'consumer-c5': anchor('consumer', 'Consumer c5 대기 차고', 'partition을 배정받지 못하면 IDLE 상태로 대기합니다.', 3, 'c5 · IDLE'),
-  coordinator: anchor('coordinator', 'Group Coordinator 관제탑', '멤버십과 partition assignment를 조정합니다.', 1, 'Coordinator'),
-  'offset-store': anchor('offset', 'Offset Store 검표소', 'Consumer group의 다음 읽기 위치를 보관합니다.', 2, 'Offset Store'),
-  'retry-loop': anchor('retry', 'Retry 회차로', '현재 처리 경로에서 제한된 재시도를 수행합니다.', 3, 'Retry 회차로'),
-  'retry-1m': anchor('retry', 'retry-1m 대기장', '애플리케이션이 발행한 첫 번째 지연 retry topic입니다.', 2, 'retry-1m'),
-  'retry-10m': anchor('retry', 'retry-10m 대기장', '더 긴 backoff를 적용하는 retry topic입니다.', 1, 'retry-10m'),
-  dlt: anchor('retry', 'DLT 격리창고', '재시도를 소진한 record와 진단 context를 격리합니다.', 2, 'DLT'),
-  'transaction-coordinator': anchor('transaction', 'Transaction Coordinator', '출력과 offset의 commit 또는 abort 경계를 조정합니다.', 1, 'TX Coordinator'),
-} as const satisfies Record<string, AtlasAnchor>
-
-export type AdvancedCityNodeId = keyof typeof ANCHORS
-
-const SCENE_NODE_IDS: Record<AdvancedChapterId, readonly AdvancedCityNodeId[]> = {
-  2: ['producer', 'partition-p0', 'partition-p1', 'partition-p2', 'application'],
-  3: ['producer', 'broker-leader', 'broker-follower-1', 'broker-follower-2', 'partition-p1', 'retry-loop', 'application'],
-  4: ['producer', 'broker-leader', 'broker-follower-1', 'broker-follower-2'],
-  5: ['partition-p0', 'consumer-c1', 'application', 'offset-store'],
-  6: ['partition-p0', 'partition-p1', 'partition-p2', 'consumer-c1', 'consumer-c2', 'consumer-c3', 'consumer-c4', 'consumer-c5', 'coordinator', 'offset-store', 'application'],
-  7: ['partition-p0', 'consumer-c1', 'application', 'retry-loop', 'retry-1m', 'retry-10m', 'dlt', 'offset-store'],
-  8: ['consumer-c1', 'application', 'producer', 'offset-store', 'transaction-coordinator'],
+interface NodeBlueprint {
+  kind: CityNodeKind
+  archetype: CityBuildingArchetype
+  label: string
+  koreanLabel: string
+  description: string
+  shortLabel?: string
+  footprint?: CityBuildingFootprint
 }
 
-function createSceneRoutes(): Record<AdvancedChapterId, readonly CityRouteDefinition[]> {
-  return {
-  2: [
-    route('producer-p0', 'producer', 'partition-p0', 'data'),
-    route('producer-p1', 'producer', 'partition-p1', 'data'),
-    route('producer-p2', 'producer', 'partition-p2', 'data'),
-    route('p0-application', 'partition-p0', 'application', 'data'),
-    route('p1-application', 'partition-p1', 'application', 'data'),
-    route('p2-application', 'partition-p2', 'application', 'data'),
-    route('application-producer-result', 'application', 'producer', 'return'),
-  ],
-  3: [
-    route('producer-leader', 'producer', 'broker-leader', 'data'),
-    route('leader-follower-1', 'broker-leader', 'broker-follower-1', 'replication'),
-    route('leader-follower-2', 'broker-leader', 'broker-follower-2', 'replication'),
-    route('producer-retry-loop', 'producer', 'retry-loop', 'retry'),
-    route('retry-loop-leader', 'retry-loop', 'broker-leader', 'retry'),
-    route('leader-partition', 'broker-leader', 'partition-p1', 'data'),
-    route('leader-producer-ack', 'broker-leader', 'producer', 'return'),
-    route('partition-application', 'partition-p1', 'application', 'data'),
-  ],
-  4: [
-    route('producer-leader', 'producer', 'broker-leader', 'data'),
-    route('leader-follower-1', 'broker-leader', 'broker-follower-1', 'replication'),
-    route('leader-follower-2', 'broker-leader', 'broker-follower-2', 'replication'),
-    route('follower-1-producer', 'broker-follower-1', 'producer', 'control'),
-    route('leader-producer-ack', 'broker-leader', 'producer', 'return'),
-  ],
-  5: [
-    route('p0-consumer', 'partition-p0', 'consumer-c1', 'data'),
-    route('consumer-application', 'consumer-c1', 'application', 'data'),
-    route('application-offset', 'application', 'offset-store', 'control'),
-    route('consumer-offset', 'consumer-c1', 'offset-store', 'control'),
-    route('offset-consumer-commit', 'offset-store', 'consumer-c1', 'return'),
-  ],
-  6: [
-    route('coordinator-c1', 'coordinator', 'consumer-c1', 'control'),
-    route('coordinator-c2', 'coordinator', 'consumer-c2', 'control'),
-    route('coordinator-c3', 'coordinator', 'consumer-c3', 'control'),
-    route('coordinator-c4', 'coordinator', 'consumer-c4', 'control'),
-    route('coordinator-c5', 'coordinator', 'consumer-c5', 'control'),
-    route('p0-c1', 'partition-p0', 'consumer-c1', 'data'),
-    route('p1-c1', 'partition-p1', 'consumer-c1', 'data'),
-    route('p1-c2', 'partition-p1', 'consumer-c2', 'data'),
-    route('p2-c3', 'partition-p2', 'consumer-c3', 'data'),
-    route('c1-offset', 'consumer-c1', 'offset-store', 'control'),
-    route('c2-offset', 'consumer-c2', 'offset-store', 'control'),
-    route('c1-application', 'consumer-c1', 'application', 'data'),
-  ],
-  7: [
-    route('p0-consumer', 'partition-p0', 'consumer-c1', 'data'),
-    route('consumer-application', 'consumer-c1', 'application', 'data'),
-    route('application-retry-loop', 'application', 'retry-loop', 'retry'),
-    route('application-retry-1m', 'application', 'retry-1m', 'retry'),
-    route('retry-1m-retry-10m', 'retry-1m', 'retry-10m', 'retry'),
-    route('retry-10m-application', 'retry-10m', 'application', 'retry'),
-    route('application-dlt', 'application', 'dlt', 'data'),
-    route('application-offset', 'application', 'offset-store', 'control'),
-    route('offset-consumer-commit', 'offset-store', 'consumer-c1', 'return'),
-  ],
-  8: [
-    route('consumer-application', 'consumer-c1', 'application', 'data'),
-    route('application-producer', 'application', 'producer', 'data'),
-    route('application-offset', 'application', 'offset-store', 'control'),
-    route('transaction-application', 'transaction-coordinator', 'application', 'transaction'),
-    route('producer-transaction', 'producer', 'transaction-coordinator', 'transaction'),
-    route('transaction-offset', 'transaction-coordinator', 'offset-store', 'transaction'),
-    route('transaction-consumer-result', 'transaction-coordinator', 'consumer-c1', 'return'),
-  ],
-  }
+const DEFAULT_FOOTPRINT: Record<CityBuildingArchetype, CityBuildingFootprint> = {
+  warehouse: { u: 1.25, v: 1.25, height: 54 },
+  gate: { u: 1.05, v: 1.35, height: 64 },
+  hub: { u: 1.35, v: 1.35, height: 68 },
+  tower: { u: 1.0, v: 1.0, height: 86 },
+  loop: { u: 1.15, v: 1.15, height: 42 },
+  vault: { u: 1.15, v: 1.15, height: 58 },
+  checkpoint: { u: 1.05, v: 1.05, height: 48 },
+  factory: { u: 1.35, v: 1.35, height: 64 },
 }
 
-const SCENE_ROUTES = createSceneRoutes()
+const NODE_BLUEPRINTS = {
+  producer: blueprint('producer', 'warehouse', 'Producer', '출발센터', 'Kafka record를 만들고 직렬화해 전송하는 출발 시설입니다.'),
+  serializer: blueprint('serializer', 'gate', 'Serializer', '검사소', '네트워크 전송 전 value 타입과 호환성을 검사하는 관문입니다.'),
+  broker: blueprint('broker', 'hub', 'Broker', '기록센터', '전달된 메시지를 partition 로그에 append하고 ACK를 회신합니다.'),
+  application: blueprint('application', 'factory', 'Application', '처리공장', '업무 규칙과 변환, 재시도 정책을 실행합니다.'),
+  'broker-leader': blueprint('broker', 'hub', 'Broker Leader', '기록센터', '현재 partition leader가 record를 append하는 기록센터입니다.', 'Leader'),
+  'broker-follower-1': blueprint('replica', 'tower', 'Follower 1', '복제 타워', 'Leader 기록을 복제하는 follower replica입니다.', 'Follower 1'),
+  'broker-follower-2': blueprint('replica', 'tower', 'Follower 2', '복제 타워', 'Leader 기록을 복제하는 follower replica입니다.', 'Follower 2'),
+  'partition-p0': blueprint('partition', 'hub', 'Partition p0', '적재장', 'p0의 독립적인 append 순서와 offset을 보관합니다.', 'p0'),
+  'partition-p1': blueprint('partition', 'hub', 'Partition p1', '적재장', 'p1의 독립적인 append 순서와 offset을 보관합니다.', 'p1'),
+  'partition-p2': blueprint('partition', 'hub', 'Partition p2', '적재장', 'p2의 독립적인 append 순서와 offset을 보관합니다.', 'p2'),
+  'consumer-c1': blueprint('consumer', 'warehouse', 'Consumer c1', '수령센터', '할당받은 partition에서 record를 poll합니다.', 'c1'),
+  'consumer-c2': blueprint('consumer', 'warehouse', 'Consumer c2', '수령센터', '할당받은 partition에서 record를 poll합니다.', 'c2'),
+  'consumer-c3': blueprint('consumer', 'warehouse', 'Consumer c3', '수령센터', '할당받은 partition에서 record를 poll합니다.', 'c3'),
+  'consumer-c4': blueprint('consumer', 'warehouse', 'Consumer c4', '대기 차고', 'partition을 배정받지 못하면 IDLE 상태로 대기합니다.', 'c4 · IDLE'),
+  'consumer-c5': blueprint('consumer', 'warehouse', 'Consumer c5', '대기 차고', 'partition을 배정받지 못하면 IDLE 상태로 대기합니다.', 'c5 · IDLE'),
+  coordinator: blueprint('coordinator', 'tower', 'Coordinator', '그룹 관제탑', '멤버십과 partition assignment를 조정합니다.', 'Coordinator'),
+  'offset-store': blueprint('offset', 'checkpoint', 'Offset Store', '검표소', 'Consumer group의 다음 읽기 위치를 보관합니다.', 'Offset Store'),
+  'retry-loop': blueprint('retry', 'loop', 'Retry 회차로', '인메모리 재시도', '현재 처리 경로에서 제한된 재시도를 수행합니다.', 'Retry 회차로'),
+  'retry-1m': blueprint('retry', 'checkpoint', 'retry-1m', '1분 지연 대기장', '애플리케이션이 발행한 첫 번째 지연 retry topic입니다.', 'retry-1m'),
+  'retry-10m': blueprint('retry', 'checkpoint', 'retry-10m', '10분 지연 대기장', '더 긴 backoff를 적용하는 retry topic입니다.', 'retry-10m'),
+  dlt: blueprint('retry', 'vault', 'DLT', '독성 메시지 격리창고', '재시도를 소진한 record와 진단 context를 격리합니다.', 'DLT'),
+  'transaction-coordinator': blueprint('transaction', 'tower', 'TX Coordinator', '트랜잭션 관제탑', '출력과 offset의 commit 또는 abort 경계를 조정합니다.', 'TX Coordinator'),
+} as const satisfies Record<string, NodeBlueprint>
+
+export type DioramaNodeId = keyof typeof NODE_BLUEPRINTS
+
+interface ChapterNodePlacement {
+  id: DioramaNodeId
+  grid: CityGridCoord
+  facilityId?: string
+}
+
+interface ChapterRouteSpec {
+  id: string
+  from: DioramaNodeId
+  to: DioramaNodeId
+  kind: CityRouteKind
+  via?: ReadonlyArray<readonly [number, number]>
+}
+
+interface ChapterSceneBlueprint {
+  chapterId: DioramaChapterId
+  label: string
+  gridBounds: CityGridBounds
+  initialVehicleRouteId: string
+  placements: readonly ChapterNodePlacement[]
+  complexes?: readonly {
+    id: string
+    label: string
+    koreanLabel: string
+    archetype: CityBuildingArchetype
+    grid: CityGridCoord
+    footprint: CityBuildingFootprint
+  }[]
+  routes: readonly ChapterRouteSpec[]
+  boundaries?: CitySceneDefinition['boundaries']
+}
+
+const CHAPTER_BLUEPRINTS: Readonly<Record<DioramaChapterId, ChapterSceneBlueprint>> = {
+  1: {
+    chapterId: 1,
+    label: 'Chapter 1 · Producer & Serializer 디오라마',
+    gridBounds: { minU: 0.4, maxU: 9.6, minV: 2.2, maxV: 7.8 },
+    initialVehicleRouteId: 'producer-serializer',
+    placements: [
+      { id: 'producer', grid: { u: 2.0, v: 5.0 } },
+      { id: 'serializer', grid: { u: 5.0, v: 5.0 } },
+      { id: 'broker', grid: { u: 8.0, v: 5.0 } },
+    ],
+    routes: [
+      { id: 'producer-serializer', from: 'producer', to: 'serializer', kind: 'data' },
+      { id: 'serializer-broker', from: 'serializer', to: 'broker', kind: 'data' },
+      { id: 'broker-producer-ack', from: 'broker', to: 'producer', kind: 'return', via: [[8.0, 3.2], [2.0, 3.2]] },
+    ],
+  },
+  2: {
+    chapterId: 2,
+    label: 'Chapter 2 · Partition 분기 물류 지구',
+    gridBounds: { minU: 0.4, maxU: 9.8, minV: 1.0, maxV: 9.2 },
+    initialVehicleRouteId: 'producer-p1',
+    placements: [
+      { id: 'producer', grid: { u: 1.8, v: 5.0 } },
+      { id: 'partition-p0', grid: { u: 5.1, v: 2.3 } },
+      { id: 'partition-p1', grid: { u: 5.1, v: 5.0 } },
+      { id: 'partition-p2', grid: { u: 5.1, v: 7.7 } },
+      { id: 'application', grid: { u: 8.4, v: 5.0 } },
+    ],
+    routes: [
+      { id: 'producer-p0', from: 'producer', to: 'partition-p0', kind: 'data', via: [[3.4, 5.0], [3.4, 2.3]] },
+      { id: 'producer-p1', from: 'producer', to: 'partition-p1', kind: 'data' },
+      { id: 'producer-p2', from: 'producer', to: 'partition-p2', kind: 'data', via: [[3.4, 5.0], [3.4, 7.7]] },
+      { id: 'p0-application', from: 'partition-p0', to: 'application', kind: 'data', via: [[6.8, 2.3], [6.8, 5.0]] },
+      { id: 'p1-application', from: 'partition-p1', to: 'application', kind: 'data' },
+      { id: 'p2-application', from: 'partition-p2', to: 'application', kind: 'data', via: [[6.8, 7.7], [6.8, 5.0]] },
+      { id: 'application-producer-result', from: 'application', to: 'producer', kind: 'return', via: [[8.4, 8.9], [1.8, 8.9]] },
+    ],
+  },
+  3: {
+    chapterId: 3,
+    label: 'Chapter 3 · ACK·재시도·멱등성 지구',
+    gridBounds: { minU: 0.3, maxU: 10.2, minV: 1.0, maxV: 9.2 },
+    initialVehicleRouteId: 'producer-leader',
+    placements: [
+      { id: 'producer', grid: { u: 1.5, v: 5.2 } },
+      { id: 'retry-loop', grid: { u: 3.1, v: 2.2 } },
+      { id: 'broker-leader', grid: { u: 4.9, v: 5.2 } },
+      { id: 'broker-follower-1', grid: { u: 5.7, v: 2.2 } },
+      { id: 'broker-follower-2', grid: { u: 5.5, v: 8.0 } },
+      { id: 'partition-p1', grid: { u: 7.1, v: 5.2 } },
+      { id: 'application', grid: { u: 9.1, v: 5.2 } },
+    ],
+    routes: [
+      { id: 'producer-leader', from: 'producer', to: 'broker-leader', kind: 'data' },
+      { id: 'leader-follower-1', from: 'broker-leader', to: 'broker-follower-1', kind: 'replication', via: [[5.7, 5.2]] },
+      { id: 'leader-follower-2', from: 'broker-leader', to: 'broker-follower-2', kind: 'replication', via: [[5.5, 5.2]] },
+      { id: 'producer-retry-loop', from: 'producer', to: 'retry-loop', kind: 'retry', via: [[1.5, 2.2]] },
+      { id: 'retry-loop-leader', from: 'retry-loop', to: 'broker-leader', kind: 'retry', via: [[4.3, 2.2], [4.3, 5.2]] },
+      { id: 'leader-partition', from: 'broker-leader', to: 'partition-p1', kind: 'data' },
+      { id: 'leader-producer-ack', from: 'broker-leader', to: 'producer', kind: 'return', via: [[4.9, 7.0], [1.5, 7.0]] },
+      { id: 'partition-application', from: 'partition-p1', to: 'application', kind: 'data' },
+    ],
+  },
+  4: {
+    chapterId: 4,
+    label: 'Chapter 4 · Broker 복제와 ISR 지구',
+    gridBounds: { minU: 0.4, maxU: 9.4, minV: 1.0, maxV: 9.0 },
+    initialVehicleRouteId: 'producer-leader',
+    placements: [
+      { id: 'producer', grid: { u: 1.8, v: 5.0 } },
+      { id: 'broker-leader', grid: { u: 5.0, v: 5.0 } },
+      { id: 'broker-follower-1', grid: { u: 7.8, v: 2.4 } },
+      { id: 'broker-follower-2', grid: { u: 7.8, v: 7.6 } },
+    ],
+    routes: [
+      { id: 'producer-leader', from: 'producer', to: 'broker-leader', kind: 'data' },
+      { id: 'leader-follower-1', from: 'broker-leader', to: 'broker-follower-1', kind: 'replication', via: [[5.0, 2.4]] },
+      { id: 'leader-follower-2', from: 'broker-leader', to: 'broker-follower-2', kind: 'replication', via: [[5.0, 7.6]] },
+      { id: 'follower-1-producer', from: 'broker-follower-1', to: 'producer', kind: 'control', via: [[1.8, 2.4]] },
+      { id: 'leader-producer-ack', from: 'broker-leader', to: 'producer', kind: 'return', via: [[5.0, 6.7], [1.8, 6.7]] },
+    ],
+  },
+  5: {
+    chapterId: 5,
+    label: 'Chapter 5 · Consumer Poll과 Offset 지구',
+    gridBounds: { minU: 0.4, maxU: 9.6, minV: 1.8, maxV: 9.0 },
+    initialVehicleRouteId: 'p0-consumer',
+    placements: [
+      { id: 'partition-p0', grid: { u: 1.8, v: 4.5 } },
+      { id: 'consumer-c1', grid: { u: 5.0, v: 4.5 } },
+      { id: 'application', grid: { u: 8.2, v: 4.5 } },
+      { id: 'offset-store', grid: { u: 6.6, v: 7.7 } },
+    ],
+    routes: [
+      { id: 'p0-consumer', from: 'partition-p0', to: 'consumer-c1', kind: 'data' },
+      { id: 'consumer-application', from: 'consumer-c1', to: 'application', kind: 'data' },
+      { id: 'application-offset', from: 'application', to: 'offset-store', kind: 'control', via: [[8.2, 7.7]] },
+      { id: 'consumer-offset', from: 'consumer-c1', to: 'offset-store', kind: 'control', via: [[5.0, 7.7]] },
+      { id: 'offset-consumer-commit', from: 'offset-store', to: 'consumer-c1', kind: 'return', via: [[5.0, 7.7]] },
+    ],
+  },
+  6: {
+    chapterId: 6,
+    label: 'Chapter 6 · Consumer Group & Rebalance 지구',
+    gridBounds: { minU: 0.4, maxU: 10.0, minV: 0.8, maxV: 9.4 },
+    initialVehicleRouteId: 'p0-c1',
+    complexes: [
+      {
+        id: 'slot-partitions',
+        label: 'Partitions p0–p2',
+        koreanLabel: '파티션 터미널',
+        archetype: 'hub',
+        grid: { u: 1.8, v: 5.0 },
+        footprint: { u: 1.3, v: 3.4, height: 64 },
+      },
+      {
+        id: 'slot-consumers',
+        label: 'Consumers c1–c5',
+        koreanLabel: '컨슈머 플릿',
+        archetype: 'warehouse',
+        grid: { u: 6.0, v: 5.0 },
+        footprint: { u: 1.3, v: 4.2, height: 60 },
+      },
+    ],
+    placements: [
+      { id: 'partition-p0', grid: { u: 1.8, v: 3.8 }, facilityId: 'slot-partitions' },
+      { id: 'partition-p1', grid: { u: 1.8, v: 5.0 }, facilityId: 'slot-partitions' },
+      { id: 'partition-p2', grid: { u: 1.8, v: 6.2 }, facilityId: 'slot-partitions' },
+      { id: 'coordinator', grid: { u: 4.6, v: 1.9 } },
+      { id: 'consumer-c1', grid: { u: 6.0, v: 3.4 }, facilityId: 'slot-consumers' },
+      { id: 'consumer-c2', grid: { u: 6.0, v: 4.2 }, facilityId: 'slot-consumers' },
+      { id: 'consumer-c3', grid: { u: 6.0, v: 5.0 }, facilityId: 'slot-consumers' },
+      { id: 'consumer-c4', grid: { u: 6.0, v: 5.8 }, facilityId: 'slot-consumers' },
+      { id: 'consumer-c5', grid: { u: 6.0, v: 6.6 }, facilityId: 'slot-consumers' },
+      { id: 'offset-store', grid: { u: 4.6, v: 8.2 } },
+      { id: 'application', grid: { u: 8.8, v: 5.0 } },
+    ],
+    routes: [
+      { id: 'coordinator-c1', from: 'coordinator', to: 'consumer-c1', kind: 'control', via: [[5.2, 1.9], [5.2, 3.4]] },
+      { id: 'coordinator-c2', from: 'coordinator', to: 'consumer-c2', kind: 'control', via: [[5.2, 1.9], [5.2, 4.2]] },
+      { id: 'coordinator-c3', from: 'coordinator', to: 'consumer-c3', kind: 'control', via: [[5.2, 1.9], [5.2, 5.0]] },
+      { id: 'coordinator-c4', from: 'coordinator', to: 'consumer-c4', kind: 'control', via: [[5.2, 1.9], [5.2, 5.8]] },
+      { id: 'coordinator-c5', from: 'coordinator', to: 'consumer-c5', kind: 'control', via: [[5.2, 1.9], [5.2, 6.6]] },
+      { id: 'p0-c1', from: 'partition-p0', to: 'consumer-c1', kind: 'data', via: [[3.6, 3.8], [3.6, 3.4]] },
+      { id: 'p1-c1', from: 'partition-p1', to: 'consumer-c1', kind: 'data', via: [[3.9, 5.0], [3.9, 3.4]] },
+      { id: 'p1-c2', from: 'partition-p1', to: 'consumer-c2', kind: 'data', via: [[4.2, 5.0], [4.2, 4.2]] },
+      { id: 'p2-c3', from: 'partition-p2', to: 'consumer-c3', kind: 'data', via: [[4.5, 6.2], [4.5, 5.0]] },
+      { id: 'c1-offset', from: 'consumer-c1', to: 'offset-store', kind: 'control', via: [[4.6, 3.4]] },
+      { id: 'c2-offset', from: 'consumer-c2', to: 'offset-store', kind: 'control', via: [[4.9, 4.2], [4.9, 8.2]] },
+      { id: 'c1-application', from: 'consumer-c1', to: 'application', kind: 'data', via: [[7.4, 3.4], [7.4, 5.0]] },
+    ],
+  },
+  7: {
+    chapterId: 7,
+    label: 'Chapter 7 · Retry 회차로 & DLT 격리 지구',
+    gridBounds: { minU: 0.3, maxU: 10.4, minV: 1.0, maxV: 9.4 },
+    initialVehicleRouteId: 'p0-consumer',
+    placements: [
+      { id: 'partition-p0', grid: { u: 1.4, v: 5.2 } },
+      { id: 'consumer-c1', grid: { u: 3.6, v: 5.2 } },
+      { id: 'application', grid: { u: 5.9, v: 5.2 } },
+      { id: 'retry-loop', grid: { u: 5.9, v: 2.3 } },
+      { id: 'retry-1m', grid: { u: 8.1, v: 2.3 } },
+      { id: 'retry-10m', grid: { u: 9.2, v: 4.3 } },
+      { id: 'offset-store', grid: { u: 4.4, v: 8.1 } },
+      { id: 'dlt', grid: { u: 8.2, v: 8.0 } },
+    ],
+    routes: [
+      { id: 'p0-consumer', from: 'partition-p0', to: 'consumer-c1', kind: 'data' },
+      { id: 'consumer-application', from: 'consumer-c1', to: 'application', kind: 'data' },
+      { id: 'application-retry-loop', from: 'application', to: 'retry-loop', kind: 'retry' },
+      { id: 'application-retry-1m', from: 'application', to: 'retry-1m', kind: 'retry', via: [[7.5, 5.2], [7.5, 2.3]] },
+      { id: 'retry-1m-retry-10m', from: 'retry-1m', to: 'retry-10m', kind: 'retry', via: [[9.2, 2.3]] },
+      { id: 'retry-10m-application', from: 'retry-10m', to: 'application', kind: 'retry', via: [[9.2, 5.2]] },
+      { id: 'application-dlt', from: 'application', to: 'dlt', kind: 'data', via: [[5.9, 8.0]] },
+      { id: 'application-offset', from: 'application', to: 'offset-store', kind: 'control', via: [[5.9, 8.1]] },
+      { id: 'offset-consumer-commit', from: 'offset-store', to: 'consumer-c1', kind: 'return', via: [[3.6, 8.1]] },
+    ],
+  },
+  8: {
+    chapterId: 8,
+    label: 'Chapter 8 · Transaction 원자적 경계 지구',
+    gridBounds: { minU: 0.4, maxU: 9.8, minV: 0.8, maxV: 9.3 },
+    initialVehicleRouteId: 'consumer-application',
+    placements: [
+      { id: 'consumer-c1', grid: { u: 1.8, v: 5.0 } },
+      { id: 'application', grid: { u: 5.1, v: 5.0 } },
+      { id: 'producer', grid: { u: 8.4, v: 5.0 } },
+      { id: 'transaction-coordinator', grid: { u: 5.1, v: 2.0 } },
+      { id: 'offset-store', grid: { u: 6.8, v: 8.0 } },
+    ],
+    routes: [
+      { id: 'consumer-application', from: 'consumer-c1', to: 'application', kind: 'data' },
+      { id: 'application-producer', from: 'application', to: 'producer', kind: 'data' },
+      { id: 'application-offset', from: 'application', to: 'offset-store', kind: 'control', via: [[5.1, 8.0]] },
+      { id: 'transaction-application', from: 'transaction-coordinator', to: 'application', kind: 'transaction' },
+      { id: 'producer-transaction', from: 'producer', to: 'transaction-coordinator', kind: 'transaction', via: [[8.4, 2.0]] },
+      { id: 'transaction-offset', from: 'transaction-coordinator', to: 'offset-store', kind: 'transaction', via: [[6.8, 2.0]] },
+      { id: 'transaction-consumer-result', from: 'transaction-coordinator', to: 'consumer-c1', kind: 'return', via: [[1.8, 2.0]] },
+    ],
+    boundaries: [
+      {
+        id: 'consume-transform-produce-tx',
+        kind: 'transaction',
+        label: 'OUTPUT + OFFSET · ATOMIC BOUNDARY',
+        path: 'M510 175 L1080 120 L1320 420 L980 760 L440 600 Z',
+        nodeIds: ['consumer-c1', 'application', 'producer', 'offset-store', 'transaction-coordinator'],
+      },
+    ],
+  },
+}
+
+const SCENES: Readonly<Record<DioramaChapterId, CitySceneDefinition>> = {
+  1: buildScene(CHAPTER_BLUEPRINTS[1]),
+  2: buildScene(CHAPTER_BLUEPRINTS[2]),
+  3: buildScene(CHAPTER_BLUEPRINTS[3]),
+  4: buildScene(CHAPTER_BLUEPRINTS[4]),
+  5: buildScene(CHAPTER_BLUEPRINTS[5]),
+  6: buildScene(CHAPTER_BLUEPRINTS[6]),
+  7: buildScene(CHAPTER_BLUEPRINTS[7]),
+  8: buildScene(CHAPTER_BLUEPRINTS[8]),
+}
 
 export const ADVANCED_CHAPTER_SCENES: Readonly<Record<AdvancedChapterId, CitySceneDefinition>> = {
-  2: scene(2, 'Partition routing district'),
-  3: scene(3, 'Producer reliability district'),
-  4: scene(4, 'Broker replication district'),
-  5: scene(5, 'Consumer offset district'),
-  6: scene(6, 'Consumer group district'),
-  7: scene(7, 'Retry and DLT district'),
-  8: scene(8, 'Transaction district'),
+  2: SCENES[2],
+  3: SCENES[3],
+  4: SCENES[4],
+  5: SCENES[5],
+  6: SCENES[6],
+  7: SCENES[7],
+  8: SCENES[8],
+}
+
+export function getChapterScene(chapterId: DioramaChapterId): CitySceneDefinition {
+  return SCENES[chapterId]
+}
+
+export function getChapterOneScene(): CitySceneDefinition {
+  return SCENES[1]
 }
 
 export function getAdvancedChapterScene(chapterId: AdvancedChapterId): CitySceneDefinition {
@@ -253,136 +423,126 @@ export function getExperimentCityPreview(experimentId: string, choiceId?: string
   return EXPERIMENT_PREVIEWS[experimentId] ?? { nodeIds: [], routeIds: [] }
 }
 
-function anchor(
-  kind: CityNodeKind,
-  label: string,
-  description: string,
-  roadAccessIndex: number,
-  shortLabel?: string,
-): AtlasAnchor {
-  const building = ROADSIDE_BUILDINGS[roadAccessIndex]
-  if (!building) throw new Error(`Roadside building ${roadAccessIndex} is not defined.`)
+function buildScene(spec: ChapterSceneBlueprint): CitySceneDefinition {
+  const nodesById = new Map<DioramaNodeId, CityNodeDefinition>()
+  const facilities: CityPhysicalFacilityDefinition[] = []
+  const seenFacilityIds = new Set<string>()
+
+  for (const complex of spec.complexes ?? []) {
+    const prism = createIsoPrism(complex.grid.u, complex.grid.v, complex.footprint.u, complex.footprint.v, complex.footprint.height)
+    facilities.push({
+      id: complex.id,
+      label: complex.label,
+      koreanLabel: complex.koreanLabel,
+      archetype: complex.archetype,
+      grid: complex.grid,
+      position: isoPoint(complex.grid.u, complex.grid.v),
+      footprint: complex.footprint,
+      hitAreaPath: prism.outlinePath,
+    })
+    seenFacilityIds.add(complex.id)
+  }
+
+  const nodes: CityNodeDefinition[] = spec.placements.map((placement) => {
+    const bp = NODE_BLUEPRINTS[placement.id]
+    const footprint = bp.footprint ?? DEFAULT_FOOTPRINT[bp.archetype]
+    const position = isoPoint(placement.grid.u, placement.grid.v)
+    const facilityId = placement.facilityId ?? placement.id
+    const prism = createIsoPrism(placement.grid.u, placement.grid.v, footprint.u, footprint.v, footprint.height)
+
+    if (!seenFacilityIds.has(facilityId)) {
+      facilities.push({
+        id: facilityId,
+        label: bp.label,
+        koreanLabel: bp.koreanLabel,
+        archetype: bp.archetype,
+        grid: placement.grid,
+        position,
+        footprint,
+        hitAreaPath: prism.outlinePath,
+      })
+      seenFacilityIds.add(facilityId)
+    }
+
+    const node: CityNodeDefinition = {
+      id: placement.id,
+      kind: bp.kind,
+      archetype: bp.archetype,
+      facilityId,
+      label: bp.shortLabel ?? bp.label,
+      description: bp.description,
+      grid: placement.grid,
+      position,
+      hitAreaPath: prism.outlinePath,
+      ariaLabel: `${bp.label} ${bp.koreanLabel}`,
+    }
+    nodesById.set(placement.id, node)
+    return node
+  })
+
+  const routes: CityRouteDefinition[] = spec.routes.map((routeSpec) => {
+    const fromNode = nodesById.get(routeSpec.from)
+    const toNode = nodesById.get(routeSpec.to)
+    if (!fromNode || !toNode) {
+      throw new Error(`Route ${routeSpec.id} references missing node in Chapter ${spec.chapterId}.`)
+    }
+    const gridPoints: readonly CityGridCoord[] = [
+      fromNode.grid,
+      ...(routeSpec.via ?? []).map(([u, v]) => ({ u, v })),
+      toNode.grid,
+    ]
+    const points: readonly CityPoint[] = gridPoints.map((coord) => isoPoint(coord.u, coord.v))
+    const path = points.map((point, index) => `${index === 0 ? 'M' : 'L'}${point.x} ${point.y}`).join(' ')
+    const midpoint = interpolatePolyline(points, 0.5)
+    const checkpoints: readonly CityCheckpointDefinition[] = [
+      { id: `${routeSpec.id}:start`, position: points[0]!, progress: 0, nodeId: fromNode.id },
+      { id: `${routeSpec.id}:mid`, position: midpoint, progress: 0.5, label: '이동 중' },
+      { id: `${routeSpec.id}:end`, position: points.at(-1)!, progress: 1, nodeId: toNode.id },
+    ]
+    return {
+      id: routeSpec.id,
+      kind: routeSpec.kind,
+      fromNodeId: fromNode.id,
+      toNodeId: toNode.id,
+      label: `${fromNode.label} → ${toNode.label}`,
+      path,
+      points,
+      checkpoints,
+    }
+  })
+
   return {
-    kind,
-    label,
-    description,
-    ...building,
-    ...(shortLabel ? { shortLabel } : {}),
+    id: `chapter-${spec.chapterId}-city`,
+    chapterId: spec.chapterId,
+    label: spec.label,
+    viewport: DIORAMA_VIEWPORT,
+    gridBounds: spec.gridBounds,
+    physicalFacilities: facilities,
+    initialVehicleRouteId: spec.initialVehicleRouteId,
+    nodes,
+    routes,
+    ...(spec.boundaries ? { boundaries: spec.boundaries } : {}),
   }
 }
 
-function roadsideBuilding(
-  id: string,
+function blueprint(
+  kind: CityNodeKind,
+  archetype: CityBuildingArchetype,
   label: string,
-  polygonPoints: string,
-  [x, y]: readonly [number, number],
-  roadAccessIndex: number,
-): RoadsideBuilding {
+  koreanLabel: string,
+  description: string,
+  shortLabel?: string,
+): NodeBlueprint {
   return {
-    id,
-    hitAreaPath: `M${polygonPoints.replaceAll(' ', 'L')}Z`,
-    labelPosition: { x, y },
-    roadAccessIndex,
-    slotLabel: label,
+    kind,
+    archetype,
+    label,
+    koreanLabel,
+    description,
+    ...(shortLabel ? { shortLabel } : {}),
   }
 }
 
 function preview(nodeIds: readonly string[], routeIds: readonly string[]): CityScenePreview {
   return { nodeIds, routeIds }
-}
-
-function points(...values: ReadonlyArray<readonly [number, number]>): readonly CityPoint[] {
-  return values.map(([x, y]) => ({ x, y }))
-}
-
-function node(id: AdvancedCityNodeId): CityNodeDefinition {
-  const source = ANCHORS[id]
-  return {
-    id,
-    kind: source.kind,
-    label: source.shortLabel ?? source.label,
-    description: source.description,
-    hitAreaPath: source.hitAreaPath,
-    position: source.labelPosition,
-    roadAccessIndex: source.roadAccessIndex,
-    ariaLabel: source.label,
-  }
-}
-
-function route(
-  id: string,
-  fromNodeId: AdvancedCityNodeId,
-  toNodeId: AdvancedCityNodeId,
-  kind: CityRouteKind,
-): CityRouteDefinition {
-  const pathPoints = roadSlice(
-    ADVANCED_CITY_MAIN_ROAD_POINTS,
-    ANCHORS[fromNodeId].roadAccessIndex,
-    ANCHORS[toNodeId].roadAccessIndex,
-  )
-  const start = pathPoints[0]!
-  const end = pathPoints.at(-1)!
-  const midpoint = interpolatePolyline(pathPoints, 0.5)
-  return {
-    id,
-    fromNodeId,
-    toNodeId,
-    kind,
-    label: `${ANCHORS[fromNodeId].label} → ${ANCHORS[toNodeId].label}`,
-    path: pathPoints.map((point, index) => `${index === 0 ? 'M' : 'L'}${point.x} ${point.y}`).join(' '),
-    points: pathPoints,
-    checkpoints: [
-      { id: `${id}:start`, position: start, progress: 0, nodeId: fromNodeId },
-      { id: `${id}:mid`, position: midpoint, progress: 0.5, label: '이동 중' },
-      { id: `${id}:end`, position: end, progress: 1, nodeId: toNodeId },
-    ],
-  }
-}
-
-function roadSlice(points: readonly CityPoint[], fromIndex: number, toIndex: number): readonly CityPoint[] {
-  if (fromIndex === toIndex) return [points[fromIndex]!, points[fromIndex]!]
-  const start = Math.min(fromIndex, toIndex)
-  const end = Math.max(fromIndex, toIndex)
-  const slice = points.slice(start, end + 1)
-  return fromIndex <= toIndex ? slice : slice.reverse()
-}
-
-function scene(chapterId: AdvancedChapterId, label: string): CitySceneDefinition {
-  return {
-    id: `chapter-${chapterId}-city`,
-    label,
-    viewport: { width: 1920, height: 1047 },
-    mainRoad: {
-      id: 'downtown-main-arterial',
-      path: ADVANCED_CITY_MAIN_ROAD_POINTS.map((point, index) => `${index === 0 ? 'M' : 'L'}${point.x} ${point.y}`).join(' '),
-      points: ADVANCED_CITY_MAIN_ROAD_POINTS,
-    },
-    physicalFacilities: PHYSICAL_FACILITIES,
-    initialVehicleRouteId: initialVehicleRouteId(chapterId),
-    nodes: SCENE_NODE_IDS[chapterId].map(node),
-    routes: SCENE_ROUTES[chapterId],
-    ...(chapterId === 8
-      ? {
-          boundaries: [{
-            id: 'consume-transform-produce-tx',
-            kind: 'transaction' as const,
-            label: 'OUTPUT + OFFSET · ATOMIC BOUNDARY',
-            path: 'M410 170L1070 85L1690 350L1580 570L1040 645L420 525Z',
-            nodeIds: ['consumer-c1', 'application', 'producer', 'offset-store', 'transaction-coordinator'],
-          }],
-        }
-      : {}),
-  }
-}
-
-function initialVehicleRouteId(chapterId: AdvancedChapterId): string {
-  return ({
-    2: 'producer-p1',
-    3: 'producer-leader',
-    4: 'producer-leader',
-    5: 'p0-consumer',
-    6: 'p0-c1',
-    7: 'p0-consumer',
-    8: 'consumer-application',
-  } as const satisfies Record<AdvancedChapterId, string>)[chapterId]
 }

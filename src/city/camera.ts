@@ -1,3 +1,4 @@
+import { isoPoint } from './isometric'
 import type {
   CityPhysicalFacilityDefinition,
   CityPoint,
@@ -17,10 +18,9 @@ export interface CityCamera {
 export interface CityCameraRect extends CityPoint, CitySize {}
 
 const DEFAULT_VIEWPORT_SIZE: CitySize = { width: 1280, height: 720 }
-const FOCUS_MARGIN = 16
-const VEHICLE_HALF_WIDTH = 64
-const VEHICLE_TOP_OFFSET = 100
-const VEHICLE_LABEL_BOTTOM_OFFSET = 64
+const FOCUS_MARGIN_X = 110
+const FOCUS_MARGIN_TOP = 138
+const FOCUS_MARGIN_BOTTOM = 112
 
 export function getAdvancedCityCamera(
   scene: CitySceneDefinition,
@@ -32,7 +32,7 @@ export function getAdvancedCityCamera(
   const overview = { x: 0, y: 0, width: sourceSize.width, height: sourceSize.height }
   const viewBoxRect = viewMode === 'overview'
     ? overview
-    : fitRectToAspect(expandRect(contentBounds(scene, facilities), FOCUS_MARGIN), viewportSize, sourceSize)
+    : fitRectToAspect(contentBounds(scene, facilities), viewportSize, sourceSize)
 
   return {
     preserveAspectRatio: 'xMidYMid meet',
@@ -46,41 +46,30 @@ function contentBounds(
   scene: CitySceneDefinition,
   facilities: readonly CityPhysicalFacilityDefinition[],
 ): CityCameraRect {
-  const points = [
-    ...scene.mainRoad.points,
-    ...scene.mainRoad.points.flatMap((point) => [
-      { x: point.x - VEHICLE_HALF_WIDTH, y: point.y - VEHICLE_TOP_OFFSET },
-      { x: point.x + VEHICLE_HALF_WIDTH, y: point.y - VEHICLE_TOP_OFFSET },
-      { x: point.x - VEHICLE_HALF_WIDTH, y: point.y + VEHICLE_LABEL_BOTTOM_OFFSET },
-      { x: point.x + VEHICLE_HALF_WIDTH, y: point.y + VEHICLE_LABEL_BOTTOM_OFFSET },
-    ]),
+  const { minU, maxU, minV, maxV } = scene.gridBounds
+  const points: CityPoint[] = [
+    isoPoint(minU, minV, 0),
+    isoPoint(maxU, minV, 0),
+    isoPoint(maxU, maxV, 0),
+    isoPoint(minU, maxV, -42),
+    ...scene.routes.flatMap((route) => route.points),
     ...facilities.flatMap((facility) => [
       facility.position,
-      { x: facility.position.x - 180, y: facility.position.y - 112 },
-      { x: facility.position.x + 180, y: facility.position.y - 112 },
-      { x: facility.position.x - 180, y: facility.position.y + 8 },
-      { x: facility.position.x + 180, y: facility.position.y + 8 },
-      { x: facility.position.x - 180, y: facility.position.y + 100 },
-      { x: facility.position.x + 180, y: facility.position.y + 100 },
+      { x: facility.position.x, y: facility.position.y - facility.footprint.height - 60 },
       ...pointsFromPath(facility.hitAreaPath),
     ]),
   ]
   const xs = points.map((point) => point.x)
   const ys = points.map((point) => point.y)
+  const minX = Math.min(...xs) - FOCUS_MARGIN_X
+  const maxX = Math.max(...xs) + FOCUS_MARGIN_X
+  const minY = Math.min(...ys) - FOCUS_MARGIN_TOP
+  const maxY = Math.max(...ys) + FOCUS_MARGIN_BOTTOM
   return {
-    x: Math.min(...xs),
-    y: Math.min(...ys),
-    width: Math.max(...xs) - Math.min(...xs),
-    height: Math.max(...ys) - Math.min(...ys),
-  }
-}
-
-function expandRect(rect: CityCameraRect, margin: number): CityCameraRect {
-  return {
-    x: rect.x - margin,
-    y: rect.y - margin,
-    width: rect.width + margin * 2,
-    height: rect.height + margin * 2,
+    x: minX,
+    y: minY,
+    width: maxX - minX,
+    height: maxY - minY,
   }
 }
 

@@ -1,5 +1,6 @@
 export type CityNodeKind =
   | 'producer'
+  | 'serializer'
   | 'partition'
   | 'broker'
   | 'replica'
@@ -11,6 +12,18 @@ export type CityNodeKind =
   | 'transaction'
   | 'generic'
 
+export type CityDirection = 'ne' | 'se' | 'sw' | 'nw'
+
+export type CityBuildingArchetype =
+  | 'warehouse'
+  | 'gate'
+  | 'hub'
+  | 'tower'
+  | 'loop'
+  | 'vault'
+  | 'checkpoint'
+  | 'factory'
+
 export type CityVisualState = 'idle' | 'active' | 'blocked' | 'failed' | 'complete' | 'muted'
 export type CityRouteKind = 'data' | 'replication' | 'control' | 'retry' | 'return' | 'transaction'
 export type CityCarrierKind = 'record' | 'retry-record' | 'offset-ticket' | 'ghost-record'
@@ -21,21 +34,45 @@ export interface CityPoint {
   y: number
 }
 
+export interface CityGridCoord {
+  u: number
+  v: number
+}
+
 export interface CitySize {
   width: number
+  height: number
+}
+
+export interface CityBuildingFootprint {
+  u: number
+  v: number
   height: number
 }
 
 export interface CityNodeDefinition {
   id: string
   kind: CityNodeKind
+  archetype: CityBuildingArchetype
+  facilityId: string
   label: string
   description: string
+  grid: CityGridCoord
   position: CityPoint
-  roadAccessIndex: number
   hitAreaPath: string
   size?: CitySize
   ariaLabel?: string
+}
+
+export interface CityPhysicalFacilityDefinition {
+  id: string
+  label: string
+  koreanLabel: string
+  archetype: CityBuildingArchetype
+  grid: CityGridCoord
+  position: CityPoint
+  footprint: CityBuildingFootprint
+  hitAreaPath: string
 }
 
 export interface CityCheckpointDefinition {
@@ -57,20 +94,6 @@ export interface CityRouteDefinition {
   label?: string
 }
 
-export interface CityMainRoadDefinition {
-  id: string
-  path: string
-  points: readonly CityPoint[]
-}
-
-export interface CityPhysicalFacilityDefinition {
-  id: string
-  label: string
-  position: CityPoint
-  roadAccessIndex: number
-  hitAreaPath: string
-}
-
 export interface CityBoundaryDefinition {
   id: string
   kind: 'transaction'
@@ -79,11 +102,19 @@ export interface CityBoundaryDefinition {
   nodeIds: readonly string[]
 }
 
+export interface CityGridBounds {
+  minU: number
+  maxU: number
+  minV: number
+  maxV: number
+}
+
 export interface CitySceneDefinition {
   id: string
+  chapterId: number
   label: string
   viewport: CitySize
-  mainRoad: CityMainRoadDefinition
+  gridBounds: CityGridBounds
   physicalFacilities: readonly CityPhysicalFacilityDefinition[]
   initialVehicleRouteId: string
   nodes: readonly CityNodeDefinition[]
@@ -150,10 +181,12 @@ export interface CityRouteState extends CityRouteDefinition {
 
 export interface CityCarrierState extends CityCarrierChange {
   id: string
-  // Cue count describes visual sources, never the number of Kafka records.
   cueLabels: readonly string[]
   cueCount: number
-  roadProgress: number
+  routeProgress: number
+  journeyProgress: number
+  position: CityPoint
+  heading: CityDirection
   sourceCarrierId: string
 }
 

@@ -1,4 +1,4 @@
-import type { CityPoint } from './types'
+import type { CityDirection, CityPoint } from './types'
 
 export interface PolylineSegmentProjection {
   point: CityPoint
@@ -40,6 +40,76 @@ export function interpolatePolyline(points: readonly CityPoint[], progress: numb
   }
 
   return points.at(-1) ?? fallback
+}
+
+/**
+ * Determines the 4-way isometric heading ('ne' | 'se' | 'sw' | 'nw') at a given progress along a polyline.
+ */
+export function headingAtPolylineProgress(points: readonly CityPoint[], progress: number): CityDirection {
+  const bounded = clampProgress(progress)
+  const total = polylineLength(points)
+  if (total === 0) return 'ne'
+
+  const target = total * bounded
+  let traveled = 0
+  for (let index = 1; index < points.length; index += 1) {
+    const start = points[index - 1]!
+    const end = points[index]!
+    const segmentLength = distanceBetween(start, end)
+    if (segmentLength === 0) continue
+
+    if (traveled + segmentLength >= target || index === points.length - 1) {
+      return directionFromVector(end.x - start.x, end.y - start.y)
+    }
+    traveled += segmentLength
+  }
+
+  return 'ne'
+}
+
+/**
+ * Extracts a contiguous sub-polyline between two progress values (supports forward and reverse slices).
+ */
+export function slicePolylineByProgress(
+  points: readonly CityPoint[],
+  startProgress: number,
+  endProgress: number,
+): readonly CityPoint[] {
+  const start = clampProgress(startProgress)
+  const end = clampProgress(endProgress)
+  const startPoint = interpolatePolyline(points, start)
+  const endPoint = interpolatePolyline(points, end)
+  const total = polylineLength(points)
+  if (total === 0 || Math.abs(end - start) < 0.0001) {
+    return [startPoint, endPoint]
+  }
+
+  const forward = end >= start
+  const minP = Math.min(start, end)
+  const maxP = Math.max(start, end)
+  const collected: CityPoint[] = [interpolatePolyline(points, minP)]
+
+  let traveled = 0
+  for (let index = 1; index < points.length; index += 1) {
+    const prev = points[index - 1]!
+    const curr = points[index]!
+    traveled += distanceBetween(prev, curr)
+    const vertexProgress = traveled / total
+    if (vertexProgress > minP + 0.0001 && vertexProgress < maxP - 0.0001) {
+      collected.push(curr)
+    }
+  }
+
+  collected.push(interpolatePolyline(points, maxP))
+  return forward ? collected : [...collected].reverse()
+}
+
+export function directionFromVector(dx: number, dy: number): CityDirection {
+  if (Math.abs(dx) < 0.001 && Math.abs(dy) < 0.001) return 'ne'
+  if (dx >= 0) {
+    return dy <= 0 ? 'ne' : 'se'
+  }
+  return dy >= 0 ? 'sw' : 'nw'
 }
 
 export function nearestPointOnPolyline(points: readonly CityPoint[], point: CityPoint): PolylineSegmentProjection {

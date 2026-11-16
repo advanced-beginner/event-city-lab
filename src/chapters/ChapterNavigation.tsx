@@ -1,5 +1,5 @@
-import styles from '../App.module.css'
 import { chapterHash } from '../routing/chapterRoute'
+import styles from '../styles/LabWorkspace.module.css'
 import { CHAPTERS, type ChapterId } from './registry'
 
 interface ChapterNavigationProps {

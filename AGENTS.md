@@ -64,11 +64,10 @@
 - 핵심 조작은 키보드로 가능해야 하며 SVG 시설에는 접근 가능한 이름을 제공한다.
 - Producer, Serializer, Broker 시설과 메시지 차량의 identity를 챕터 흐름 전체에서 일관되게 유지한다.
 - 외부 유료·Pro·워터마크 자산을 복제하거나 배포 산출물에 포함하지 않는다. 새 SVG는 독립적으로 제작하고 `xlink`를 사용하지 않는다.
-- Chapter 1 도시는 사용자 승인 단일 배경 `src/assets/city/background/event-city-main.webp`를 SVG `<image>`로 배치한다. 도로·일반 건물·공원·나무를 별도 sprite로 재조립하거나 배경 위에 중복 배치하지 않는다.
-- 배경 중앙의 큰 건물 세 개를 왼쪽부터 Producer 출발센터, Serializer 검사소, Broker 기록센터로 사용한다. 클릭 영역, 접근 가능한 이름, 상태 램프·오류 표지·ACK와 도착 문자는 동적 SVG overlay로 유지한다.
-- 기존 도시 master와 building/facility/road/park/tree sprite는 폐기됐으며 복원하지 않는다. `src/assets/city/sprites/`에는 `vehicle-*` 이미지만 유지하고 실제 runtime은 움직이는 Kafka 밴만 명시적으로 import한다.
-- 차량 sprite는 `image-rendering: pixelated`와 bottom-center anchor를 유지한다. 주행 checkpoint는 배경 속 실제 도로 위에 놓고, 후면이 좌하단·전면이 우상단인 `vehicle-kafka-van-northeast`를 회전 없이 사용한다.
-- 자산 출처·건물 매핑·runtime 사용 여부는 `src/assets/city/manifest.json`, 공통 색상은 `src/assets/city/palette.json`을 기준으로 한다. runtime 도시 이미지 합계는 1.5MB 이하로 관리한다.
+- Chapter 1–8 도시는 외부 비트맵 배경(`webp`/`png`)이나 스프라이트를 사용하지 않고, `src/city/isometric.ts`와 `src/components/IsometricDioramaStage.tsx`가 생성하는 **단일 2:1 Isometric Vector Diorama (SVG + CSS)**로 통합 렌더링한다.
+- 모든 시설과 도로·교차로·회차로는 2:1 등각 그리드(`1600×900` 표준 viewBox) 위에서 수학적으로 생성해 건물 입출구와 도로 시작점의 오차를 0px로 유지한다. 3-포인트 라이팅(Top 100%, Left 82%, Right 64% 명도), Diorama Cutaway Base, Z축 등장/호버 부유, `조립 뷰 / 분해 뷰` 토글을 일관되게 유지한다.
+- 모든 우편 배송 차량(`IsometricPostalVan`)은 순수 SVG 폴리곤으로 제작되어 진행 방향(`ne`, `se`, `sw`, `nw`)에 맞게 주행하며, `src/city/projection.ts`가 Waypoint Graph 기반 다중 분기(partition/replica) 및 회차(Retry Loop) 경로를 결정론적으로 투영한다.
+- 자산 규격과 컬러 토큰은 `src/assets/city/manifest.json`, `src/assets/city/palette.json`을 기준으로 관리한다.
 - Google Fonts가 실패해도 시스템 fallback으로 기능과 레이아웃이 유지되어야 한다.
 
 ### 의존성과 라이선스

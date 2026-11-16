@@ -35,20 +35,21 @@ describe('guided playback contract', () => {
     expect(carrierProgressAtCursor(scene, run.events, -1)).toBe(0)
   })
 
-  it('builds one time-scaled segment from carrier distance, dwell, and minimum display time', () => {
+  it('builds one time-scaled segment from carrier waypoint distance, dwell, and minimum display time', () => {
     const scene = getAdvancedChapterScene(2)
     const run = chapter2Run('stable-customer-key')
     const segment = createPlaybackSegment({
       currentProgress: 0,
-      cursor: -1,
+      cursor: 1,
       events: run.events,
       scene,
       speed: 1,
     })
 
     expect(segment).not.toBeNull()
-    expect(segment?.fromCursor).toBe(-1)
-    expect(segment?.toCursor).toBe(0)
+    expect(segment?.fromCursor).toBe(1)
+    expect(segment?.toCursor).toBe(2)
+    expect(segment?.moveDurationMs).toBeGreaterThan(0)
     expect(segment?.totalDurationMs).toBeGreaterThanOrEqual(MIN_EVENT_DISPLAY_MS)
     expect(segment?.totalDurationMs).toBeGreaterThanOrEqual((segment?.moveDurationMs ?? 0) + EVENT_DWELL_MS)
     expect(CARRIER_SPEED_PX_PER_SECOND).toBe(240)
@@ -57,9 +58,9 @@ describe('guided playback contract', () => {
   it('applies 0.5x and 2x only to display durations', () => {
     const scene = getAdvancedChapterScene(2)
     const run = chapter2Run('stable-customer-key')
-    const normal = createPlaybackSegment({ currentProgress: 0, cursor: -1, events: run.events, scene, speed: 1 })
-    const slow = createPlaybackSegment({ currentProgress: 0, cursor: -1, events: run.events, scene, speed: 0.5 })
-    const fast = createPlaybackSegment({ currentProgress: 0, cursor: -1, events: run.events, scene, speed: 2 })
+    const normal = createPlaybackSegment({ currentProgress: 0, cursor: 1, events: run.events, scene, speed: 1 })
+    const slow = createPlaybackSegment({ currentProgress: 0, cursor: 1, events: run.events, scene, speed: 0.5 })
+    const fast = createPlaybackSegment({ currentProgress: 0, cursor: 1, events: run.events, scene, speed: 2 })
 
     expect(slow?.moveDurationMs).toBeCloseTo((normal?.moveDurationMs ?? 0) * 2, 5)
     expect(slow?.totalDurationMs).toBeCloseTo((normal?.totalDurationMs ?? 0) * 2, 5)
@@ -176,24 +177,32 @@ describe('guided playback contract', () => {
     expect(retimed?.moveDurationMs).toBeLessThan(previousSegment.moveDurationMs)
   })
 
-  it('finds the latest observed logical event through a physical facility and does not jump to future events', () => {
-    const scene = getAdvancedChapterScene(2)
-    const run = chapter2Run('random-key-per-record')
+  it('finds the latest observed logical event through a grouped physical facility without jumping to future events', () => {
+    const scene = getAdvancedChapterScene(6)
+    const experiment = getChapterRule(6).experiments[0]!
+    const run = simulateChapterExperiment({
+      runId: 'playback-ch6',
+      seed: 2401,
+      chapterId: 6,
+      experimentId: experiment.id,
+      choiceId: 'add-consumers-only',
+    })
 
-    expect(nodeIdsForFacility(scene, 'partition-p1')).toEqual(['partition-p0', 'partition-p1', 'partition-p2'])
+    expect(nodeIdsForFacility(scene, 'slot-partitions')).toEqual(['partition-p0', 'partition-p1', 'partition-p2'])
     expect(inspectFacilityAtCursor({
-      cursor: 0,
+      cursor: -1,
       events: run.events,
-      facilityOrNodeId: 'partition-p1',
+      facilityOrNodeId: 'slot-consumers',
       scene,
     }).latestEventIndex).toBe(-1)
+
     const inspection = inspectFacilityAtCursor({
       cursor: run.events.length - 1,
       events: run.events,
-      facilityOrNodeId: 'partition-p1',
+      facilityOrNodeId: 'slot-consumers',
       scene,
     })
     expect(inspection.latestEventIndex).toBeGreaterThanOrEqual(0)
-    expect(inspection.latestNodeId).toBe('partition-p0')
+    expect(inspection.latestNodeId).toMatch(/^consumer-c/)
   })
 })

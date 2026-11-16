@@ -1,0 +1,419 @@
+.stageFrame {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 50% 42%, #ffffffaa 0%, #efede6 62%, #e6e3d8 100%),
+    repeating-linear-gradient(0deg, transparent, transparent 31px, #cbd5e130 32px),
+    repeating-linear-gradient(90deg, transparent, transparent 31px, #cbd5e130 32px);
+}
+
+.stageTopBar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 14px;
+  border-bottom: 1px solid #d5dbd9;
+  background: #ffffffd9;
+  backdrop-filter: blur(6px);
+  z-index: 4;
+}
+
+.toolbarGroup {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.districtTag {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: #334155;
+  font: 800 10px/1.2 var(--mono);
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.liveDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 0 3px #238a5b24;
+}
+
+.segmentedControl {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #f1f5f9;
+}
+
+.segmentedControl button {
+  height: 25px;
+  padding: 0 9px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #475569;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.segmentedControl button[aria-pressed='true'] {
+  background: #ffffff;
+  color: #0e7490;
+  box-shadow: 0 1px 3px #0f172a1f;
+}
+
+.explodeButton {
+  height: 29px;
+  padding: 0 11px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #334155;
+  font-size: 10px;
+  font-weight: 800;
+  transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease;
+}
+
+.explodeButton[aria-pressed='true'] {
+  border-color: #7c3aed;
+  background: #f3e8ff;
+  color: #5b21b6;
+}
+
+.legend {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #64748b;
+  font: 700 9px/1 var(--mono);
+}
+
+.legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.legend i {
+  width: 7px;
+  height: 7px;
+  display: inline-block;
+  transform: rotate(45deg);
+}
+
+.legendCyan { background: #06b6d4; }
+.legendViolet { background: #7c3aed; }
+.legendRed { background: #e11d48; }
+.legendGreen { background: #10b981; }
+
+.cityHud {
+  flex: 0 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 7px 14px 2px;
+  z-index: 3;
+}
+
+.hudChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 999px;
+  background: #fffffff2;
+  color: #1e293b;
+  font: 700 10px/1.2 var(--mono);
+  box-shadow: 0 2px 8px #0f172a14;
+}
+
+.hud_blocked,
+.hud_failed {
+  border-color: #fda4af;
+  background: #fff1f2;
+  color: #be123c;
+}
+
+.hud_complete {
+  border-color: #6ee7b7;
+  background: #ecfdf5;
+  color: #047857;
+}
+
+.hud_active {
+  border-color: #67e8f9;
+  background: #ecfeff;
+  color: #0e7490;
+}
+
+.canvasWrapper {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+  padding: 4px 10px 76px;
+}
+
+.worldSvg {
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
+  overflow: visible;
+  user-select: none;
+}
+
+/* Cutaway Diorama Base */
+.baseShadow { fill: #64748b; opacity: 0.24; }
+.baseSubLeft { fill: #090d16; stroke: #020617; stroke-width: 1.5; }
+.baseSubRight { fill: #050810; stroke: #020617; stroke-width: 1.5; }
+.baseLeft { fill: #162032; stroke: #0f172a; stroke-width: 1.5; }
+.baseRight { fill: #0f172a; stroke: #090d16; stroke-width: 1.5; }
+.baseDeck { stroke: #334155; stroke-width: 2; }
+.baseRimHighlight { fill: none; stroke: #64748b; stroke-width: 1.8; opacity: 0.65; }
+.gridLines path { fill: none; stroke: #334155; stroke-width: 1; opacity: 0.45; }
+
+/* Streets & Conduits */
+.streetRoute path { fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.roadCurb { stroke: #090d16; stroke-width: 26; }
+.roadAsphalt { stroke: #334155; stroke-width: 19; }
+.roadCenterLine { stroke: #94a3b8; stroke-width: 2; stroke-dasharray: 8 9; opacity: 0.6; }
+.roadStatusBeam { stroke: #22d3ee; stroke-width: 5.5; opacity: 0.92; }
+
+.conduitRoute path { fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.conduitHalo { stroke: #0f172a; stroke-width: 8; opacity: 0.5; }
+.conduitLine { stroke: #64748b; stroke-width: 3.5; stroke-dasharray: 6 6; opacity: 0.72; }
+
+.route_active .roadStatusBeam,
+.route_active .conduitLine { stroke: #22d3ee; opacity: 1; }
+.route_complete .roadStatusBeam,
+.route_complete .conduitLine { stroke: #10b981; opacity: 1; }
+.route_blocked .roadStatusBeam,
+.route_blocked .conduitLine { stroke: #f59e0b; opacity: 1; }
+.route_failed .roadStatusBeam,
+.route_failed .conduitLine { stroke: #f43f5e; stroke-dasharray: 7 8; opacity: 1; }
+.route_muted .roadAsphalt { stroke: #1e293b; }
+.routeDisabled { opacity: 0.58; }
+
+.previewRoute .roadStatusBeam,
+.previewRoute .conduitLine { stroke: #a78bfa; opacity: 1; }
+
+.flowPulse {
+  stroke-dasharray: 12 10;
+  animation: isoFlowDash 0.85s linear infinite;
+}
+
+@keyframes isoFlowDash {
+  from { stroke-dashoffset: 44; }
+  to { stroke-dashoffset: 0; }
+}
+
+/* Staggered Z-axis extrusion & hover levitation */
+.facilityExtrude {
+  animation: isoExtrudeUp 540ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: calc(var(--stagger-index, 0) * 55ms);
+}
+
+@keyframes isoExtrudeUp {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.facility { cursor: pointer; outline: none; }
+.hitArea { fill: transparent; stroke: none; }
+.buildingShadow { fill: #020617; opacity: 0.36; transition: opacity 180ms ease; }
+.layerBody,
+.layerRoof { transition: transform 260ms cubic-bezier(0.22, 1, 0.36, 1); }
+
+.facility:hover .buildingAssembly,
+.facility:focus-visible .buildingAssembly {
+  transform: translateY(-7px);
+}
+.buildingAssembly { transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1); }
+
+.buildingFocusRing {
+  fill: none;
+  stroke: transparent;
+  stroke-width: 3;
+  stroke-linejoin: round;
+  transition: stroke 180ms ease;
+}
+.facility:hover .buildingFocusRing { stroke: #38bdf8; }
+.facility:focus-visible .buildingFocusRing,
+.focused .buildingFocusRing { stroke: #22d3ee; filter: url(#iso-glow-cyan); }
+.settingFocused .buildingFocusRing,
+.previewFacility .buildingFocusRing { stroke: #a78bfa; filter: url(#iso-glow-violet); }
+.state_failed .buildingFocusRing { stroke: #f43f5e; }
+.state_complete .buildingFocusRing { stroke: #10b981; }
+
+/* Facility Nameplates */
+.facilitySign rect {
+  fill: #0f172af2;
+  stroke: #475569;
+  stroke-width: 1.4;
+  filter: drop-shadow(0 4px 8px #0206174d);
+}
+.focused .facilitySign rect { stroke: #22d3ee; stroke-width: 2; }
+.state_failed .facilitySign rect { stroke: #f43f5e; stroke-width: 2; }
+.state_complete .facilitySign rect { stroke: #10b981; stroke-width: 2; }
+.previewFacility .facilitySign rect { stroke: #a78bfa; stroke-width: 2; }
+
+.stateLamp { fill: #94a3b8; }
+.stateLamp[data-state='active'] { fill: #22d3ee; }
+.stateLamp[data-state='complete'] { fill: #10b981; }
+.stateLamp[data-state='blocked'] { fill: #f59e0b; }
+.stateLamp[data-state='failed'] { fill: #f43f5e; }
+
+.signTitle {
+  fill: #f8fafc;
+  font: 800 10.5px/1 "Nanum Gothic", sans-serif;
+}
+.signStatus {
+  fill: #cbd5e1;
+  font: 700 9.5px/1 var(--mono);
+}
+
+.errorCallout rect {
+  fill: #e11d48;
+  stroke: #ffe4e6;
+  stroke-width: 1.5;
+}
+.errorCallout text {
+  fill: #ffffff;
+  font: 800 10.5px/1 var(--mono);
+}
+
+.logicalPill rect,
+.logicalSummaryPill rect {
+  fill: #ffffffeb;
+  stroke: #cbd5e1;
+  stroke-width: 1.2;
+}
+.logicalPill text,
+.logicalSummaryPill text {
+  fill: #1e293b;
+  font: 800 9.5px/1 var(--mono);
+}
+.logicalPill[data-logical-preview='true'] rect,
+.logicalSummaryPill[data-logical-preview='true'] rect {
+  fill: #f3e8ff;
+  stroke: #7c3aed;
+  stroke-width: 1.8;
+}
+.logicalPill[data-logical-state='failed'] rect {
+  fill: #ffe4e6;
+  stroke: #e11d48;
+}
+.logicalPill[data-logical-state='complete'] rect {
+  fill: #d1fae5;
+  stroke: #10b981;
+}
+
+/* Carrier Vehicles */
+.carrierAlert circle { fill: #e11d48; stroke: #ffffff; stroke-width: 2; }
+.carrierAlert text { fill: #ffffff; font: 900 13px/1 var(--mono); }
+.ticketText { fill: #ecfeff; font: 900 8px/1 var(--mono); }
+
+.cargoLabel rect {
+  fill: #fffbebf2;
+  stroke: #d97706;
+  stroke-width: 1.4;
+  filter: drop-shadow(0 3px 6px #02061740);
+}
+.cargoLabel text {
+  fill: #78350f;
+  font: 800 9.5px/1 var(--mono);
+}
+.carrierState_failed .cargoLabel rect {
+  fill: #fff1f2f5;
+  stroke: #e11d48;
+}
+.carrierState_failed .cargoLabel text { fill: #9f1239; }
+
+/* Signal & Barrier */
+.signalTrack {
+  fill: none;
+  stroke: #0f172a;
+  stroke-width: 8;
+  stroke-linecap: round;
+  opacity: 0.45;
+}
+.signalPulseLine {
+  fill: none;
+  stroke-width: 4;
+  stroke-linecap: round;
+  stroke-dasharray: 10 8;
+  animation: isoFlowDash 0.7s linear infinite;
+}
+.signal_success .signalPulseLine { stroke: #34d399; }
+.signal_control .signalPulseLine { stroke: #a78bfa; }
+.signal_failed .signalPulseLine { stroke: #fb7185; }
+
+.signalBeacon circle:first-child { fill: none; stroke-width: 2.5; opacity: 0.7; }
+.signalBeacon circle:last-child { stroke: #ffffff; stroke-width: 1.5; }
+.signal_success .signalBeacon circle:first-child { stroke: #34d399; }
+.signal_success .signalBeacon circle:last-child { fill: #10b981; }
+.signal_control .signalBeacon circle:first-child { stroke: #a78bfa; }
+.signal_control .signalBeacon circle:last-child { fill: #7c3aed; }
+.signal_failed .signalBeacon circle:first-child { stroke: #fb7185; }
+.signal_failed .signalBeacon circle:last-child { fill: #e11d48; }
+
+.ackCardButton { cursor: pointer; outline: none; }
+.ackCard rect {
+  fill: #ecfdf5f7;
+  stroke: #10b981;
+  stroke-width: 2;
+  filter: drop-shadow(0 8px 18px #022c2240);
+}
+.ackTitle { fill: #065f46; font: 800 11px/1 "Nanum Gothic", sans-serif; }
+.ackMeta { fill: #047857; font: 700 9px/1 var(--mono); }
+
+/* Reduced Motion */
+.reduced .facilityExtrude,
+.reduced .flowPulse,
+.reduced .signalPulseLine {
+  animation: none !important;
+}
+.reduced .layerBody,
+.reduced .layerRoof,
+.reduced .buildingAssembly {
+  transition: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .facilityExtrude,
+  .flowPulse,
+  .signalPulseLine {
+    animation: none !important;
+  }
+  .layerBody,
+  .layerRoof,
+  .buildingAssembly {
+    transition: none !important;
+  }
+}

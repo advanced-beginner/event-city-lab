@@ -308,26 +308,29 @@ function carrierChangesFor(
     }
   }
 
+  const checkpointKey = context.event.kind === 'experiment.succeeded' ? 'end' : 'mid'
+  const progressValue = context.event.kind === 'experiment.succeeded' ? 1 : undefined
+
   if (context.event.component === 'offset' || routeId.includes('offset')) {
     return {
-      offset: { kind: 'offset-ticket', routeId, checkpointId: `${routeId}:mid`, progress: 0.64, state: context.event.state, label: context.event.title },
+      offset: { kind: 'offset-ticket', routeId, checkpointId: `${routeId}:${checkpointKey}`, progress: progressValue ?? 0.64, state: context.event.state, label: context.event.title },
     }
   }
 
   if (context.chapterId === 7 && context.experimentId === 'dead-letter-evidence' && context.sequence >= 1) {
     return {
-      manifest: { kind: 'retry-record', routeId, checkpointId: `${routeId}:mid`, progress: 0.68, state: context.event.state, label: context.choiceId === 'publish-dlt-with-context' ? 'DLT manifest' : 'DLT payload' },
+      manifest: { kind: 'retry-record', routeId, checkpointId: `${routeId}:${checkpointKey}`, progress: progressValue ?? 0.68, state: context.event.state, label: context.choiceId === 'publish-dlt-with-context' ? 'DLT manifest' : 'DLT payload' },
     }
   }
 
   if (context.chapterId === 7 && routeId.includes('retry')) {
     return {
-      retry: { kind: 'retry-record', routeId, checkpointId: `${routeId}:mid`, progress: 0.58, state: context.event.state, label: context.event.title },
+      retry: { kind: 'retry-record', routeId, checkpointId: `${routeId}:${checkpointKey}`, progress: progressValue ?? 0.58, state: context.event.state, label: context.event.title },
     }
   }
 
   return {
-    active: { kind: 'record', routeId, checkpointId: `${routeId}:mid`, progress: 0.52, state: context.event.state, label: context.event.title },
+    active: { kind: 'record', routeId, checkpointId: `${routeId}:${checkpointKey}`, progress: progressValue ?? 0.52, state: context.event.state, label: context.event.title },
   }
 }
 
