@@ -197,4 +197,35 @@ describe('GuidedChapterLab', () => {
     expect(screen.queryByTitle('업무 ordering key가 불안정하다')).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: '예측한 조건 실행' })).toBeDisabled()
   })
+
+  it('surfaces misconception, config-before-prediction flow, action guide, and takeaway on direct success', async () => {
+    vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => window.setTimeout(() => cb(0), 16))
+    vi.stubGlobal('cancelAnimationFrame', (handle: number) => window.clearTimeout(handle))
+    render(<GuidedChapterLab chapter={getChapter(2)} />)
+
+    expect(screen.getByText('⚠️ 흔한 오해')).toBeVisible()
+    expect(screen.getByText('Kafka topic 전체에 하나의 전역 순서가 보장된다고 생각한다.')).toBeVisible()
+    expect(screen.getByLabelText('실험 학습 안내')).toHaveTextContent('같은 key를 가진 이벤트들이 어느 partition으로 가는지 예측한다.')
+
+    const choicesLegend = screen.getByText('실행 설정')
+    const promptHeading = screen.getByText('이 설정의 결과를 예측하세요')
+    expect(
+      choicesLegend.compareDocumentPosition(promptHeading) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
+    expect(screen.getByText(/지금 할 일 · 1·2단계 설정 확인 후 3단계 결과를 예측하세요/)).toBeVisible()
+
+    // Succeed directly on first run without running the trap first
+    fireEvent.click(screen.getByLabelText(/customerId를 key로 사용/))
+    fireEvent.click(screen.getByRole('button', { name: '성공한다' }))
+    fireEvent.click(screen.getByRole('button', { name: '예측한 조건 실행' }))
+    await waitFor(() => expect(mocks.runChapterSimulation).toHaveBeenCalledTimes(1))
+    fireEvent.click(await screen.findByTitle('고객별 순서 경계가 만들어졌다'))
+
+    const takeaway = screen.getByLabelText('핵심 깨달음 및 실무 주의사항')
+    expect(takeaway).toBeVisible()
+    expect(takeaway).toHaveTextContent('같은 key는 같은 partition으로 라우팅되고 그 partition 안에서 기록 순서가 유지된다.')
+    expect(takeaway).toHaveTextContent('고객별 순서를 얻는 대신 특정 고객 key에 트래픽이 몰리면 partition 편향이 생길 수 있다.')
+    expect(takeaway).toHaveTextContent('custom partitioner가 있으면 기본 key 기반 선택 규칙이 달라질 수 있음을 표시한다.')
+    expect(screen.getByText(/지금 할 일 · 핵심 교훈과 Trade-off를 확인하세요/)).toBeVisible()
+  })
 })

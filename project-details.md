@@ -4,14 +4,14 @@
 
 이 문서는 Event City Lab의 제품 흐름, 챕터별 구현 상태, 기술적 동작, 검증 결과, 알려진 미비점과 TODO를 관리하는 단일 기록이다.
 
-- 기록 기준일: 2026-11-16
+- 기록 기준일: 2026-11-17
 - 기준 브랜치: `main`
 - Chapter 1 기준 구현 커밋: `db7e918` (`실패를 도시 배송 경험으로 이해할 수 있게 한다`)
 - App version: `0.2.0`
 - Content version: `2026.2`
 - Kafka rule basis: `4.3.1`
 - Storage schema: `2` (`v1` 자동 migration)
-- 현재 판정: Chapter 1–8 전체의 도시 렌더링과 경로 엔진을 외부 비트맵 없는 순수 2:1 Isometric SVG 디오라마(`IsometricDioramaStage`)와 연결 Waypoint Graph 주행 엔진으로 Zero-base 재구축 완료. Chapter 1과 Chapter 2–8의 워크스페이스 셸 Look & Feel(`LabWorkspace.module.css`)을 단일 시스템으로 통합했다. 최신 검증 범위는 §8의 2026-11-16 기록을 따른다.
+- 현재 판정: Chapter 1–8 전체의 도시 렌더링과 경로 엔진을 순수 2:1 Isometric SVG 디오라마(`IsometricDioramaStage`)와 연결 Waypoint Graph 주행 엔진으로 Zero-base 재구축 완료한 데 이어, 각 챕터의 **실험 목적 · 흔한 오해 · 4단계 진행 스텝퍼 · 단계별 행동 지침 · 핵심 깨달음(Trade-off 포함)** UI/콘텐츠 배선을 Chapter 1–8 전체에 통일 적용했다. 최신 검증 범위는 §8의 2026-11-17 기록을 따른다.
 
 ## 2. 제품 목표
 
@@ -321,6 +321,14 @@ Chapter 1 light-city 구현에서 확인한 내용:
 - `src/city/projection.ts`와 `guidedPlayback.ts`에서 단조 증가 직선 제약을 제거하고 Chapter 1 cue 어댑터(`createChapterOneCuedEvents`), A→B→C 연속 주행, 파티션/복제 다중 분기 차량 동시 투영(`vehicle` + `branch-*`), Retry 회차 루프·DLT 분기(`resolveTransitionPolyline`)를 구현했다.
 - `src/components/IsometricDioramaStage.tsx`와 `src/styles/LabWorkspace.module.css`로 Chapter 1–8의 중앙 디오라마와 3열 워크스페이스·3탭 증거 패널(`로그 / 분석 / 비교`)·타임라인 UI를 단일 Look & Feel로 통합하고 `조립 뷰 / 분해 뷰(Exploded View)`, Staggered Z-axis extrusion, 호버 부유(Levitation) 모션을 추가했다.
 - 최종 검증(2026-11-16): `npm run typecheck`, `npm run test:run`(Vitest 31파일 212개), `npm run build` 통과 및 Chromium `1280×720`, `1440×900`, `1920×1080` Playwright E2E 42개 테스트 전수 통과를 확인했다(Firefox·WebKit 크로스 브라우저는 본 턴에서 미실행).
+
+2026-11-17 Chapter 1–8 학습 목적 · 흔한 오해 · 단계별 행동 가이드 · 핵심 깨달음 UX 고도화:
+
+- `src/content/chapterScenarioSpecs.ts`에 `chapterOneScenarioSpec` 및 `getExperimentScenarioSpec()`을 추가해, 기존에 UI와 분리되어 있던 `misconception`, `failureOrQuestion`, `repairOrConclusion`, `accuracyNotes` 데이터를 Chapter 1–8 워크스페이스에 직접 연결했다.
+- `src/styles/LabWorkspace.module.css`, `src/components/GuidedChapterLab.tsx`, `src/App.tsx`의 상단 브리핑 바(`66px`)를 **`[실험 목적] · [⚠️ 흔한 오해] · [4단계 진행 스텝퍼(Step 1~4)]`** 구조로 개편했다.
+- Chapter 2–8 좌측 패널의 인지 순서를 **`① 실험 선택 → ② 실행 설정 확인·변경(초기 실험 설정 / 권장 수정 후보 배지) → ③ 결과 예측 → ④ 👉 지금 할 일 행동 배너 + 실행 버튼`**으로 교정하고, Chapter 1에도 동일한 `지금 할 일` 배너를 적용했다.
+- 우측 증거 패널의 `로그` 탭 상단에 **`[🎯 이 실험이 알려주고자 하는 것]`** 브리핑 카드를 상설화하고, 실패 시 **`[❌ 왜 실패했는가 → 🔧 지금 수정해야 할 설정]`** 대조 박스와 원클릭 적용 버튼(Chapter 1 `권장 설정(JsonSerializer) 바로 적용` 포함), 성공 시 이전 실패 유무와 무관하게 항상 유지되는 **`[💡 여기에서 우리가 알 수 있는 것]`**(핵심 결론 + `⚖️ 실무 Trade-off` + `⚠️ Kafka 4.3 주의사항`) 카드를 추가했다.
+- 최종 검증(2026-11-17): `npm run typecheck`, `npm run test:run`(Vitest 31파일 214개), `npm run build` 통과 및 Chromium `1280×720`, `1440×900`, `1920×1080` Playwright E2E 42개 테스트(`--workers=3`) 전수 통과를 확인했다(Firefox·WebKit 크로스 브라우저는 본 턴에서 미실행, GitHub Actions CI 워크플로에서 크로스 브라우저 126개 검증 예정).
 
 ## 9. 알려진 미비점
 

@@ -7,7 +7,14 @@ import { createChapterOneCuedEvents } from './city/projection'
 import type { CitySize } from './city/types'
 import { ChapterNavigation } from './chapters/ChapterNavigation'
 import { getChapter, type ChapterMetadata } from './chapters/registry'
-import { GuidedChapterLab } from './components/GuidedChapterLab'
+import {
+  ActionGuideBanner,
+  GuidedChapterLab,
+  LearningBriefingCard,
+  LearningTakeawayCard,
+  StepTracker,
+  type LearningStep,
+} from './components/GuidedChapterLab'
 import {
   carrierProgressAtCursor,
   createPlaybackSegment,
@@ -17,6 +24,8 @@ import {
   type PlaybackSpeed,
 } from './components/guidedPlayback'
 import { IsometricDioramaStage } from './components/IsometricDioramaStage'
+import { chapterOneScenarioSpec } from './content/chapterScenarioSpecs'
+import { kafkaReferences } from './content/kafkaReferences'
 import {
   APP_VERSION,
   CONTENT_VERSION,
@@ -168,6 +177,59 @@ function ChapterOneLab({ chapter }: { chapter: ChapterMetadata }) {
   const isPendingRerun = Boolean(
     activeRun?.status === 'failed' && activeRun.config.serializer !== state.config.serializer,
   )
+  const chapterOneExperimentSpec = chapterOneScenarioSpec.experiments[0]
+  const chapterOneReferences = kafkaReferences.filter((reference) =>
+    chapterOneScenarioSpec.references.includes(reference.id),
+  )
+  const currentStep: LearningStep = isPendingRerun
+    ? 3
+    : activeRun && isTerminal && activeRun.status === 'failed'
+      ? 2
+      : activeRun && isTerminal && activeRun.status === 'succeeded'
+        ? 4
+        : activeRun && state.eventCursor >= 0
+          ? 2
+          : 1
+  const currentSerializerLabel = state.config.serializer === 'string' ? 'StringSerializer' : 'JsonSerializer'
+  const actionGuide: {
+    tone: 'ready' | 'failed' | 'pending' | 'succeeded'
+    title: string
+    detail: string
+  } = isPendingRerun
+    ? {
+        tone: 'pending',
+        title: '바뀐 설정으로 다시 보내세요',
+        detail: 'JsonSerializer가 적용 대기 중입니다. 아래 [같은 메시지 다시 보내기]로 재실행하세요.',
+      }
+    : activeRun && isTerminal && activeRun.status === 'failed'
+      ? {
+          tone: 'failed',
+          title: '원인을 읽고 value.serializer를 변경하세요',
+          detail: "우측 [분석] 탭에서 실패 지점을 확인한 뒤 'JsonSerializer'로 바꾸세요.",
+        }
+      : activeRun && isTerminal && activeRun.status === 'succeeded'
+        ? {
+            tone: 'succeeded',
+            title: '핵심 교훈과 Trade-off를 확인하세요',
+            detail: '우측 [비교]·[분석] 탭에서 Serializer 실행 위치와 JSON Trade-off를 확인하세요.',
+          }
+        : activeRun && state.eventCursor >= 0
+          ? {
+              tone: 'ready',
+              title: '메시지 이동과 이벤트를 관찰하세요',
+              detail: '타임라인 끝까지 재생하거나 마지막 사건을 눌러 처리 결과를 확인하세요.',
+            }
+          : state.config.serializer === 'string'
+            ? {
+                tone: 'ready',
+                title: '현재 설정 그대로 첫 메시지를 보내 보세요',
+                detail: 'StringSerializer 상태에서 [첫 메시지 보내기]를 눌러 어느 지점에서 멈추는지 관찰하세요.',
+              }
+            : {
+                tone: 'ready',
+                title: 'JsonSerializer로 첫 메시지를 보내 보세요',
+                detail: 'OrderEvent가 JSON byte[]로 직렬화되어 Broker와 ACK까지 도달하는지 확인하세요.',
+              }
 
   const cuedEvents = useMemo(
     () => createChapterOneCuedEvents(activeRun, isPendingRerun),
@@ -480,12 +542,25 @@ function ChapterOneLab({ chapter }: { chapter: ChapterMetadata }) {
       </header>
 
       <section className={styles.missionStrip} aria-labelledby="briefing-title">
-        <div className={styles.missionTitle}>
+        <div className={styles.missionPrimary}>
           <span className={styles.sectionIndex}>01</span>
-          <div><p className={styles.kicker}>BRIEFING</p><h2 id="briefing-title">주문 이벤트를 <code>orders.v1</code>으로 보내세요.</h2></div>
+          <div>
+            <div className={styles.missionTitle}>
+              <span className={styles.purposeTag}>실험 목적</span>
+              <h2 id="briefing-title">주문 이벤트를 <code>orders.v1</code>으로 보내세요.</h2>
+            </div>
+            <p>실패 지점과 로그를 증거로 원인을 찾고, 설정을 고친 뒤 같은 조건으로 재실행하세요.</p>
+          </div>
         </div>
-        <p>실패 지점과 로그를 증거로 원인을 찾고, 설정을 고친 뒤 같은 조건으로 재실행하세요.</p>
-        <div className={styles.goalStrip}><span>목표</span><strong>Broker append + ACK</strong><span>seed</span><strong>#2401</strong></div>
+
+        <div className={styles.misconceptionBox}>
+          <span>⚠️ 흔한 오해</span>
+          <p>{chapterOneScenarioSpec.misconception}</p>
+        </div>
+
+        <StepTracker stepLabels={['설정·실행', '원인 진단', '설정 수정', '교훈 확인']} currentStep={currentStep}>
+          <div className={styles.goalStrip}><span>목표</span><strong>Broker append + ACK</strong><span>seed</span><strong>#2401</strong></div>
+        </StepTracker>
       </section>
 
       <section className={styles.workspace}>
@@ -541,6 +616,11 @@ function ChapterOneLab({ chapter }: { chapter: ChapterMetadata }) {
           </div>
 
           {isPendingRerun && <div className={styles.pendingBadge}><span>↻</span><div><strong>수정 대기</strong><small>재실행해야 새 설정이 적용됩니다.</small></div></div>}
+          <ActionGuideBanner
+            tone={actionGuide.tone}
+            title={actionGuide.title}
+            detail={actionGuide.detail}
+          />
           <button className={styles.primaryRunButton} type="button" onClick={() => void handleRun()} disabled={isRunning}>
             <Icon name="send" /><span>{isRunning ? '엔진 계산 중…' : state.runs.length ? '같은 메시지 다시 보내기' : '첫 메시지 보내기'}</span><kbd>R</kbd>
           </button>
@@ -592,12 +672,23 @@ function ChapterOneLab({ chapter }: { chapter: ChapterMetadata }) {
 
           <div className={styles.evidenceBody}>
             {evidenceTab === 'logs' && (
-              <ol className={styles.logList}>
-                {(activeRun?.events.slice(0, state.eventCursor + 1) ?? []).map((event) => (
-                  <li key={event.id} className={event.state === 'failed' ? styles.logError : ''}><time>{String(event.atMs).padStart(4, '0')}</time><code>{event.log}</code></li>
-                ))}
-                {!activeRun && <li className={styles.emptyState}>실행 로그가 아직 없습니다.</li>}
-              </ol>
+              <>
+                <LearningBriefingCard
+                  question={chapterOneExperimentSpec?.failureOrQuestion ?? chapter.learningGoal}
+                  criteria={chapter.learningGoal}
+                  currentConfigLabel={currentSerializerLabel}
+                />
+                <ol className={styles.logList}>
+                  {(activeRun?.events.slice(0, state.eventCursor + 1) ?? []).map((event) => (
+                    <li key={event.id} className={event.state === 'failed' ? styles.logError : ''}><time>{String(event.atMs).padStart(4, '0')}</time><code>{event.log}</code></li>
+                  ))}
+                  {!activeRun && <li className={styles.emptyState}>실행 로그가 아직 없습니다.</li>}
+                </ol>
+                <div className={styles.references}>
+                  <span>Kafka {KAFKA_RULE_VERSION} 근거</span>
+                  {chapterOneReferences.map((reference) => <a key={reference.id} href={reference.url} target="_blank" rel="noreferrer">{reference.title}</a>)}
+                </div>
+              </>
             )}
 
             {evidenceTab === 'analysis' && (
@@ -611,28 +702,62 @@ function ChapterOneLab({ chapter }: { chapter: ChapterMetadata }) {
                       <div><dt>기대 값</dt><dd className={styles.goodValue}>{activeRun.diagnosis.recommendedValue}</dd></div>
                       <div><dt>Broker 요청</dt><dd>발생하지 않음</dd></div>
                     </dl>
+                    <div className={styles.repairActionBox}>
+                      <span>🔧 지금 수정해야 할 설정</span>
+                      <div className={styles.repairDiffGrid}>
+                        <div><small>실패한 현재 값</small><strong className={styles.badValue}>{activeRun.diagnosis.currentValue}</strong></div>
+                        <div><small>권장 수정 값</small><strong className={styles.goodValue}>{activeRun.diagnosis.recommendedValue}</strong></div>
+                      </div>
+                      <button type="button" onClick={() => state.setSerializer('json')}>권장 설정(JsonSerializer) 바로 적용</button>
+                    </div>
                     <button type="button" className={styles.hintButton} onClick={state.revealHint} disabled={state.hintLevel >= 4}><Icon name="hint" />힌트 {state.hintLevel}/4 열기</button>
                     <div className={styles.hints}>{HINTS.slice(0, state.hintLevel).map((hint, index) => <p key={hint}><span>{index + 1}</span>{hint}</p>)}</div>
                   </>
                 ) : activeRun?.status === 'succeeded' ? (
-                  <div className={styles.successCard}><strong>✓ 경로 복구 완료</strong><p>{activeRun.summary}</p><p><b>Trade-off:</b> JSON은 구조를 보존하지만 payload 크기와 스키마 관리 비용을 추가합니다.</p></div>
+                  <>
+                    <div className={styles.successCard}><strong>✓ 경로 복구 완료</strong><p>{activeRun.summary}</p><p><b>Trade-off:</b> JSON은 구조를 보존하지만 payload 크기와 스키마 관리 비용을 추가합니다.</p></div>
+                    <LearningTakeawayCard
+                      conclusion={chapterOneExperimentSpec?.repairOrConclusion ?? activeRun.summary}
+                      tradeOff="JSON은 구조를 보존하고 디버깅이 쉽지만, 문자열 직렬화보다 payload 크기와 스키마 관리 비용이 커집니다."
+                      accuracyNotes={chapterOneScenarioSpec.accuracyNotes}
+                    />
+                  </>
                 ) : <p className={styles.emptyState}>실패가 발생하면 증상과 설정의 인과 관계를 분석합니다.</p>}
+                <div className={styles.references}>
+                  <span>Kafka {KAFKA_RULE_VERSION} 근거</span>
+                  {chapterOneReferences.map((reference) => <a key={reference.id} href={reference.url} target="_blank" rel="noreferrer">{reference.title}</a>)}
+                </div>
               </div>
             )}
 
             {evidenceTab === 'comparison' && (
-              previousRun && activeRun ? (
-                <div className={styles.runComparison}>
-                  {[previousRun, activeRun].map((run, index) => (
-                    <article key={run.runId} className={run.status === 'failed' ? styles.runFailed : styles.runSuccess}>
-                      <div><span>RUN {activeRunIndex + index}</span><strong>{statusLabel(run.status)}</strong></div>
-                      <code>{run.config.serializer === 'string' ? 'StringSerializer' : 'JsonSerializer'}</code>
-                      <small>{run.status === 'failed' ? 'Serializer 검사소에서 중단' : 'offset 42 기록 + ACK 문자'}</small>
-                    </article>
-                  ))}
-                  <div className={styles.diffSummary}><span>바뀐 설정</span><strong>value.serializer</strong><p>Broker 장애가 아니라 실제 value 타입과 Serializer의 불일치가 원인이었습니다.</p></div>
+              <div>
+                {activeRun?.status === 'succeeded' && (
+                  <LearningTakeawayCard
+                    conclusion={chapterOneExperimentSpec?.repairOrConclusion ?? activeRun.summary}
+                    tradeOff="JSON은 구조를 보존하고 디버깅이 쉽지만, 문자열 직렬화보다 payload 크기와 스키마 관리 비용이 커집니다."
+                    accuracyNotes={chapterOneScenarioSpec.accuracyNotes}
+                  />
+                )}
+                {previousRun && activeRun ? (
+                  <div className={styles.runComparison}>
+                    {[previousRun, activeRun].map((run, index) => (
+                      <article key={run.runId} className={run.status === 'failed' ? styles.runFailed : styles.runSuccess}>
+                        <div><span>RUN {activeRunIndex + index}</span><strong>{statusLabel(run.status)}</strong></div>
+                        <code>{run.config.serializer === 'string' ? 'StringSerializer' : 'JsonSerializer'}</code>
+                        <small>{run.status === 'failed' ? 'Serializer 검사소에서 중단' : 'offset 42 기록 + ACK 문자'}</small>
+                      </article>
+                    ))}
+                    <div className={styles.diffSummary}><span>바뀐 설정</span><strong>value.serializer</strong><p>Broker 장애가 아니라 실제 value 타입과 Serializer의 불일치가 원인이었습니다.</p></div>
+                  </div>
+                ) : activeRun?.status !== 'succeeded' ? (
+                  <p className={styles.emptyState}>실패를 수정하고 같은 메시지를 다시 보내면 실행 차이를 비교합니다.</p>
+                ) : null}
+                <div className={styles.references}>
+                  <span>Kafka {KAFKA_RULE_VERSION} 근거</span>
+                  {chapterOneReferences.map((reference) => <a key={reference.id} href={reference.url} target="_blank" rel="noreferrer">{reference.title}</a>)}
                 </div>
-              ) : <p className={styles.emptyState}>실패를 수정하고 같은 메시지를 다시 보내면 실행 차이를 비교합니다.</p>
+              </div>
             )}
           </div>
         </aside>

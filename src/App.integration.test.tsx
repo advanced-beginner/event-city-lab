@@ -185,4 +185,31 @@ describe('Chapter 1 App integration', () => {
     expect(screen.queryByRole('button', { name: /Producer 도착 문자/ })).not.toBeInTheDocument()
     expect(labStore.getState().eventCursor).toBe(-1)
   })
+
+  it('shows Chapter 1 misconception, briefing card, quick serializer fix, and takeaway summary', async () => {
+    await renderChapterOne()
+
+    expect(screen.getByText('⚠️ 흔한 오해')).toBeVisible()
+    expect(
+      screen.getByText('Producer가 일단 네트워크로 메시지를 보낸 뒤 Broker가 타입을 검사한다고 생각한다.'),
+    ).toBeVisible()
+    expect(screen.getByLabelText('실험 학습 안내')).toHaveTextContent(
+      'OrderEvent 객체와 맞지 않는 StringSerializer를 설정하면 메시지는 어디에서 멈추는가?',
+    )
+    expect(screen.getByText(/지금 할 일 · 현재 설정 그대로 첫 메시지를 보내 보세요/)).toBeVisible()
+
+    await completeFailedRun()
+    expect(screen.getByText(/지금 할 일 · 원인을 읽고 value\.serializer를 변경하세요/)).toBeVisible()
+    fireEvent.click(screen.getByRole('button', { name: '권장 설정(JsonSerializer) 바로 적용' }))
+
+    expect(screen.getByText(/지금 할 일 · 바뀐 설정으로 다시 보내세요/)).toBeVisible()
+    fireEvent.click(screen.getByRole('button', { name: /같은 메시지 다시 보내기/ }))
+    await waitFor(() => expect(labStore.getState().runs).toHaveLength(2))
+    moveCursorToEnd()
+
+    const takeaway = await screen.findByLabelText('핵심 깨달음 및 실무 주의사항')
+    expect(takeaway).toBeVisible()
+    expect(takeaway).toHaveTextContent('Serializer는 네트워크 전송 전 Producer 내부에서 실행되므로')
+    expect(takeaway).toHaveTextContent('직렬화(Serialization) 실패는 네트워크 전송 이전에 발생하므로 Broker 로그에는 아무 기록도 남지 않는다.')
+  })
 })

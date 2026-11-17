@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
 import { useStore } from 'zustand'
 
 import { ChapterNavigation } from '../chapters/ChapterNavigation'
@@ -6,6 +6,7 @@ import type { ChapterMetadata } from '../chapters/registry'
 import type { AdvancedCityViewMode } from '../city/camera'
 import { getAdvancedChapterScene, getExperimentCityPreview } from '../city/chapterScenes'
 import type { CitySize } from '../city/types'
+import { getChapterScenarioSpec, getExperimentScenarioSpec } from '../content/chapterScenarioSpecs'
 import { kafkaReferences } from '../content/kafkaReferences'
 import { getChapterRule } from '../domain/chapterEngine'
 import type {
@@ -36,6 +37,116 @@ import { IsometricDioramaStage } from './IsometricDioramaStage'
 
 type Prediction = 'failed' | 'succeeded'
 type EvidenceTab = 'logs' | 'analysis' | 'comparison'
+export type LearningStep = 1 | 2 | 3 | 4
+
+export function StepTracker({
+  stepLabels,
+  currentStep,
+  children,
+}: {
+  stepLabels: readonly [string, string, string, string]
+  currentStep: LearningStep
+  children?: ReactNode
+}) {
+  return (
+    <div className={styles.stepTracker}>
+      <div className={styles.stepPills} role="group" aria-label="학습 진행 단계">
+        {stepLabels.map((label, index) => {
+          const stepNumber = (index + 1) as LearningStep
+          const isCurrent = stepNumber === currentStep
+          const isDone = stepNumber < currentStep
+          return (
+            <span
+              key={label}
+              aria-current={isCurrent ? 'step' : undefined}
+              className={`${styles.stepPill} ${isCurrent ? styles.stepPillActive : ''} ${isDone ? styles.stepPillDone : ''}`}
+            >
+              <em>{stepNumber}</em>
+              {label}
+            </span>
+          )
+        })}
+      </div>
+      {children}
+    </div>
+  )
+}
+
+export function ActionGuideBanner({
+  tone,
+  title,
+  detail,
+}: {
+  tone: 'ready' | 'failed' | 'pending' | 'succeeded'
+  title: string
+  detail: string
+}) {
+  const toneClass = tone === 'failed'
+    ? styles.actionGuideFailed
+    : tone === 'pending'
+      ? styles.actionGuidePending
+      : tone === 'succeeded'
+        ? styles.actionGuideSuccess
+        : ''
+  return (
+    <div className={`${styles.actionGuideBanner} ${toneClass}`} role="status">
+      <span aria-hidden="true">👉</span>
+      <div>
+        <strong>지금 할 일 · {title}</strong>
+        <small>{detail}</small>
+      </div>
+    </div>
+  )
+}
+
+export function LearningBriefingCard({
+  question,
+  criteria,
+  currentConfigLabel,
+}: {
+  question: string
+  criteria: string
+  currentConfigLabel: string
+}) {
+  return (
+    <section className={styles.briefingCard} aria-label="실험 학습 안내">
+      <div className={styles.briefingCardHeader}>
+        <span>🎯 이 실험이 알려주고자 하는 것</span>
+        <code>현재: {currentConfigLabel}</code>
+      </div>
+      <strong>{question}</strong>
+      <p>관찰·달성 기준: {criteria}</p>
+    </section>
+  )
+}
+
+export function LearningTakeawayCard({
+  conclusion,
+  tradeOff,
+  accuracyNotes,
+}: {
+  conclusion: string
+  tradeOff: string | null
+  accuracyNotes: readonly string[]
+}) {
+  return (
+    <section className={styles.takeawayCard} aria-label="핵심 깨달음 및 실무 주의사항">
+      <span>💡 여기에서 우리가 알 수 있는 것</span>
+      <strong>{conclusion}</strong>
+      {tradeOff && (
+        <div className={styles.takeawayTradeoff}>
+          <span>⚖️ 실무 Trade-off</span>
+          <p>{tradeOff}</p>
+        </div>
+      )}
+      {accuracyNotes.length > 0 && (
+        <ul className={styles.takeawayNotes}>
+          {accuracyNotes.map((note) => <li key={note}>⚠️ {note}</li>)}
+        </ul>
+      )}
+    </section>
+  )
+}
 
 function makeSnapshot(): WorkspaceSnapshot {
   const state = labStore.getState()
@@ -140,6 +251,10 @@ export function GuidedChapterLab({ chapter }: { chapter: ChapterMetadata }) {
   const scene = getAdvancedChapterScene(chapterId)
   const scenePreview = getExperimentCityPreview(experiment.id, choiceId)
   const selectedChoice = experiment.choices.find((choice) => choice.id === choiceId)
+  const scenarioSpec = getChapterScenarioSpec(chapterId)
+  const experimentSpec = getExperimentScenarioSpec(chapterId, experiment.id)
+  const recommendedChoice = experiment.choices.find((choice) => choice.id === experiment.recommendedChoiceId) ?? null
+  const experimentDiagnosis = experiment.choices.find((choice) => choice.outcome.diagnosis !== null)?.outcome.diagnosis ?? null
   const playbackSnapshots = useMemo(
     () => (run ? createPlaybackSnapshots(scene, run.events) : createPlaybackSnapshots(scene, [])),
     [run, scene],
@@ -151,6 +266,62 @@ export function GuidedChapterLab({ chapter }: { chapter: ChapterMetadata }) {
     return scene.nodes.filter((node) => node.facilityId === inspectedFacilityId)
   }, [inspectedFacilityId, scene])
   const pendingRerun = Boolean(run && choiceId !== run.choiceId)
+
+  const currentStep: LearningStep = pendingRerun
+    ? 3
+    : run && terminalSettled && run.status === 'failed'
+      ? 2
+      : run && terminalSettled && run.status === 'succeeded'
+        ? 4
+        : run
+          ? 2
+          : 1
+
+  const actionGuide: {
+    tone: 'ready' | 'failed' | 'pending' | 'succeeded'
+    title: string
+    detail: string
+  } = pendingRerun
+    ? {
+        tone: 'pending',
+        title: '수정된 설정으로 재실행하세요',
+        detail: choiceId === experiment.recommendedChoiceId
+          ? '권장 설정이 선택되었습니다. [같은 조건으로 재실행]을 눌러 변화를 비교하세요.'
+          : '설정이 바뀌었습니다. [같은 조건으로 재실행]으로 결과를 확인하세요.',
+      }
+    : run && terminalSettled && run.status === 'failed'
+      ? {
+          tone: 'failed',
+          title: '원인을 읽고 2단계 설정을 바꾸세요',
+          detail: recommendedChoice
+            ? `우측 [분석] 탭에서 원인을 확인한 뒤 '${recommendedChoice.label}'(권장)으로 변경하세요.`
+            : '우측 [분석] 탭의 원인을 확인한 뒤 설정을 변경하세요.',
+        }
+      : run && terminalSettled && run.status === 'succeeded'
+        ? {
+            tone: 'succeeded',
+            title: '핵심 교훈과 Trade-off를 확인하세요',
+            detail: experimentIndex < rule.experiments.length - 1
+              ? '우측 패널에서 핵심 깨달음을 확인한 뒤 1단계 다음 실험으로 이동하세요.'
+              : '이 챕터의 실험을 마쳤습니다. 우측에서 핵심 교훈과 실무 주의사항을 확인하세요.',
+          }
+        : run
+          ? {
+              tone: 'ready',
+              title: '차량 이동과 사건 타임라인을 관찰하세요',
+              detail: '타임라인 끝까지 재생하거나 마지막 사건을 눌러 실패·성공 결과를 확인하세요.',
+            }
+          : !prediction
+            ? {
+                tone: 'ready',
+                title: '1·2단계 설정 확인 후 3단계 결과를 예측하세요',
+                detail: '현재 선택된 설정으로 성공할지 실패할지 3단계 예측 버튼을 눌러야 실행할 수 있습니다.',
+              }
+            : {
+                tone: 'ready',
+                title: '예측 완료 · 이제 도시를 실행하세요',
+                detail: '아래 [예측한 조건 실행] 버튼을 눌러 디오라마와 로그로 예측을 검증하세요.',
+              }
 
   const setCarrierProgressValue = (progress: number) => {
     carrierProgressRef.current = progress
@@ -526,14 +697,27 @@ export function GuidedChapterLab({ chapter }: { chapter: ChapterMetadata }) {
       </header>
 
       <section className={styles.missionStrip}>
-        <div className={styles.missionTitle}>
+        <div className={styles.missionPrimary}>
           <span className={styles.sectionIndex}>{String(experimentIndex + 1).padStart(2, '0')}</span>
-          <strong>{experiment.title}</strong>
+          <div>
+            <div className={styles.missionTitle}>
+              <span className={styles.purposeTag}>실험 목적</span>
+              <strong>{experiment.title}</strong>
+            </div>
+            <p>{experiment.mission}</p>
+          </div>
         </div>
-        <p>{experiment.mission}</p>
-        <output className={`${styles.scoreBadge} ${chapterComplete ? styles.scoreBadgeComplete : ''}`}>
-          평가 {Math.round((completedCount / rule.experiments.length) * 100)}%
-        </output>
+
+        <div className={styles.misconceptionBox}>
+          <span>⚠️ 흔한 오해</span>
+          <p>{scenarioSpec.misconception}</p>
+        </div>
+
+        <StepTracker stepLabels={['설정·예측', '원인 진단', '설정 수정', '교훈 확인']} currentStep={currentStep}>
+          <output className={`${styles.scoreBadge} ${chapterComplete ? styles.scoreBadgeComplete : ''}`}>
+            평가 {Math.round((completedCount / rule.experiments.length) * 100)}%
+          </output>
+        </StepTracker>
       </section>
 
       <section className={styles.workspace}>
@@ -544,6 +728,7 @@ export function GuidedChapterLab({ chapter }: { chapter: ChapterMetadata }) {
           </div>
 
           <div className={styles.scrollArea}>
+            <div className={styles.stepHeading}><span>STEP 1 · 실험 선택</span></div>
             <div className={styles.experimentList}>
               {rule.experiments.map((candidate, index) => (
                 <button
@@ -558,30 +743,44 @@ export function GuidedChapterLab({ chapter }: { chapter: ChapterMetadata }) {
               ))}
             </div>
 
+            <div className={styles.stepHeading}><span>STEP 2 · 실행 설정 확인·변경</span></div>
+            <fieldset className={styles.choices}>
+              <legend>실행 설정</legend>
+              {experiment.choices.map((choice) => {
+                const isRecommended = choice.id === experiment.recommendedChoiceId
+                const isSelected = choiceId === choice.id
+                return (
+                  <label key={choice.id} className={isSelected ? styles.choiceSelected : undefined}>
+                    <input
+                      type="radio"
+                      name={`${chapterId}-${experiment.id}-choice`}
+                      value={choice.id}
+                      checked={isSelected}
+                      onChange={() => setChoiceId(choice.id)}
+                    />
+                    <span>
+                      <span className={styles.choiceHeader}>
+                        <strong>{choice.label}</strong>
+                        <span className={isRecommended ? styles.choiceBadgeRecommended : styles.choiceBadgeTrap}>
+                          {isRecommended ? '권장 수정 후보' : '초기 실험 설정'}
+                        </span>
+                      </span>
+                      <small>{choice.description}</small>
+                    </span>
+                  </label>
+                )
+              })}
+            </fieldset>
+
+            <div className={styles.stepHeading}><span>STEP 3 · 결과 예측</span></div>
             <div className={styles.prompt}>
-              <span>먼저 예측하세요</span>
+              <span>이 설정의 결과를 예측하세요</span>
               <p>{experiment.predictionPrompt}</p>
               <div>
                 <button type="button" aria-pressed={prediction === 'failed'} onClick={() => setPrediction('failed')}>실패한다</button>
                 <button type="button" aria-pressed={prediction === 'succeeded'} onClick={() => setPrediction('succeeded')}>성공한다</button>
               </div>
             </div>
-
-            <fieldset className={styles.choices}>
-              <legend>실행 설정</legend>
-              {experiment.choices.map((choice) => (
-                <label key={choice.id}>
-                  <input
-                    type="radio"
-                    name={`${chapterId}-${experiment.id}-choice`}
-                    value={choice.id}
-                    checked={choiceId === choice.id}
-                    onChange={() => setChoiceId(choice.id)}
-                  />
-                  <span><strong>{choice.label}</strong><small>{choice.description}</small></span>
-                </label>
-              ))}
-            </fieldset>
           </div>
 
           {pendingRerun && (
@@ -590,6 +789,12 @@ export function GuidedChapterLab({ chapter }: { chapter: ChapterMetadata }) {
               <div><strong>수정 대기</strong><small>같은 조건으로 다시 실행해 비교하세요.</small></div>
             </div>
           )}
+
+          <ActionGuideBanner
+            tone={actionGuide.tone}
+            title={actionGuide.title}
+            detail={actionGuide.detail}
+          />
 
           <button className={styles.primaryRunButton} type="button" disabled={!prediction || isRunning} onClick={execute}>
             {isRunning ? '도시 실행 중…' : attempts > 0 ? '같은 조건으로 재실행' : '예측한 조건 실행'}
@@ -666,6 +871,11 @@ export function GuidedChapterLab({ chapter }: { chapter: ChapterMetadata }) {
           <div className={styles.evidenceBody}>
             {evidenceTab === 'logs' && (
               <>
+                <LearningBriefingCard
+                  question={experimentSpec?.failureOrQuestion ?? experiment.predictionPrompt}
+                  criteria={experiment.successCriteria}
+                  currentConfigLabel={selectedChoice?.label ?? choiceId}
+                />
                 <ol className={styles.logList}>
                   {visibleEvents.length === 0
                     ? <li className={styles.emptyState}>아직 이벤트가 없습니다.</li>
@@ -686,24 +896,54 @@ export function GuidedChapterLab({ chapter }: { chapter: ChapterMetadata }) {
               <div>
                 {terminalSettled && run?.status === 'failed' && run.diagnosis ? (
                   <div className={styles.diagnosisCard}>
-                    <strong>{run.diagnosis.symptom}</strong>
+                    <strong>❌ 왜 실패했는가 · {run.diagnosis.symptom}</strong>
                     <p>{run.diagnosis.rootCause}</p>
                     <ul>{run.diagnosis.evidence.map((item) => <li key={item}>{item}</li>)}</ul>
-                    <button type="button" onClick={() => setChoiceId(run.diagnosis?.recommendedChoiceId ?? choiceId)}>
-                      권장 설정 적용
-                    </button>
-                    <small>{run.diagnosis.tradeOff}</small>
+                    <div className={styles.repairActionBox}>
+                      <span>🔧 지금 수정해야 할 설정</span>
+                      <div className={styles.repairDiffGrid}>
+                        <div>
+                          <small>실패한 현재 실행</small>
+                          <strong className={styles.badValue}>
+                            {experiment.choices.find((c) => c.id === run.choiceId)?.label ?? run.choiceId}
+                          </strong>
+                        </div>
+                        <div>
+                          <small>권장 수정 설정</small>
+                          <strong className={styles.goodValue}>
+                            {recommendedChoice?.label ?? run.diagnosis.recommendedChoiceId}
+                          </strong>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setChoiceId(run.diagnosis?.recommendedChoiceId ?? choiceId)
+                          if (!prediction) setPrediction('succeeded')
+                        }}
+                      >
+                        권장 설정 적용
+                      </button>
+                    </div>
+                    <small>⚖️ Trade-off: {run.diagnosis.tradeOff}</small>
                   </div>
                 ) : run?.status === 'succeeded' && terminalSettled ? (
-                  <div className={styles.successCard}>
-                    <strong>실험 통과</strong>
-                    <p>{run.summary}</p>
-                    {experimentIndex < rule.experiments.length - 1 && (
-                      <button type="button" onClick={() => selectExperiment(experimentIndex + 1)}>다음 실험</button>
-                    )}
-                  </div>
+                  <>
+                    <div className={styles.successCard}>
+                      <strong>실험 통과</strong>
+                      <p>{run.summary}</p>
+                      {experimentIndex < rule.experiments.length - 1 && (
+                        <button type="button" onClick={() => selectExperiment(experimentIndex + 1)}>다음 실험</button>
+                      )}
+                    </div>
+                    <LearningTakeawayCard
+                      conclusion={experimentSpec?.repairOrConclusion ?? run.summary}
+                      tradeOff={experimentDiagnosis?.tradeOff ?? null}
+                      accuracyNotes={scenarioSpec.accuracyNotes}
+                    />
+                  </>
                 ) : (
-                  <p className={styles.emptyState}>실행이 완료되면 원인 분석과 권장 설정이 여기에 표시됩니다.</p>
+                  <p className={styles.emptyState}>실행이 완료되면 원인 분석과 수정할 설정이 여기에 표시됩니다.</p>
                 )}
                 <div className={styles.references}>
                   <span>Kafka {KAFKA_RULE_VERSION} 근거</span>
@@ -715,13 +955,20 @@ export function GuidedChapterLab({ chapter }: { chapter: ChapterMetadata }) {
             {evidenceTab === 'comparison' && (
               <div>
                 {terminalSettled && run?.status === 'succeeded' && (
-                  <div className={styles.successCard}>
-                    <strong>실험 통과</strong>
-                    <p>{run.summary}</p>
-                    {experimentIndex < rule.experiments.length - 1 && (
-                      <button type="button" onClick={() => selectExperiment(experimentIndex + 1)}>다음 실험</button>
-                    )}
-                  </div>
+                  <>
+                    <div className={styles.successCard}>
+                      <strong>실험 통과</strong>
+                      <p>{run.summary}</p>
+                      {experimentIndex < rule.experiments.length - 1 && (
+                        <button type="button" onClick={() => selectExperiment(experimentIndex + 1)}>다음 실험</button>
+                      )}
+                    </div>
+                    <LearningTakeawayCard
+                      conclusion={experimentSpec?.repairOrConclusion ?? run.summary}
+                      tradeOff={experimentDiagnosis?.tradeOff ?? null}
+                      accuracyNotes={scenarioSpec.accuracyNotes}
+                    />
+                  </>
                 )}
 
                 {previousRun && run ? (
@@ -733,10 +980,9 @@ export function GuidedChapterLab({ chapter }: { chapter: ChapterMetadata }) {
                         <small>{item.summary}</small>
                       </article>
                     ))}
-                    {previousRun.diagnosis && (
+                    {previousRun.diagnosis && !(terminalSettled && run.status === 'succeeded') && (
                       <div className={styles.diffSummary}>
                         <span>TRADE-OFF</span>
-                        <strong>{experiment.title}</strong>
                         <p>{previousRun.diagnosis.tradeOff}</p>
                       </div>
                     )}

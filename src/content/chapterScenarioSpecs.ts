@@ -208,6 +208,35 @@ export const chapterScenarioSpecs: readonly ChapterScenarioSpec[] = [
   },
 ] as const
 
+export interface AnyChapterScenarioSpec {
+  chapterId: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8
+  topic: string
+  misconception: string
+  experiments: readonly ChapterExperimentSpec[]
+  references: readonly KafkaReferenceId[]
+  accuracyNotes: readonly string[]
+}
+
+export const chapterOneScenarioSpec: AnyChapterScenarioSpec = {
+  chapterId: 1,
+  topic: 'Producer 직렬화(Serializer), Broker append, ACK 확인',
+  misconception: 'Producer가 일단 네트워크로 메시지를 보낸 뒤 Broker가 타입을 검사한다고 생각한다.',
+  experiments: [
+    {
+      id: 'producer-serializer-bootcamp',
+      title: '주문 이벤트 직렬화와 첫 Broker 기록',
+      failureOrQuestion: 'OrderEvent 객체와 맞지 않는 StringSerializer를 설정하면 메시지는 어디에서 멈추는가?',
+      repairOrConclusion:
+        'Serializer는 네트워크 전송 전 Producer 내부에서 실행되므로, 메시지 구조에 맞는 JsonSerializer를 설정해야 Broker append와 ACK까지 도달한다.',
+    },
+  ],
+  references: ['producer-configs', 'kafka-producer-api'],
+  accuracyNotes: [
+    '직렬화(Serialization) 실패는 네트워크 전송 이전에 발생하므로 Broker 로그에는 아무 기록도 남지 않는다.',
+    'JSON 직렬화는 구조 파악이 쉽지만 바이트 크기와 스키마 호환성 관리 비용(Trade-off)이 수반된다.',
+  ],
+}
+
 export function getChapterScenarioSpec(chapterId: ChapterScenarioSpec['chapterId']): ChapterScenarioSpec {
   const scenario = chapterScenarioSpecs.find((candidate) => candidate.chapterId === chapterId)
 
@@ -216,4 +245,12 @@ export function getChapterScenarioSpec(chapterId: ChapterScenarioSpec['chapterId
   }
 
   return scenario
+}
+
+export function getExperimentScenarioSpec(
+  chapterId: AnyChapterScenarioSpec['chapterId'],
+  experimentId: string,
+): ChapterExperimentSpec | undefined {
+  const scenario = chapterId === 1 ? chapterOneScenarioSpec : getChapterScenarioSpec(chapterId)
+  return scenario.experiments.find((candidate) => candidate.id === experimentId)
 }

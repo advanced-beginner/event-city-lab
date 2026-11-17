@@ -4,7 +4,7 @@
   min-width: 1280px;
   min-height: 720px;
   display: grid;
-  grid-template-rows: 56px 46px minmax(0, 1fr) 84px 22px;
+  grid-template-rows: 56px 66px minmax(0, 1fr) 84px 22px;
   overflow: hidden;
   color: var(--ink);
   background: var(--canvas);
@@ -189,19 +189,44 @@
   box-shadow: 0 1px 3px #08757933;
 }
 
-/* Mission Strip */
+/* Mission Strip & 4-Step Tracker */
 .missionStrip {
   display: grid;
-  grid-template-columns: minmax(340px, 1fr) 1.3fr auto;
-  gap: 16px;
-  padding: 0 18px;
+  grid-template-columns: minmax(320px, 1.15fr) minmax(260px, 1.05fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 18px;
   border-bottom: 1px solid var(--line);
   background: linear-gradient(90deg, #eef9f7, #ffffff 50%, #f7f4fb);
 }
 
-.missionTitle {
+.missionPrimary {
+  display: flex;
+  align-items: center;
   gap: 10px;
   min-width: 0;
+}
+
+.missionPrimary > div {
+  min-width: 0;
+}
+
+.missionTitle {
+  gap: 7px;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+}
+
+.purposeTag {
+  flex: 0 0 auto;
+  padding: 2px 6px;
+  border: 1px solid #8bd0cf;
+  border-radius: 5px;
+  background: var(--cyan-soft);
+  color: #0b6e72;
+  font: 800 8.5px/1.1 var(--mono);
+  white-space: nowrap;
 }
 
 .sectionIndex {
@@ -212,8 +237,8 @@
 
 .missionTitle h2,
 .missionTitle strong {
-  margin: 1px 0 0;
-  font-size: 13px;
+  margin: 0;
+  font-size: 12.5px;
   line-height: 1.25;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -225,14 +250,88 @@
   font-size: 0.94em;
 }
 
-.missionStrip > p {
-  margin: 0;
-  color: #657589;
-  font-size: 11px;
-  line-height: 1.35;
+.missionPrimary p {
+  margin: 2px 0 0;
+  color: #54657a;
+  font-size: 10.5px;
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   overflow: hidden;
-  text-overflow: ellipsis;
+}
+
+.misconceptionBox {
+  min-width: 0;
+  padding: 5px 10px;
+  border: 1px solid #edd29c;
+  border-left: 3px solid var(--amber);
+  border-radius: 7px;
+  background: #fffaf0;
+}
+
+.misconceptionBox span {
+  display: inline-block;
+  color: #9c5b07;
+  font: 800 8.5px/1.1 var(--mono);
+  letter-spacing: 0.03em;
+}
+
+.misconceptionBox p {
+  margin: 2px 0 0;
+  color: #5a4323;
+  font-size: 10.5px;
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.stepTracker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.stepPills {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px;
+  border: 1px solid #d5dde5;
+  border-radius: 8px;
+  background: #ffffffd9;
+}
+
+.stepPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 7px;
+  border-radius: 6px;
+  color: #778495;
+  font: 700 9px/1 var(--sans, inherit);
   white-space: nowrap;
+}
+
+.stepPill em {
+  font-style: normal;
+  font-family: var(--mono);
+  font-weight: 800;
+  opacity: 0.85;
+}
+
+.stepPillActive {
+  background: #148b8d;
+  color: #ffffff;
+  box-shadow: 0 1px 4px #0e9da033;
+}
+
+.stepPillDone {
+  background: var(--green-soft);
+  color: #18764a;
 }
 
 .goalStrip {
@@ -456,6 +555,20 @@
 .editorLoading { display: grid; place-items: center; color: #788697; font: 10px var(--mono); }
 
 /* Chapter 2–8 Experiment Selector & Choices */
+.stepHeading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 10px 0 5px;
+  color: #365063;
+  font: 800 9px/1.2 var(--mono);
+  letter-spacing: 0.04em;
+}
+
+.stepHeading:first-child {
+  margin-top: 0;
+}
+
 .experimentList {
   display: grid;
   gap: 5px;
@@ -527,7 +640,7 @@
 .choices {
   display: grid;
   gap: 5px;
-  margin: 9px 0 0;
+  margin: 0;
   padding: 8px;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -540,14 +653,101 @@
   gap: 5px;
   align-items: start;
   padding: 6px;
+  border: 1px solid transparent;
   border-radius: 6px;
   background: var(--surface-muted);
   cursor: pointer;
+}
+.choices label.choiceSelected {
+  border-color: #82cbc9;
+  background: #effaf9;
 }
 .choices input { margin: 2px 0 0; accent-color: var(--cyan); }
 .choices strong, .choices small { display: block; }
 .choices strong { color: #435469; font-size: 10px; }
 .choices small { margin-top: 2px; color: #758294; font-size: 9px; line-height: 1.35; }
+
+.choiceHeader {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+}
+
+.choiceBadgeTrap,
+.choiceBadgeRecommended {
+  display: inline-block;
+  padding: 1px 5px;
+  border-radius: 4px;
+  font: 800 8px/1.25 var(--mono);
+  white-space: nowrap;
+}
+
+.choiceBadgeTrap {
+  border: 1px solid #ecc68c;
+  background: #fff5de;
+  color: #9b5c08;
+}
+
+.choiceBadgeRecommended {
+  border: 1px solid #9bd7b6;
+  background: var(--green-soft);
+  color: #167648;
+}
+
+.actionGuideBanner {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  margin-top: 7px;
+  padding: 7px 9px;
+  border: 1px solid #9fd4d3;
+  border-left: 3px solid var(--cyan);
+  border-radius: 7px;
+  background: #eff9f8;
+  color: #1d595d;
+  font-size: 9.5px;
+  line-height: 1.38;
+}
+
+.actionGuideBanner strong {
+  display: block;
+  font-size: 9.5px;
+  color: #0b6e72;
+}
+
+.actionGuideBanner small {
+  display: block;
+  margin-top: 1px;
+  color: #4a6e72;
+  font-size: 9px;
+}
+
+.actionGuideFailed {
+  border-color: #f0b7bf;
+  border-left-color: var(--red);
+  background: var(--red-soft);
+}
+.actionGuideFailed strong { color: #a12d3c; }
+.actionGuideFailed small { color: #7e4b52; }
+
+.actionGuidePending {
+  border-color: #cbbce9;
+  border-left-color: var(--violet);
+  background: var(--violet-soft);
+}
+.actionGuidePending strong { color: #5b3f9c; }
+.actionGuidePending small { color: #6c5998; }
+
+.actionGuideSuccess {
+  border-color: #a6d9bd;
+  border-left-color: var(--green);
+  background: var(--green-soft);
+}
+.actionGuideSuccess strong { color: #167448; }
+.actionGuideSuccess small { color: #3d6b54; }
 
 .pendingBadge {
   flex: 0 0 auto;
@@ -722,8 +922,52 @@
 .evidencePanel > .tabs { margin: 8px 10px 0; }
 .evidenceBody { flex: 1 1 auto; min-height: 0; overflow: auto; padding: 10px; }
 
+.briefingCard {
+  margin-bottom: 9px;
+  padding: 9px 10px;
+  border: 1px solid #b8dedd;
+  border-left: 3px solid var(--cyan);
+  border-radius: 8px;
+  background: #f2fbfa;
+}
+
+.briefingCardHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.briefingCardHeader span {
+  color: #0b6e72;
+  font: 800 9px/1.2 var(--mono);
+}
+
+.briefingCardHeader code {
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: #ffffff;
+  color: #365063;
+  font-size: 8.5px;
+}
+
+.briefingCard strong {
+  display: block;
+  margin-top: 4px;
+  color: #21404a;
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.briefingCard p {
+  margin: 4px 0 0;
+  color: #4f6b73;
+  font-size: 9px;
+  line-height: 1.4;
+}
+
 .logList {
-  min-height: 100%;
+  min-height: 76px;
   margin: 0;
   padding: 8px;
   list-style: none;
@@ -801,7 +1045,7 @@
   background: var(--red-soft);
 }
 
-.diagnosisCard > strong { color: #a83242; font-size: 11px; }
+.diagnosisCard > strong { display: block; color: #a83242; font-size: 11px; }
 .diagnosisCard p { margin: 5px 0; color: #715e68; font-size: 9.5px; line-height: 1.45; }
 .diagnosisCard ul { margin: 6px 0; padding-left: 16px; color: #7c6268; font-size: 9px; line-height: 1.45; }
 .diagnosisCard button {
@@ -816,9 +1060,65 @@
 }
 .diagnosisCard small { display: block; margin-top: 6px; color: #8a6670; font-size: 8.5px; line-height: 1.4; }
 
+.repairActionBox {
+  margin: 8px 0 6px;
+  padding: 8px;
+  border: 1px solid #dccfe9;
+  border-radius: 7px;
+  background: #ffffff;
+}
+
+.repairActionBox > span {
+  display: block;
+  margin-bottom: 5px;
+  color: #5b3f9c;
+  font: 800 8.5px/1.2 var(--mono);
+}
+
+.repairDiffGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px;
+  margin-bottom: 7px;
+}
+
+.repairDiffGrid div {
+  min-width: 0;
+  padding: 5px 6px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface-muted);
+}
+
+.repairDiffGrid small {
+  display: block;
+  margin: 0 0 2px !important;
+  color: #7c8999 !important;
+  font-size: 8px !important;
+}
+
+.repairDiffGrid strong {
+  display: block;
+  font-size: 9px;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.repairActionBox button {
+  width: 100%;
+  min-height: 30px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--violet);
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 800;
+}
+
 .hintButton {
   width: 100%;
   height: 31px;
+  margin-top: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -853,6 +1153,65 @@
   color: #ffffff;
   font-size: 10px;
   font-weight: 800;
+}
+
+.takeawayCard {
+  margin-top: 8px;
+  padding: 10px;
+  border: 1px solid #c7bce6;
+  border-left: 3px solid var(--violet);
+  border-radius: 8px;
+  background: #f8f5ff;
+}
+
+.takeawayCard > span {
+  display: block;
+  color: #5b3f9c;
+  font: 800 9px/1.2 var(--mono);
+}
+
+.takeawayCard > strong {
+  display: block;
+  margin-top: 4px;
+  color: #2f2848;
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.takeawayTradeoff {
+  margin-top: 7px;
+  padding: 7px 8px;
+  border: 1px solid #ded5f4;
+  border-radius: 6px;
+  background: #ffffff;
+}
+
+.takeawayTradeoff span {
+  display: block;
+  color: #6b52a7;
+  font: 800 8.5px/1.2 var(--mono);
+}
+
+.takeawayTradeoff p {
+  margin: 3px 0 0;
+  color: #4d4567;
+  font-size: 9px;
+  line-height: 1.45;
+}
+
+.takeawayNotes {
+  margin: 7px 0 0;
+  padding: 6px 8px 6px 20px;
+  border: 1px solid #ecd3a1;
+  border-radius: 6px;
+  background: #fffaf0;
+  color: #6a4c1d;
+  font-size: 8.5px;
+  line-height: 1.45;
+}
+
+.takeawayNotes li + li {
+  margin-top: 3px;
 }
 
 .runComparison {
@@ -1037,7 +1396,16 @@
   .topbar { padding-inline: 12px; }
   .headerMeta { gap: 5px; }
   .saveState { display: none; }
-  .missionStrip { padding-inline: 12px; }
+  .missionStrip {
+    grid-template-columns: minmax(290px, 1.15fr) minmax(240px, 1fr) auto;
+    gap: 8px;
+    padding-inline: 12px;
+  }
+  .stepTracker { gap: 5px; }
+  .stepPills { gap: 2px; padding: 2px; }
+  .stepPill { padding: 4px 5px; font-size: 8.5px; }
+  .goalStrip { padding: 4px 7px; font-size: 8.5px; }
+  .scoreBadge { padding: 5px 8px; font-size: 9px; }
 }
 
 @media (min-width: 1800px) {
